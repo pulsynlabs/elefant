@@ -17,3 +17,4 @@ export {
   type BinaryResult,
 } from './binary.js';
 export { grepTool, type GrepParams } from './grep.js';
+export { ToolRegistry, createToolRegistry } from './registry.ts';
