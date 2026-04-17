@@ -1,0 +1,14 @@
+# Tauri
+src-tauri/target
+src-tauri/WixTools
+
+# Vite
+dist
+dist-ssr
+*.local
+
+# Node
+node_modules
+
+# macOS
+.DS_Store
