@@ -47,7 +47,7 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 	return ok({
 		start: async () => {
 			await app.listen(config.port)
-			console.log(`Elefant daemon listening on port ${config.port}`)
+			console.error(`[elefant] Daemon listening on port ${config.port}`)
 		},
 		stop: async () => {
 			await app.stop()
