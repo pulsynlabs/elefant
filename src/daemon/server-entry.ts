@@ -1,5 +1,6 @@
 import { loadConfig } from '../config/index.ts';
 import { HookRegistry } from '../hooks/index.ts';
+import { registerShellShutdownCleanup } from '../tools/index.js';
 import { removePid, writePid } from './pid.ts';
 import { gracefulShutdown, setGlobalHookRegistry } from './shutdown.ts';
 
@@ -17,6 +18,7 @@ if (!pidWriteResult.ok) {
 
 const hooks = new HookRegistry();
 setGlobalHookRegistry(hooks);
+registerShellShutdownCleanup(hooks);
 
 let shuttingDown = false;
 

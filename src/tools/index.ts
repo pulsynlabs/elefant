@@ -7,6 +7,11 @@ export { writeTool, type WriteParams } from './write.js';
 export { editTool, type EditParams } from './edit.js';
 export { globTool, type GlobParams } from './glob.js';
 export {
+	bashTool,
+	registerShellShutdownCleanup,
+	type BashParams,
+} from './shell/index.js';
+export {
   getRipgrepPath,
   executeBinary,
   type BinaryResult,
