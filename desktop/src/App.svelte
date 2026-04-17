@@ -3,8 +3,11 @@
 	import AppShell from "$lib/components/layout/AppShell.svelte";
 	import TopBar from "$lib/components/layout/TopBar.svelte";
 	import Sidebar from "$lib/components/layout/Sidebar.svelte";
+	import ChatView from "./features/chat/ChatView.svelte";
 	import { themeStore } from "$lib/stores/theme.svelte.js";
 	import { navigationStore } from "$lib/stores/navigation.svelte.js";
+	import { connectionStore } from "$lib/stores/connection.svelte.js";
+	import { settingsStore } from "$lib/stores/settings.svelte.js";
 
 	let sidebarCollapsed = $state(false);
 
@@ -12,11 +15,18 @@
 		sidebarCollapsed = !sidebarCollapsed;
 	}
 
-	onMount(async () => {
-		await themeStore.init();
+	onMount(() => {
+		themeStore.init();
+		settingsStore.init();
+		connectionStore.start();
+
+		return () => {
+			connectionStore.stop();
+		};
 	});
 
 	const currentView = $derived(navigationStore.current);
+	const connStatus = $derived(connectionStore.status);
 </script>
 
 <AppShell bind:sidebarCollapsed>
@@ -27,6 +37,19 @@
 	{#snippet topbar()}
 		<TopBar onToggleSidebar={toggleSidebar}>
 			<div class="topbar-actions">
+				<!-- Connection status indicator -->
+				<div class="connection-indicator">
+					<span
+						class="status-dot"
+						class:connected={connStatus === 'connected'}
+						class:reconnecting={connStatus === 'reconnecting'}
+						class:disconnected={connStatus === 'disconnected'}
+					></span>
+					<span class="status-text">
+						{connStatus === 'connected' ? 'Connected' : connStatus === 'reconnecting' ? 'Reconnecting...' : 'Disconnected'}
+					</span>
+				</div>
+
 				<button
 					onclick={() => themeStore.toggle()}
 					class="theme-toggle"
@@ -39,25 +62,61 @@
 		</TopBar>
 	{/snippet}
 
-	<!-- Content area — views will be wired in subsequent waves -->
-	<div class="content-placeholder">
-		<div class="placeholder-inner">
-			<div class="placeholder-icon">🐘</div>
-			<h1 class="placeholder-title">Elefant</h1>
-			<p class="placeholder-subtitle">
-				Current view: {currentView}
-			</p>
-			<p class="placeholder-tagline">Code with memory.</p>
+	<!-- Content area — routed by navigation -->
+	{#if currentView === 'chat'}
+		<ChatView />
+	{:else}
+		<div class="content-placeholder">
+			<div class="placeholder-inner">
+				<div class="placeholder-icon">🐘</div>
+				<p class="placeholder-subtitle">
+					View: <strong>{currentView}</strong>
+				</p>
+				<p class="placeholder-tagline">Coming in next wave...</p>
+			</div>
 		</div>
-	</div>
+	{/if}
 </AppShell>
 
 <style>
 	.topbar-actions {
 		display: flex;
 		align-items: center;
-		gap: var(--space-2);
+		gap: var(--space-3);
 		margin-left: auto;
+	}
+
+	.connection-indicator {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 12px;
+		color: var(--color-text-muted);
+	}
+
+	.status-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		display: inline-block;
+		background-color: var(--color-error);
+	}
+
+	.status-dot.connected {
+		background-color: var(--color-success);
+	}
+
+	.status-dot.reconnecting {
+		background-color: var(--color-warning);
+	}
+
+	.status-dot.disconnected {
+		background-color: var(--color-error);
+	}
+
+	.status-text {
+		white-space: nowrap;
 	}
 
 	.theme-toggle {
@@ -96,17 +155,10 @@
 		margin-bottom: var(--space-4);
 	}
 
-	.placeholder-title {
-		font-family: var(--font-sans);
-		font-size: var(--font-size-2xl);
-		font-weight: var(--font-weight-semibold);
-		color: var(--color-text-primary);
-		margin-bottom: var(--space-2);
-	}
-
 	.placeholder-subtitle {
 		font-size: var(--font-size-md);
 		color: var(--color-text-secondary);
+		margin: 0;
 	}
 
 	.placeholder-tagline {

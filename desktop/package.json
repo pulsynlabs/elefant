@@ -21,6 +21,7 @@
 		"bits-ui": "^1",
 		"clsx": "^2",
 		"tailwind-merge": "^2",
+		"shiki": "^1",
 		"tailwind-variants": "^0.3.0"
 	},
 	"devDependencies": {
