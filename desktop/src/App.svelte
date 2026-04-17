@@ -3,32 +3,95 @@
 	import AppShell from "$lib/components/layout/AppShell.svelte";
 	import TopBar from "$lib/components/layout/TopBar.svelte";
 	import Sidebar from "$lib/components/layout/Sidebar.svelte";
-	import ChatView from "./features/chat/ChatView.svelte";
-	import SettingsView from "./features/settings/SettingsView.svelte";
-	import ModelsView from "./features/models/ModelsView.svelte";
+	import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
+	import ThemeToggle from "$lib/components/ThemeToggle.svelte";
 	import { themeStore } from "$lib/stores/theme.svelte.js";
 	import { navigationStore } from "$lib/stores/navigation.svelte.js";
 	import { connectionStore } from "$lib/stores/connection.svelte.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
+	import { chatStore } from "./features/chat/chat.svelte.js";
+	import { daemonLifecycle } from "$lib/services/daemon-lifecycle.js";
+	import { configService } from "$lib/services/config-service.js";
+	import { SHORTCUTS, matchesShortcut } from "$lib/shortcuts.js";
+
+	// All view imports
+	import ChatView from "./features/chat/ChatView.svelte";
+	import SettingsView from "./features/settings/SettingsView.svelte";
+	import ModelsView from "./features/models/ModelsView.svelte";
+	import AboutView from "./features/about/AboutView.svelte";
 
 	let sidebarCollapsed = $state(false);
 
-	function toggleSidebar() {
+	function toggleSidebar(): void {
 		sidebarCollapsed = !sidebarCollapsed;
 	}
 
 	onMount(() => {
+		// Initialize theme
 		themeStore.init();
+
+		// Initialize settings (daemon URL, auto-start preference)
 		settingsStore.init();
+
+		// Auto-start daemon if configured
+		if (settingsStore.autoStartDaemon) {
+			daemonLifecycle.getDaemonStatus().then((status) => {
+				if (status !== "running") {
+					daemonLifecycle.startDaemon().catch(() => {
+						// Silently ignore auto-start failures
+					});
+				}
+			});
+		}
+
+		// Start connection health polling
 		connectionStore.start();
+
+		// Load available providers for the chat provider selector
+		configService.readConfig().then((config) => {
+			if (config && config.providers.length > 0) {
+				chatStore.setAvailableProviders(
+					config.providers.map((p) => p.name),
+					config.defaultProvider,
+				);
+			}
+		});
+
+		// Keyboard shortcuts
+		function handleKeydown(event: KeyboardEvent): void {
+			for (const shortcut of SHORTCUTS) {
+				if (matchesShortcut(event, shortcut)) {
+					if (shortcut.action === "settings") {
+						event.preventDefault();
+						navigationStore.navigate("settings");
+					} else if (shortcut.action === "new-chat") {
+						event.preventDefault();
+						chatStore.clearConversation();
+						navigationStore.navigate("chat");
+					}
+				}
+			}
+		}
+
+		window.addEventListener("keydown", handleKeydown);
+
+		// Responsive sidebar
+		function handleResize(): void {
+			if (window.innerWidth < 900) {
+				sidebarCollapsed = true;
+			}
+		}
+		window.addEventListener("resize", handleResize);
+		handleResize();
 
 		return () => {
 			connectionStore.stop();
+			window.removeEventListener("keydown", handleKeydown);
+			window.removeEventListener("resize", handleResize);
 		};
 	});
 
 	const currentView = $derived(navigationStore.current);
-	const connStatus = $derived(connectionStore.status);
 </script>
 
 <AppShell bind:sidebarCollapsed>
@@ -38,138 +101,48 @@
 
 	{#snippet topbar()}
 		<TopBar onToggleSidebar={toggleSidebar}>
-			<div class="topbar-actions">
-				<!-- Connection status indicator -->
-				<div class="connection-indicator">
-					<span
-						class="status-dot"
-						class:connected={connStatus === 'connected'}
-						class:reconnecting={connStatus === 'reconnecting'}
-						class:disconnected={connStatus === 'disconnected'}
-					></span>
-					<span class="status-text">
-						{connStatus === 'connected' ? 'Connected' : connStatus === 'reconnecting' ? 'Reconnecting...' : 'Disconnected'}
-					</span>
-				</div>
-
-				<button
-					onclick={() => themeStore.toggle()}
-					class="theme-toggle"
-					aria-label="Toggle theme"
-					title="Toggle theme"
-				>
-					{themeStore.isDark ? "☀️" : "🌙"}
-				</button>
-			</div>
+			<ConnectionStatus />
+			{#if chatStore.selectedProvider ?? chatStore.defaultProvider}
+				<span class="topbar-provider">
+					{chatStore.selectedProvider ?? chatStore.defaultProvider}
+				</span>
+			{/if}
+			<ThemeToggle />
 		</TopBar>
 	{/snippet}
 
-	<!-- Content area — routed by navigation -->
-	{#if currentView === 'chat'}
+	<!-- View routing -->
+	{#if currentView === "chat"}
 		<ChatView />
-	{:else if currentView === 'settings'}
+	{:else if currentView === "settings"}
 		<SettingsView />
-	{:else if currentView === 'models'}
+	{:else if currentView === "models"}
 		<ModelsView />
+	{:else if currentView === "about"}
+		<AboutView />
 	{:else}
-		<div class="content-placeholder">
-			<div class="placeholder-inner">
-				<div class="placeholder-icon">🐘</div>
-				<p class="placeholder-subtitle">
-					View: <strong>{currentView}</strong>
-				</p>
-				<p class="placeholder-tagline">Coming in next wave...</p>
-			</div>
+		<div class="unknown-view">
+			Unknown view: {currentView}
 		</div>
 	{/if}
 </AppShell>
 
 <style>
-	.topbar-actions {
-		display: flex;
-		align-items: center;
-		gap: var(--space-3);
-		margin-left: auto;
-	}
-
-	.connection-indicator {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 12px;
+	.topbar-provider {
+		font-size: 11px;
+		font-family: var(--font-mono);
 		color: var(--color-text-muted);
-	}
-
-	.status-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		flex-shrink: 0;
-		display: inline-block;
-		background-color: var(--color-error);
-	}
-
-	.status-dot.connected {
-		background-color: var(--color-success);
-	}
-
-	.status-dot.reconnecting {
-		background-color: var(--color-warning);
-	}
-
-	.status-dot.disconnected {
-		background-color: var(--color-error);
-	}
-
-	.status-text {
+		padding: 2px 8px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-full);
 		white-space: nowrap;
 	}
 
-	.theme-toggle {
-		background: none;
-		border: none;
-		cursor: pointer;
-		color: var(--color-text-secondary);
-		font-size: 16px;
-		padding: var(--space-1);
-		border-radius: var(--radius-sm);
-		transition:
-			color var(--transition-fast),
-			background-color var(--transition-fast);
-	}
-
-	.theme-toggle:hover {
-		color: var(--color-text-primary);
-		background-color: var(--color-surface-hover);
-	}
-
-	.content-placeholder {
-		padding: var(--space-6);
-		height: 100%;
+	.unknown-view {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-	}
-
-	.placeholder-inner {
-		text-align: center;
+		height: 100%;
 		color: var(--color-text-muted);
-	}
-
-	.placeholder-icon {
-		font-size: 48px;
-		margin-bottom: var(--space-4);
-	}
-
-	.placeholder-subtitle {
-		font-size: var(--font-size-md);
-		color: var(--color-text-secondary);
-		margin: 0;
-	}
-
-	.placeholder-tagline {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-		margin-top: var(--space-1);
 	}
 </style>
