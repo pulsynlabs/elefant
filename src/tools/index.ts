@@ -11,3 +11,4 @@ export {
   executeBinary,
   type BinaryResult,
 } from './binary.js';
+export { grepTool, type GrepParams } from './grep.js';
