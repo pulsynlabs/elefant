@@ -15,10 +15,11 @@
 	}> | undefined);
 	const firstQuestion = $derived(questions?.[0]);
 	const questionId = $derived(toolCall.id);
+	const isMultiple = $derived(firstQuestion?.multiple ?? false);
 
 	// Local state for answer interaction
 	let answerState = $state<'pending' | 'submitting' | 'answered' | 'error'>('pending');
-	let selectedAnswer = $state<string | null>(null);
+	let selectedAnswers = $state<string[]>([]);
 	let errorMessage = $state<string | null>(null);
 
 	// Derive status from toolCall.result if present (already answered via tool result)
@@ -40,14 +41,12 @@
 		}
 	});
 
-	async function handleAnswer(optionLabel: string): Promise<void> {
-		if (answerState === 'submitting') return;
-
-		answerState = 'submitting';
-		selectedAnswer = optionLabel;
-
+	/**
+	 * Submit answers to the daemon via DaemonClient.
+	 */
+	async function submitAnswers(answers: string[]): Promise<void> {
 		const client = getDaemonClient();
-		const result = await client.answerQuestion(questionId, [optionLabel]);
+		const result = await client.answerQuestion(questionId, answers);
 
 		if (result.ok) {
 			answerState = 'answered';
@@ -57,10 +56,42 @@
 		}
 	}
 
+	/**
+	 * Single-select: clicking an option submits immediately.
+	 */
+	async function handleSingleAnswer(optionLabel: string): Promise<void> {
+		if (answerState === 'submitting') return;
+
+		answerState = 'submitting';
+		selectedAnswers = [optionLabel];
+		await submitAnswers([optionLabel]);
+	}
+
+	/**
+	 * Multi-select: toggle an option in the selection set.
+	 */
+	function toggleOption(label: string): void {
+		if (selectedAnswers.includes(label)) {
+			selectedAnswers = selectedAnswers.filter(l => l !== label);
+		} else {
+			selectedAnswers = [...selectedAnswers, label];
+		}
+	}
+
+	/**
+	 * Multi-select: submit all selected options.
+	 */
+	async function handleMultiSubmit(): Promise<void> {
+		if (answerState === 'submitting' || selectedAnswers.length === 0) return;
+
+		answerState = 'submitting';
+		await submitAnswers(selectedAnswers);
+	}
+
 	function handleRetry(): void {
 		answerState = 'pending';
 		errorMessage = null;
-		selectedAnswer = null;
+		selectedAnswers = [];
 	}
 </script>
 
@@ -78,21 +109,55 @@
 			{#if answerState === 'answered' || toolResult}
 				<div class="answered-state">
 					<span class="answered-label">Answered:</span>
-					<span class="answered-value">{selectedAnswer ?? 'Submitted'}</span>
+					<span class="answered-value">
+						{selectedAnswers.length > 0 ? selectedAnswers.join(', ') : (toolResult?.content ?? 'Submitted')}
+					</span>
 				</div>
 			{:else if answerState === 'error'}
 				<div class="error-state">
 					<p class="error-text">{errorMessage}</p>
 					<Button variant="outline" size="sm" onclick={handleRetry}>Retry</Button>
 				</div>
+			{:else if isMultiple}
+				<!-- Multi-select: checkboxes + submit button -->
+				<div class="options-list" class:disabled={answerState === 'submitting'}>
+					{#each firstQuestion.options as option}
+						{@const isSelected = selectedAnswers.includes(option.label)}
+						<button
+							class="option-checkbox"
+							class:selected={isSelected}
+							disabled={answerState === 'submitting'}
+							onclick={() => toggleOption(option.label)}
+							aria-pressed={isSelected}
+							type="button"
+						>
+							<span class="checkbox-indicator" aria-hidden="true">{isSelected ? '☑' : '☐'}</span>
+							<span class="option-inner">
+								<span class="option-label">{option.label}</span>
+								{#if option.description}
+									<span class="option-description">{option.description}</span>
+								{/if}
+							</span>
+						</button>
+					{/each}
+					<Button
+						variant="default"
+						size="sm"
+						disabled={answerState === 'submitting' || selectedAnswers.length === 0}
+						onclick={handleMultiSubmit}
+					>
+						{answerState === 'submitting' ? 'Submitting…' : `Submit (${selectedAnswers.length} selected)`}
+					</Button>
+				</div>
 			{:else}
+				<!-- Single-select: click to submit immediately -->
 				<div class="options-list" class:disabled={answerState === 'submitting'}>
 					{#each firstQuestion.options as option}
 						<Button
 							variant="outline"
 							size="default"
 							disabled={answerState === 'submitting'}
-							onclick={() => handleAnswer(option.label)}
+							onclick={() => handleSingleAnswer(option.label)}
 							class="option-button"
 						>
 							<span class="option-label">{option.label}</span>
@@ -162,6 +227,56 @@
 		font-size: var(--font-size-xs);
 		color: var(--color-text-muted);
 		font-weight: var(--font-weight-normal);
+	}
+
+	/* Multi-select checkbox-style buttons */
+	.option-checkbox {
+		display: flex;
+		align-items: flex-start;
+		gap: var(--space-2);
+		width: 100%;
+		padding: var(--space-2) var(--space-3);
+		background: none;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		text-align: left;
+		transition: background-color var(--transition-fast), border-color var(--transition-fast);
+		font-family: var(--font-sans);
+		color: var(--color-text-primary);
+	}
+
+	.option-checkbox:hover:not(:disabled) {
+		background-color: var(--color-surface-hover);
+		border-color: var(--color-border-strong);
+	}
+
+	.option-checkbox.selected {
+		border-color: var(--color-primary);
+		background-color: var(--color-primary-subtle);
+	}
+
+	.option-checkbox:focus-visible {
+		outline: 2px solid var(--color-border-focus);
+		outline-offset: 2px;
+	}
+
+	.option-checkbox:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.checkbox-indicator {
+		font-size: var(--font-size-sm);
+		color: var(--color-primary);
+		flex-shrink: 0;
+		line-height: 1.4;
+	}
+
+	.option-inner {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
 	}
 
 	.answered-state {
