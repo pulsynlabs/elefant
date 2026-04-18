@@ -1,12 +1,18 @@
 import type { ElefantConfig } from '../config/index.ts'
 import { Database } from '../db/database.ts'
 import { HookRegistry } from '../hooks/index.ts'
+import { basename } from 'node:path'
+import { PermissionGate } from '../permissions/gate.ts'
+import { PluginLoader } from '../plugins/loader.ts'
 import { ProjectManager } from '../project/manager.ts'
 import type { ProjectInfo } from '../project/types.ts'
 import { ProviderRouter } from '../providers/router.ts'
 import { createApp } from '../server/app.ts'
+import { StateManager } from '../state/manager.ts'
 import { createToolRegistry } from '../tools/registry.ts'
 import { sessionManager } from '../tools/shell/index.js'
+import { ElefantWsServer } from '../transport/ws-server.ts'
+import { SseManager } from '../transport/sse-manager.ts'
 import type { ElefantError } from '../types/errors.ts'
 import { err, ok, type Result } from '../types/result.ts'
 import type { DaemonContext } from './context.ts'
@@ -50,22 +56,47 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 	// B. Initialize SQLite database
 	const db = new Database(projectInfo.dbPath)
 
-	// C. Build DaemonContext (for later use by StateManager, plugins, etc.)
-	// Note: this context will be EXPANDED in future tasks (Wave 2, 3, 4, 5)
-	// For now, it holds project + db. Hooks and tools are already created above.
-	const context: DaemonContext = {
+	// C. Initialize StateManager
+	const stateManager = new StateManager(projectInfo.projectPath, {
+		id: projectInfo.projectId,
+		name: basename(projectInfo.projectPath),
+		path: projectInfo.projectPath,
+	})
+
+	const contextBase = {
 		config,
 		hooks: hookRegistry,
 		tools: toolRegistry,
 		providers: providerRouter,
 		project: projectInfo,
 		db,
-	}
+		state: stateManager,
+	} as Omit<DaemonContext, 'plugins' | 'ws' | 'sse' | 'permissions'>
 
-	const app = createApp(providerRouter, toolRegistry, hookRegistry)
+	const context = contextBase as DaemonContext
+ 
+	const pluginLoader = new PluginLoader(context)
+	context.plugins = pluginLoader
+	await pluginLoader.loadAll()
+
+	// Transport layer: WebSocket + SSE
+	const ws = new ElefantWsServer(context)
+	const sse = new SseManager(db)
+	context.ws = ws
+	context.sse = sse
+
+	// Permission gate for tool-call approval
+	const permissions = new PermissionGate(context, ws)
+	context.permissions = permissions
+
+	const app = createApp(providerRouter, toolRegistry, hookRegistry, ws, sse)
+
+	ws.startHeartbeat()
 
 	hookRegistry.register('shutdown', async () => {
 		await sessionManager.closeAll()
+		ws.stopHeartbeat()
+		sse.destroy()
 		db.close()
 	})
 
@@ -77,6 +108,9 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 			console.error(`[elefant] Daemon listening on port ${config.port}`)
 		},
 		stop: async () => {
+			await pluginLoader.unloadAll()
+			ws.stopHeartbeat()
+			sse.destroy()
 			await app.stop()
 			db.close()
 		},
