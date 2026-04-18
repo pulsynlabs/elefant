@@ -47,15 +47,17 @@ export async function updateConfig(
 	}
 }
 
-export async function addProvider(provider: ProviderEntry): Promise<void> {
+export async function addProvider(provider: ProviderEntry): Promise<'created' | 'exists'> {
 	const res = await apiFetch('/api/providers', {
 		method: 'POST',
 		body: JSON.stringify(provider),
 	});
+	if (res.status === 409) return 'exists';
 	if (!res.ok) {
 		const body = await res.json().catch(() => ({})) as { error?: string };
 		throw new Error(body.error ?? `HTTP ${res.status}`);
 	}
+	return 'created';
 }
 
 export async function updateProvider(name: string, provider: ProviderEntry): Promise<void> {

@@ -47,14 +47,11 @@
 				model: model.trim(),
 				format,
 			});
+			// 'created' or 'exists' — both mean we're good to proceed
 		} catch (e) {
-			const msg = e instanceof Error ? e.message : '';
-			// "already exists" means it saved on a previous attempt — just continue
-			if (!msg.includes('already exists')) {
-				error = msg || 'Failed to save provider.';
-				saving = false;
-				return;
-			}
+			error = e instanceof Error ? e.message : 'Failed to save provider.';
+			saving = false;
+			return;
 		}
 		step = 'starting';
 		await waitForDaemon();
@@ -91,20 +88,15 @@
 	}
 
 	onMount(async () => {
-		// Poll until daemon responds, then check if providers are configured
-		for (let i = 0; i < 20; i++) {
-			const config = await configService.readConfig();
-			if (config !== null) {
-				// Masked keys are '••••••••' when real, '' when unconfigured
-				const hasRealProvider = config.providers.some((p) => p.apiKey !== '');
-				if (hasRealProvider) {
-					navigationStore.navigate('chat');
-				}
-				return; // Daemon responded — stop polling regardless
+		// Check once if daemon is already up with providers configured.
+		// Don't loop — if daemon is down we want to show the setup UI immediately.
+		const config = await configService.readConfig();
+		if (config !== null) {
+			const hasRealProvider = config.providers.some((p) => p.apiKey !== '');
+			if (hasRealProvider) {
+				navigationStore.navigate('chat');
 			}
-			await new Promise<void>((r) => setTimeout(r, 500));
 		}
-		// Daemon didn't respond in time — stay on onboarding
 	});
 </script>
 
