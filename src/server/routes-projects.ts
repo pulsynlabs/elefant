@@ -197,3 +197,17 @@ export function mountProjectsSessionsRoutes(app: Elysia, db: Database): Elysia {
 			return { ok: true, data: session.data };
 		});
 }
+
+/**
+ * Mount all project-related routes in a single call.
+ * Chains create, list, update, delete, and sessions routes.
+ * Note: events route requires SseManager and is mounted separately.
+ */
+export function mountProjectsRoutes(app: Elysia, db: Database): Elysia {
+	mountProjectsCreateRoute(app, db);
+	mountProjectsListRoute(app, db);
+	mountProjectsUpdateRoute(app, db);
+	mountProjectsDeleteRoute(app, db);
+	mountProjectsSessionsRoutes(app, db);
+	return app;
+}

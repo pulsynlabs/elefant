@@ -5,15 +5,17 @@ import type { ProviderRouter } from '../providers/router.ts'
 import type { ToolRegistry } from '../tools/registry.ts'
 import type { ElefantWsServer } from '../transport/ws-server.ts'
 import type { SseManager } from '../transport/sse-manager.ts'
+import type { Database } from '../db/database.ts'
 import { registerServerRoutes } from './routes.ts'
 import { registerQuestionRoute } from '../tools/question/route.ts'
 import { mountWsRoute } from './routes-ws.ts'
-import { mountProjectEventsRoute } from './routes-projects.ts'
+import { mountProjectEventsRoute, mountProjectsRoutes } from './routes-projects.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,
 	toolRegistry: ToolRegistry,
 	hookRegistry: HookRegistry,
+	db: Database,
 	ws?: ElefantWsServer,
 	sse?: SseManager,
 ) {
@@ -78,6 +80,9 @@ export function createApp(
 	// Mount transport routes when available
 	if (ws) mountWsRoute(baseApp, ws)
 	if (sse) mountProjectEventsRoute(baseApp, sse)
+
+	// Mount project CRUD routes
+	mountProjectsRoutes(baseApp, db)
 
 	return baseApp
 }

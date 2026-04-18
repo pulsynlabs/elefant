@@ -72,13 +72,14 @@ export function getSessionById(
 export function listSessionsByProject(
   db: Database,
   projectId: string,
+  limit = 10,
 ): Result<SessionRow[], ElefantError> {
   try {
     const rows = db.db
       .query(
-        'SELECT * FROM sessions WHERE project_id = ? ORDER BY started_at DESC',
+        'SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC LIMIT ?',
       )
-      .all(projectId);
+      .all(projectId, limit);
     return ok(rows.map((r) => SessionRowSchema.parse(r)));
   } catch (e) {
     return err({

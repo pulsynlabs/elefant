@@ -81,7 +81,7 @@ export function getProjectByPath(
 export function listProjects(db: Database): Result<ProjectRow[], ElefantError> {
   try {
     const rows = db.db
-      .query('SELECT * FROM projects ORDER BY created_at DESC')
+      .query('SELECT * FROM projects ORDER BY updated_at DESC')
       .all();
     return ok(rows.map((r) => ProjectRowSchema.parse(r)));
   } catch (e) {

@@ -94,7 +94,7 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 	const compaction = new CompactionManager(context)
 	context.compaction = compaction
 
-	const app = createApp(providerRouter, toolRegistry, hookRegistry, ws, sse)
+	const app = createApp(providerRouter, toolRegistry, hookRegistry, db, ws, sse)
 
 	ws.startHeartbeat()
 
