@@ -18,3 +18,17 @@ export {
 } from './binary.js';
 export { grepTool, type GrepParams } from './grep.js';
 export { ToolRegistry, createToolRegistry } from './registry.ts';
+
+// New tools (Wave 1-4)
+export { applyPatchTool, type ApplyPatchParams } from './apply_patch/index.js';
+export { webfetchTool, type WebfetchParams } from './webfetch.js';
+export { websearchTool, type WebsearchParams } from './websearch.js';
+export {
+	todowriteTool,
+	todoreadTool,
+	type TodoWriteParams,
+	type TodoReadParams,
+} from './todo/index.js';
+export { questionTool, type QuestionParams, type Question, type QuestionOption } from './question/index.js';
+export { skillTool, type SkillParams } from './skill/index.js';
+export { lspTool, type LspParams, type LspOperation } from './lsp/index.js';

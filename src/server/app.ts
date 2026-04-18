@@ -4,6 +4,7 @@ import type { HookRegistry } from '../hooks/index.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { ToolRegistry } from '../tools/registry.ts'
 import { registerServerRoutes } from './routes.ts'
+import { registerQuestionRoute } from '../tools/question/route.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,
@@ -62,6 +63,9 @@ export function createApp(
 			uptime: process.uptime(),
 			timestamp: new Date().toISOString(),
 		}))
+
+	// Register question tool route for HITL interactions
+	registerQuestionRoute(app as unknown as Elysia)
 
 	return registerServerRoutes(app as unknown as Elysia, providerRouter, toolRegistry, hookRegistry)
 }
