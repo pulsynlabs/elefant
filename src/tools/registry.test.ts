@@ -5,11 +5,27 @@ import type { ToolDefinition } from '../types/tools.ts'
 import { createToolRegistry, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all core tools', () => {
+	it('registers all 14 tools', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
-		expect(names).toEqual(['bash', 'edit', 'glob', 'grep', 'read', 'write'])
+		expect(names).toEqual([
+			'apply_patch',
+			'bash',
+			'edit',
+			'glob',
+			'grep',
+			'lsp',
+			'question',
+			'read',
+			'skill',
+			'todoread',
+			'todowrite',
+			'webfetch',
+			'websearch',
+			'write',
+		])
+		expect(names.length).toBe(14)
 	})
 
 	it('execute() calls the matching tool', async () => {
@@ -44,6 +60,28 @@ describe('ToolRegistry', () => {
 			expect(result.error.code).toBe('TOOL_NOT_FOUND')
 			expect(result.error.message).toContain('missing-tool')
 		}
+	})
+
+	it('has all new tools available via get()', () => {
+		const registry = createToolRegistry(new HookRegistry())
+
+		// All 8 new tools should be retrievable
+		expect(registry.get('apply_patch').ok).toBe(true)
+		expect(registry.get('webfetch').ok).toBe(true)
+		expect(registry.get('websearch').ok).toBe(true)
+		expect(registry.get('todowrite').ok).toBe(true)
+		expect(registry.get('todoread').ok).toBe(true)
+		expect(registry.get('question').ok).toBe(true)
+		expect(registry.get('skill').ok).toBe(true)
+		expect(registry.get('lsp').ok).toBe(true)
+
+		// Original 6 tools should still be available
+		expect(registry.get('read').ok).toBe(true)
+		expect(registry.get('write').ok).toBe(true)
+		expect(registry.get('edit').ok).toBe(true)
+		expect(registry.get('glob').ok).toBe(true)
+		expect(registry.get('grep').ok).toBe(true)
+		expect(registry.get('bash').ok).toBe(true)
 	})
 
 	it('fires tool:before and tool:after hooks around execution', async () => {

@@ -65,7 +65,7 @@ export function createApp(
 		}))
 
 	// Register question tool route for HITL interactions
-	registerQuestionRoute(app)
+	registerQuestionRoute(app as unknown as Elysia)
 
 	return registerServerRoutes(app as unknown as Elysia, providerRouter, toolRegistry, hookRegistry)
 }

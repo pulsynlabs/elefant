@@ -2,11 +2,18 @@ import { emit, type HookRegistry } from '../hooks/index.ts';
 import type { ElefantError } from '../types/errors.ts';
 import { err, ok, type Result } from '../types/result.ts';
 import type { ToolDefinition, ToolResult } from '../types/tools.ts';
+import { applyPatchTool } from './apply_patch/index.js';
 import { editTool } from './edit.js';
 import { globTool } from './glob.js';
 import { grepTool } from './grep.js';
+import { lspTool } from './lsp/index.js';
+import { questionTool } from './question/index.js';
 import { readTool } from './read.js';
 import { bashTool } from './shell/index.js';
+import { skillTool } from './skill/index.js';
+import { todoreadTool, todowriteTool } from './todo/index.js';
+import { webfetchTool } from './webfetch.js';
+import { websearchTool } from './websearch.js';
 import { writeTool } from './write.js';
 
 function createToolError(message: string, details?: unknown): ElefantError {
@@ -157,5 +164,13 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 	registry.register(globTool);
 	registry.register(grepTool);
 	registry.register(bashTool);
+	registry.register(applyPatchTool);
+	registry.register(webfetchTool);
+	registry.register(websearchTool);
+	registry.register(todowriteTool);
+	registry.register(todoreadTool);
+	registry.register(questionTool);
+	registry.register(skillTool);
+	registry.register(lspTool);
 	return registry;
 }
