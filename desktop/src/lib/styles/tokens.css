@@ -1,17 +1,18 @@
 /* =========================================
    ELEFANT DESIGN TOKENS
+   Single source of truth for all visual properties.
    Dark mode default, light mode via [data-theme="light"]
    ========================================= */
 
 /* --- DARK THEME (default) --- */
 :root,
 [data-theme="dark"] {
-	/* Primary — Elefant Green (user mandate) */
-	--color-primary: #28d06c;
-	--color-primary-hover: #22b85e;
-	--color-primary-muted: #1a9a4e;
-	--color-primary-subtle: #052b15;
-	--color-primary-foreground: #05140b;
+	/* Primary — Electric Amber */
+	--color-primary: #F5A623;
+	--color-primary-hover: #E09415;
+	--color-primary-muted: #C47F0E;
+	--color-primary-subtle: #2B1D06;
+	--color-primary-foreground: #1A0E02;
 
 	/* Backgrounds */
 	--color-bg: #0a0a0a;
@@ -22,7 +23,7 @@
 	/* Borders */
 	--color-border: #27272a;
 	--color-border-strong: #3f3f46;
-	--color-border-focus: #28d06c;
+	--color-border-focus: #F5A623;
 
 	/* Text */
 	--color-text-primary: #fafafa;
@@ -37,11 +38,42 @@
 	--color-error: #ef4444;
 	--color-info: #3b82f6;
 
-	/* Shadows (dark-optimized) */
+	/* Shadows */
+	--shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.4);
 	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
 	--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
 	--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
-	--shadow-glow: 0 0 20px rgba(40, 208, 108, 0.2);
+	--shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.8);
+	--shadow-glow: 0 0 20px rgba(245, 166, 35, 0.2);
+
+	/* Glass */
+	--blur-sm: 4px;
+	--blur-md: 12px;
+	--blur-lg: 24px;
+	--glass-bg: rgba(17, 17, 19, 0.6);
+	--glass-bg-strong: rgba(17, 17, 19, 0.85);
+	--glass-border: rgba(255, 255, 255, 0.06);
+	--glass-border-strong: rgba(255, 255, 255, 0.12);
+	--glass-inner-glow: rgba(255, 255, 255, 0.03);
+
+	/* Glow */
+	--glow-primary: 0 0 20px rgba(245, 166, 35, 0.25);
+	--glow-primary-strong: 0 0 30px rgba(245, 166, 35, 0.4);
+	--glow-ambient: 0 0 80px rgba(245, 166, 35, 0.06);
+	--glow-focus: 0 0 0 2px rgba(245, 166, 35, 0.4);
+
+	/* Texture */
+	--texture-noise-opacity: 0.03;
+	--texture-grid-color: rgba(255, 255, 255, 0.03);
+	--texture-grid-size: 20px;
+
+	/* Elevation / Z-index */
+	--z-base: 0;
+	--z-dropdown: 10;
+	--z-sticky: 20;
+	--z-modal: 30;
+	--z-toast: 40;
+	--z-tooltip: 50;
 
 	/* shadcn-svelte CSS variable mapping */
 	--background: var(--color-bg);
@@ -67,12 +99,12 @@
 
 /* --- LIGHT THEME --- */
 [data-theme="light"] {
-	/* Primary — #28d06c (user mandate, matches dark theme) */
-	--color-primary: #28d06c;
-	--color-primary-hover: #22b85e;
-	--color-primary-muted: #1a9a4e;
-	--color-primary-subtle: #dcf7e7;
-	--color-primary-foreground: #05140b;
+	/* Primary — Electric Amber */
+	--color-primary: #F5A623;
+	--color-primary-hover: #E09415;
+	--color-primary-muted: #C47F0E;
+	--color-primary-subtle: #FEF3E0;
+	--color-primary-foreground: #1A0E02;
 
 	/* Backgrounds */
 	--color-bg: #ffffff;
@@ -83,7 +115,7 @@
 	/* Borders */
 	--color-border: #e4e4e7;
 	--color-border-strong: #d4d4d8;
-	--color-border-focus: #1db85a;
+	--color-border-focus: #E09415;
 
 	/* Text */
 	--color-text-primary: #09090b;
@@ -98,11 +130,42 @@
 	--color-error: #dc2626;
 	--color-info: #2563eb;
 
-	/* Shadows (light-optimized) */
+	/* Shadows */
+	--shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.04);
 	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
 	--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 	--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.12);
-	--shadow-glow: 0 0 20px rgba(29, 184, 90, 0.15);
+	--shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+	--shadow-glow: 0 0 20px rgba(245, 166, 35, 0.15);
+
+	/* Glass */
+	--blur-sm: 4px;
+	--blur-md: 12px;
+	--blur-lg: 24px;
+	--glass-bg: rgba(255, 255, 255, 0.7);
+	--glass-bg-strong: rgba(255, 255, 255, 0.9);
+	--glass-border: rgba(0, 0, 0, 0.06);
+	--glass-border-strong: rgba(0, 0, 0, 0.12);
+	--glass-inner-glow: rgba(255, 255, 255, 0.5);
+
+	/* Glow */
+	--glow-primary: 0 0 20px rgba(245, 166, 35, 0.15);
+	--glow-primary-strong: 0 0 30px rgba(245, 166, 35, 0.25);
+	--glow-ambient: 0 0 80px rgba(245, 166, 35, 0.04);
+	--glow-focus: 0 0 0 2px rgba(245, 166, 35, 0.3);
+
+	/* Texture */
+	--texture-noise-opacity: 0.02;
+	--texture-grid-color: rgba(0, 0, 0, 0.03);
+	--texture-grid-size: 20px;
+
+	/* Elevation / Z-index (theme-independent, repeated for completeness) */
+	--z-base: 0;
+	--z-dropdown: 10;
+	--z-sticky: 20;
+	--z-modal: 30;
+	--z-toast: 40;
+	--z-tooltip: 50;
 
 	/* shadcn-svelte CSS variable mapping */
 	--background: var(--color-bg);
@@ -145,10 +208,12 @@
 }
 
 /* =========================================
-   BORDER RADIUS
+   BORDER RADIUS (expanded with industrial variants)
    ========================================= */
 :root {
 	--radius-none: 0px;
+	--radius-2xs: 1px;
+	--radius-xs: 2px;
 	--radius-sm: 4px;
 	--radius-md: 6px;
 	--radius-lg: 8px;
@@ -161,13 +226,26 @@
 }
 
 /* =========================================
-   TRANSITIONS
+   MOTION SYSTEM
    ========================================= */
 :root {
-	--transition-fast: 150ms ease;
-	--transition-base: 200ms ease;
-	--transition-slow: 300ms ease;
-	--transition-spring: 250ms cubic-bezier(0.16, 1, 0.3, 1);
+	/* Duration Scale */
+	--duration-instant: 50ms;
+	--duration-fast: 150ms;
+	--duration-base: 250ms;
+	--duration-slow: 400ms;
+
+	/* Easing Curves */
+	--ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+	--ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-linear-soft: cubic-bezier(0.4, 0, 0.2, 1);
+
+	/* Composed Transition Shorthands */
+	--transition-instant: var(--duration-instant) var(--ease-linear-soft);
+	--transition-fast: var(--duration-fast) var(--ease-out-quart);
+	--transition-base: var(--duration-base) var(--ease-out-quart);
+	--transition-slow: var(--duration-slow) var(--ease-out-quart);
+	--transition-spring: var(--duration-base) var(--ease-spring);
 }
 
 /* =========================================
@@ -178,4 +256,17 @@
 	--sidebar-width-collapsed: 56px;
 	--topbar-height: 48px;
 	--sidebar-collapse-breakpoint: 900px;
+}
+
+/* =========================================
+   REDUCED MOTION
+   ========================================= */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
 }
