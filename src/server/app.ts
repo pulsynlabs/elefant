@@ -3,13 +3,19 @@ import { Elysia } from 'elysia'
 import type { HookRegistry } from '../hooks/index.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { ToolRegistry } from '../tools/registry.ts'
+import type { ElefantWsServer } from '../transport/ws-server.ts'
+import type { SseManager } from '../transport/sse-manager.ts'
 import { registerServerRoutes } from './routes.ts'
 import { registerQuestionRoute } from '../tools/question/route.ts'
+import { mountWsRoute } from './routes-ws.ts'
+import { mountProjectEventsRoute } from './routes-projects.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,
 	toolRegistry: ToolRegistry,
 	hookRegistry: HookRegistry,
+	ws?: ElefantWsServer,
+	sse?: SseManager,
 ): Elysia {
 	const CORS_HEADERS = {
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -67,5 +73,11 @@ export function createApp(
 	// Register question tool route for HITL interactions
 	registerQuestionRoute(app as unknown as Elysia)
 
-	return registerServerRoutes(app as unknown as Elysia, providerRouter, toolRegistry, hookRegistry)
+	const baseApp = registerServerRoutes(app as unknown as Elysia, providerRouter, toolRegistry, hookRegistry)
+
+	// Mount transport routes when available
+	if (ws) mountWsRoute(baseApp, ws)
+	if (sse) mountProjectEventsRoute(baseApp, sse)
+
+	return baseApp
 }
