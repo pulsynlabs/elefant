@@ -161,6 +161,8 @@ describe('Project routes', () => {
 		const response = await app.handle(
 			new Request('http://localhost/api/projects/non-existent-id/sessions', {
 				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({}),
 			})
 		)
 
@@ -232,6 +234,8 @@ describe('Project routes', () => {
 		const createSessionRes = await app.handle(
 			new Request(`http://localhost/api/projects/${project.id}/sessions`, {
 				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({}),
 			})
 		)
 		expect(createSessionRes.status).toBe(201)

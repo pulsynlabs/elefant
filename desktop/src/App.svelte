@@ -10,6 +10,7 @@
 	import { navigationStore } from "$lib/stores/navigation.svelte.js";
 	import { connectionStore } from "$lib/stores/connection.svelte.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
+	import { projectsStore } from "$lib/stores/projects.svelte.js";
 	import { chatStore } from "./features/chat/chat.svelte.js";
 	import { daemonLifecycle } from "$lib/services/daemon-lifecycle.js";
 	import { configService } from "$lib/services/config-service.js";
@@ -21,6 +22,14 @@
 	import ModelsView from "./features/models/ModelsView.svelte";
 	import AboutView from "./features/about/AboutView.svelte";
 	import OnboardingView from "./features/onboarding/OnboardingView.svelte";
+	import ProjectPickerView from "./features/projects/ProjectPickerView.svelte";
+
+	type NavigationRuntime = typeof navigationStore & {
+		initNavigation: (opts: { getActiveProjectId: () => string | null }) => void;
+		goToProjectPicker: () => void;
+	};
+
+	const navigationRuntime = navigationStore as NavigationRuntime;
 
 	let sidebarCollapsed = $state(false);
 
@@ -46,6 +55,20 @@
 		}
 	});
 
+	let previousActiveProjectId = $state<string | null>(null);
+
+	$effect(() => {
+		const current = projectsStore.activeProjectId;
+
+		if (current !== null && previousActiveProjectId === null) {
+			navigationStore.navigate("chat");
+		} else if (current === null && previousActiveProjectId !== null) {
+			navigationRuntime.goToProjectPicker();
+		}
+
+		previousActiveProjectId = current;
+	});
+
 	function toggleSidebar(): void {
 		sidebarCollapsed = !sidebarCollapsed;
 	}
@@ -56,6 +79,10 @@
 
 		// Initialize settings (daemon URL, auto-start preference)
 		settingsStore.init();
+
+		navigationRuntime.initNavigation({
+			getActiveProjectId: () => projectsStore.activeProjectId,
+		});
 
 		// Auto-start daemon if configured
 		if (settingsStore.autoStartDaemon) {
@@ -85,6 +112,7 @@
 							realProviders.map((p) => p.name),
 							config.defaultProvider || realProviders[0].name,
 						);
+						await projectsStore.loadProjects();
 					}
 					return;
 				}
@@ -163,10 +191,17 @@
 						realProviders.map((p) => p.name),
 						config.defaultProvider || realProviders[0].name,
 					);
+					await projectsStore.loadProjects();
 					hasConfig = true;
 				}
 			}
 		}} />
+	{:else if projectsStore.activeProjectId === null}
+		<ProjectPickerView onProjectSelected={() => {
+			navigationStore.navigate("chat");
+		}} />
+	{:else if currentView === "projects"}
+		<ProjectPickerView />
 	{:else if currentView === "chat"}
 		<ChatView />
 	{:else if currentView === "settings"}

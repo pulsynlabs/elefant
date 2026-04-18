@@ -11,6 +11,9 @@ export function initNavigation(opts: { getActiveProjectId: () => string | null }
 }
 
 export const navigationStore = {
+	initNavigation(opts: { getActiveProjectId: () => string | null }): void {
+		_getActiveProjectId = opts.getActiveProjectId;
+	},
 	get current() {
 		return currentView;
 	},

@@ -22,6 +22,12 @@
 	} from '$lib/icons/index.js';
 	import ProjectCard from './ProjectCard.svelte';
 
+	type Props = {
+		onProjectSelected?: () => void;
+	};
+
+	let { onProjectSelected = () => {} }: Props = $props();
+
 	// Kick off a load on mount if we haven't loaded yet. Using an $effect with
 	// a guard keeps us idempotent across remounts (e.g. when the user clicks
 	// back into the picker from the TopBar in later tasks).
@@ -56,6 +62,7 @@
 			const dir = await pickDirectory();
 			if (!dir) return; // User cancelled — no error, no navigation.
 			await projectsStore.openProject(dir);
+			onProjectSelected();
 			// Navigation transition lands in W3.T5. At that point this is:
 			//   navigationStore.navigate('chat');
 			// For now, successfully opening a project is visible via the
@@ -76,6 +83,7 @@
 		// Real navigation lands in W3.T5; for now, select via the store so
 		// reactive consumers can already see the change in dev.
 		void projectsStore.selectProject(project.id);
+		onProjectSelected();
 	}
 
 	function handleRename(project: Project, newName: string): void {

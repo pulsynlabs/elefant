@@ -171,6 +171,36 @@ function selectSession(sessionId: string): void {
 	activeSessionId = sessionId;
 }
 
+/** Reset all store state to initial values. Exported for test isolation. */
+export function resetProjectsStore(): void {
+	projects = [];
+	activeProjectId = null;
+	sessionsByProject = {};
+	activeSessionId = null;
+	lastError = null;
+	isLoading = false;
+}
+
+/** Set projects array directly. Exported for test isolation. */
+export function _setProjects(p: Project[]): void {
+	projects = p;
+}
+
+/** Set active project ID directly. Exported for test isolation. */
+export function _setActiveProjectId(id: string | null): void {
+	activeProjectId = id;
+}
+
+/** Set sessions by project directly. Exported for test isolation. */
+export function _setSessionsByProject(s: Record<string, Session[]>): void {
+	sessionsByProject = s;
+}
+
+/** Set active session ID directly. Exported for test isolation. */
+export function _setActiveSessionId(id: string | null): void {
+	activeSessionId = id;
+}
+
 export const projectsStore = {
 	get projects() {
 		return projects;
@@ -201,4 +231,9 @@ export const projectsStore = {
 	loadSessions,
 	createSession,
 	selectSession,
+	resetProjectsStore,
+	_setProjects,
+	_setActiveProjectId,
+	_setSessionsByProject,
+	_setActiveSessionId,
 };
