@@ -6,6 +6,23 @@ import type {
 } from './types.js';
 import { parseSSEStream } from './sse-parser.js';
 
+// Default daemon URL — consumed by events.ts (SSE) and approvals.ts (WebSocket).
+// Keep in sync with `settingsStore.daemonUrl` when users customise the port.
+export const DAEMON_URL = 'http://localhost:1337';
+
+// Eden Treaty client (future wiring):
+//
+// When the daemon is published as `@elefant/daemon` (or this app is in the
+// same workspace as `src/index.ts`), swap the raw fetch calls below for a
+// fully typed treaty client:
+//
+//   import { treaty } from '@elysiajs/eden';
+//   import type { App } from '@elefant/daemon';
+//   export const api = treaty<App>(DAEMON_URL);
+//
+// SSE streams (chat, project events) should still use the native `fetch` /
+// `EventSource` paths — treaty does not wrap streaming responses cleanly.
+
 export class DaemonClient {
 	private baseUrl: string;
 	private timeout: number;

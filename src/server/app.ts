@@ -3,14 +3,22 @@ import { Elysia } from 'elysia'
 import type { HookRegistry } from '../hooks/index.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { ToolRegistry } from '../tools/registry.ts'
+import type { ElefantWsServer } from '../transport/ws-server.ts'
+import type { SseManager } from '../transport/sse-manager.ts'
+import type { Database } from '../db/database.ts'
 import { registerServerRoutes } from './routes.ts'
 import { registerQuestionRoute } from '../tools/question/route.ts'
+import { mountWsRoute } from './routes-ws.ts'
+import { mountProjectEventsRoute, mountProjectsRoutes } from './routes-projects.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,
 	toolRegistry: ToolRegistry,
 	hookRegistry: HookRegistry,
-): Elysia {
+	db: Database,
+	ws?: ElefantWsServer,
+	sse?: SseManager,
+) {
 	const CORS_HEADERS = {
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 		'Access-Control-Allow-Headers': 'Content-Type, Accept, Authorization',
@@ -67,5 +75,21 @@ export function createApp(
 	// Register question tool route for HITL interactions
 	registerQuestionRoute(app as unknown as Elysia)
 
-	return registerServerRoutes(app as unknown as Elysia, providerRouter, toolRegistry, hookRegistry)
+	const baseApp = registerServerRoutes(app as unknown as Elysia, providerRouter, toolRegistry, hookRegistry)
+
+	// Mount transport routes when available
+	if (ws) mountWsRoute(baseApp, ws)
+	if (sse) mountProjectEventsRoute(baseApp, sse)
+
+	// Mount project CRUD routes
+	mountProjectsRoutes(baseApp, db)
+
+	return baseApp
 }
+
+/**
+ * The fully-typed Elysia app instance with all routes.
+ * Exported for Eden Treaty type inference on the client side.
+ * Usage: `import type { App } from 'elefant'`
+ */
+export type App = ReturnType<typeof createApp>

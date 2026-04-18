@@ -1,0 +1,5 @@
+[install]
+# No special install config needed
+
+[test]
+preload = ["./test-setup.ts"]

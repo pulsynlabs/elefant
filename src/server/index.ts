@@ -1,4 +1,5 @@
 export { createApp } from './app.ts'
+export type { App } from './app.ts'
 export { runAgentLoop, type AgentLoopOptions } from './agent-loop.ts'
 export { createConversationRoute } from './conversation.ts'
 export { registerServerRoutes } from './routes.ts'

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { HugeiconsIcon, MenuIcon } from "$lib/icons/index.js";
+	import { projectsStore } from "$lib/stores/projects.svelte.js";
+	import { navigationStore } from "$lib/stores/navigation.svelte.js";
 
 	type Props = {
 		onToggleSidebar?: () => void;
@@ -7,6 +9,12 @@
 	};
 
 	let { onToggleSidebar, children }: Props = $props();
+
+	const activeProject = $derived(projectsStore.activeProject);
+
+	function handleSwitchProject(): void {
+		navigationStore.goToProjectPicker();
+	}
 </script>
 
 <div class="topbar-content">
@@ -18,6 +26,18 @@
 	>
 		<HugeiconsIcon icon={MenuIcon} size={16} strokeWidth={1.5} />
 	</button>
+
+	{#if activeProject}
+		<button
+			type="button"
+			class="project-pill"
+			onclick={handleSwitchProject}
+			title={activeProject.path}
+			aria-label={`Switch project — currently ${activeProject.name}`}
+		>
+			<span class="project-pill-name">{activeProject.name}</span>
+		</button>
+	{/if}
 
 	<div class="topbar-spacer"></div>
 
@@ -56,6 +76,45 @@
 
 	.sidebar-toggle:focus-visible {
 		outline: none;
+		box-shadow: var(--glow-focus);
+	}
+
+	.project-pill {
+		display: inline-flex;
+		align-items: center;
+		max-width: 240px;
+		font-size: 11px;
+		font-family: var(--font-mono);
+		color: var(--color-text-muted);
+		padding: 2px 8px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-full);
+		background: transparent;
+		cursor: pointer;
+		white-space: nowrap;
+		transition:
+			color var(--transition-fast),
+			border-color var(--transition-fast),
+			background-color var(--transition-fast),
+			box-shadow var(--transition-fast);
+	}
+
+	.project-pill-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.project-pill:hover {
+		color: var(--color-primary);
+		border-color: var(--color-primary);
+		background-color: var(--color-primary-subtle);
+	}
+
+	.project-pill:focus-visible {
+		outline: none;
+		color: var(--color-primary);
+		border-color: var(--color-primary);
 		box-shadow: var(--glow-focus);
 	}
 

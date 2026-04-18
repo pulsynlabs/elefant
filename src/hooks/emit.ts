@@ -5,14 +5,32 @@ export async function emit<E extends HookEventName>(
 	registry: HookRegistry,
 	event: E,
 	context: HookContextMap[E],
-): Promise<void> {
+): Promise<HookContextMap[E]> {
+	let ctx = { ...context } as HookContextMap[E];
 	const handlers = registry.getHandlers(event);
 
-	for (const [index, handler] of handlers.entries()) {
+	for (const handler of handlers) {
 		try {
-			await handler(context);
+			const result = await handler(ctx);
+			if (result == null) {
+				continue;
+			}
+
+			if (
+				typeof result === 'object' &&
+				'cancel' in result &&
+				result.cancel === true
+			) {
+				break;
+			}
+
+			if (typeof result === 'object') {
+				ctx = { ...ctx, ...result };
+			}
 		} catch (error) {
-			console.error(`[hooks] error in handler ${index} for event "${event}"`, error);
+			console.error(`[elefant] Hook handler error (${event}):`, error);
 		}
 	}
+
+	return ctx;
 }

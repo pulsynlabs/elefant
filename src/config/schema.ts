@@ -13,6 +13,7 @@ const configSchema = z.object({
 	providers: z.array(providerSchema).default([]),
 	defaultProvider: z.string().default(''),
 	logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
+	projectPath: z.string().default(() => process.cwd()),
 });
 
 export { configSchema, providerSchema };
