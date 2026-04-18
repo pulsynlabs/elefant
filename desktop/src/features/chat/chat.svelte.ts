@@ -1,4 +1,5 @@
 import type { ChatMessage, ContentBlock, ToolCallDisplay } from './types.js';
+import type { QuestionEvent } from '$lib/daemon/types.js';
 
 function generateId(): string {
 	return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -105,6 +106,31 @@ export function addToolResult(toolCallId: string, content: string, resultIsError
 	});
 }
 
+export function addQuestion(event: QuestionEvent): void {
+	if (!streamingMessageId) return;
+
+	// Create a virtual tool call for the question so it renders as a ToolCallDisplay
+	const toolCall: ToolCallDisplay = {
+		id: event.questionId,
+		name: 'question',
+		arguments: {
+			questions: [{
+				question: event.question,
+				header: event.header,
+				options: event.options,
+				multiple: event.multiple,
+			}],
+			conversationId: event.conversationId,
+		},
+	};
+
+	messages = messages.map((msg) => {
+		if (msg.id !== streamingMessageId) return msg;
+		const blocks: ContentBlock[] = [...(msg.blocks ?? []), { type: 'tool_call', toolCall }];
+		return { ...msg, blocks };
+	});
+}
+
 export function finalizeMessage(_finishReason: string): void {
 	if (!streamingMessageId) return;
 
@@ -185,6 +211,7 @@ export const chatStore = {
 	appendToken,
 	addToolCall,
 	addToolResult,
+	addQuestion,
 	finalizeMessage,
 	setStreamingError,
 	clearConversation,

@@ -4,6 +4,7 @@
 	import MessageInput from './MessageInput.svelte';
 	import ProviderSelector from './ProviderSelector.svelte';
 	import AdvancedOptions from './AdvancedOptions.svelte';
+	import ConnectionBanner from './ConnectionBanner.svelte';
 	import { getDaemonClient } from '$lib/daemon/client.js';
 	import type { MessageRole } from '$lib/daemon/types.js';
 
@@ -51,6 +52,8 @@
 					});
 				} else if (event.type === 'tool_result') {
 					chatStore.addToolResult(event.toolCallId, event.content, event.isError);
+				} else if (event.type === 'question') {
+					chatStore.addQuestion(event);
 				} else if (event.type === 'done') {
 					chatStore.finalizeMessage(event.finishReason);
 					break;
@@ -78,6 +81,9 @@
 </script>
 
 <div class="chat-view">
+	<!-- Connection status banner -->
+	<ConnectionBanner />
+
 	<!-- Header with provider selector -->
 	<div class="chat-header">
 		<h2 class="chat-title industrial-caps">Chat</h2>
