@@ -9,6 +9,7 @@ import type { ElefantError } from '../../types/errors.js';
 import type { Result } from '../../types/result.js';
 import { ok, err } from '../../types/result.js';
 import { questionBroker, type AnswerPayload } from './broker.js';
+import { emitQuestion } from './emitter.js';
 
 export interface QuestionOption {
 	label: string;
@@ -107,20 +108,15 @@ export const questionTool: ToolDefinition<QuestionParams, string> = {
 			// Register with broker (60 second timeout)
 			const answerPromise = questionBroker.register(questionId, 60_000);
 
-			// TODO: Emit hook event to notify the frontend
-			// For now, log to stderr as a placeholder
-			// This should be wired to the hook system when available from tool layer
-			process.stderr.write(
-				JSON.stringify({
-					type: 'question',
-					questionId,
-					question: question.question,
-					header: question.header,
-					options: question.options,
-					multiple: question.multiple ?? false,
-					conversationId: params.conversationId,
-				}) + '\n',
-			);
+			// Emit question event to SSE stream so frontend can render it
+			emitQuestion({
+				questionId,
+				question: question.question,
+				header: question.header,
+				options: question.options,
+				multiple: question.multiple ?? false,
+				conversationId: params.conversationId,
+			});
 
 			try {
 				const answer = await answerPromise;

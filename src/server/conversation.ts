@@ -9,6 +9,7 @@ import type { ToolCall, ToolResult } from '../types/tools.ts'
 import type { ToolRegistry } from '../tools/registry.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { formatSSEEvent, formatSSEKeepalive } from './sse.ts'
+import { setQuestionEmitter, type QuestionSsePayload } from '../tools/question/emitter.ts'
 
 const toolCallSchema = z.object({
 	id: z.string().min(1),
@@ -96,6 +97,17 @@ function toSSEChunk(event: StreamEvent): string | null {
 	return null
 }
 
+function toQuestionSSEChunk(payload: QuestionSsePayload): string {
+	return formatSSEEvent('question', {
+		questionId: payload.questionId,
+		question: payload.question,
+		header: payload.header,
+		options: payload.options,
+		multiple: payload.multiple,
+		conversationId: payload.conversationId,
+	})
+}
+
 function createSSEStream(
 	providerRouter: ProviderRouter,
 	toolRegistry: ToolRegistry,
@@ -117,6 +129,9 @@ function createSSEStream(
 			keepaliveTimer = null
 		}
 
+		// Clear question emitter to prevent stale callbacks
+		setQuestionEmitter(null)
+
 		if (abortUpstream) {
 			abortController.abort()
 		}
@@ -135,6 +150,11 @@ function createSSEStream(
 			keepaliveTimer = setInterval(() => {
 				encodeSSEChunk(controller, formatSSEKeepalive())
 			}, 15_000)
+
+			// Set up question emitter for this stream
+			setQuestionEmitter((payload: QuestionSsePayload) => {
+				encodeSSEChunk(controller, toQuestionSSEChunk(payload))
+			})
 
 			void (async () => {
 				try {
