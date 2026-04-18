@@ -78,14 +78,16 @@
 		void projectsStore.selectProject(project.id);
 	}
 
-	function handleRename(project: Project): void {
-		// W2.T6 will replace this with the inline-rename UX.
-		console.info('[picker] rename requested for', project.id);
+	function handleRename(project: Project, newName: string): void {
+		// The card commits the rename against the store itself — this
+		// callback is an observability hook (useful for analytics/logging).
+		console.info('[picker] renamed', project.id, '→', newName);
 	}
 
 	function handleDelete(project: Project): void {
-		// W2.T6 will replace this with the confirm-dialog flow.
-		console.info('[picker] delete requested for', project.id);
+		// The card commits the delete against the store itself; this is
+		// the post-delete observation hook.
+		console.info('[picker] deleted', project.id);
 	}
 
 	// Derived convenience — avoids repeated access in the template.
