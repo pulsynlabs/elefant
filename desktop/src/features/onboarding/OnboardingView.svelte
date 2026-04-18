@@ -1,11 +1,13 @@
 <script lang="ts">
-	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import { connectionStore } from '$lib/stores/connection.svelte.js';
 	import { configService } from '$lib/services/config-service.js';
 	import { daemonLifecycle } from '$lib/services/daemon-lifecycle.js';
 	import { onMount } from 'svelte';
 
 	type Step = 'welcome' | 'provider' | 'starting';
+
+	type Props = { onComplete?: () => Promise<void> };
+	let { onComplete }: Props = $props();
 
 	let step = $state<Step>('welcome');
 
@@ -57,44 +59,46 @@
 		await waitForDaemon();
 	}
 
+	async function complete() {
+		await onComplete?.();
+	}
+
 	async function waitForDaemon() {
-		// If the provider API responded (200 or 409), the daemon is already up.
-		// Check health directly first before trying to start anything.
+		// Daemon is already up if it responded to the provider API — complete immediately
 		await connectionStore.checkNow();
 		if (connectionStore.isConnected) {
-			navigationStore.navigate('chat');
+			await complete();
 			return;
 		}
 
-		// Daemon not reachable yet — try to start it
+		// Daemon not reachable — try to start it
 		try {
 			await daemonLifecycle.startDaemon();
 		} catch {
-			// Shell plugin may not work in all environments; ignore and keep polling
+			// Shell plugin may not work everywhere; keep polling
 		}
 
-		// Poll health for up to 15s
+		// Poll up to 15s
 		for (let i = 0; i < 15; i++) {
 			await new Promise<void>((r) => setTimeout(r, 1000));
 			await connectionStore.checkNow();
 			if (connectionStore.isConnected) {
-				navigationStore.navigate('chat');
+				await complete();
 				return;
 			}
 		}
 
-		// Timed out — go to chat anyway, user can start daemon manually
-		navigationStore.navigate('chat');
+		// Timed out — complete anyway, user can configure manually
+		await complete();
 	}
 
 	onMount(async () => {
-		// Check once if daemon is already up with providers configured.
-		// Don't loop — if daemon is down we want to show the setup UI immediately.
+		// If daemon is already up with a real provider, skip onboarding
 		const config = await configService.readConfig();
 		if (config !== null) {
 			const hasRealProvider = config.providers.some((p) => p.apiKey !== '');
 			if (hasRealProvider) {
-				navigationStore.navigate('chat');
+				await complete();
 			}
 		}
 	});
@@ -210,7 +214,7 @@
 					<button class="btn-primary" onclick={handleSaveProvider} disabled={saving}>
 						{saving ? 'Saving...' : 'Save & start daemon'}
 					</button>
-					<button class="btn-ghost-link" onclick={() => navigationStore.navigate('settings')}>
+					<button class="btn-ghost-link" onclick={complete}>
 						Set up manually in Settings
 					</button>
 				</div>

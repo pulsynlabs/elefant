@@ -153,7 +153,19 @@
 	{#if hasConfig === null}
 		<!-- Still loading config — blank to avoid flash -->
 	{:else if hasConfig === false}
-		<OnboardingView />
+		<OnboardingView onComplete={async () => {
+			const config = await configService.readConfig();
+			if (config) {
+				const realProviders = config.providers.filter((p) => p.apiKey !== '');
+				if (realProviders.length > 0) {
+					chatStore.setAvailableProviders(
+						realProviders.map((p) => p.name),
+						config.defaultProvider || realProviders[0].name,
+					);
+					hasConfig = true;
+				}
+			}
+		}} />
 	{:else if currentView === "chat"}
 		<ChatView />
 	{:else if currentView === "settings"}
