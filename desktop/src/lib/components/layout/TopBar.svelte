@@ -45,12 +45,18 @@
 		cursor: pointer;
 		transition:
 			color var(--transition-fast),
-			background-color var(--transition-fast);
+			background-color var(--transition-fast),
+			box-shadow var(--transition-fast);
 	}
 
 	.sidebar-toggle:hover {
 		color: var(--color-text-primary);
 		background-color: var(--color-surface-hover);
+	}
+
+	.sidebar-toggle:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-focus);
 	}
 
 	.topbar-spacer {

@@ -59,6 +59,26 @@
 		height: 100%;
 		padding: var(--space-3) 0;
 		overflow: hidden;
+		position: relative;
+	}
+
+	/* Vertical accent line — left edge */
+	.sidebar-nav::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 2px;
+		height: 100%;
+		background: linear-gradient(
+			to bottom,
+			transparent 0%,
+			var(--color-primary) 20%,
+			var(--color-primary) 80%,
+			transparent 100%
+		);
+		opacity: 0.6;
+		pointer-events: none;
 	}
 
 	.sidebar-brand {
@@ -83,6 +103,8 @@
 		font-size: var(--font-size-lg);
 		flex-shrink: 0;
 		font-family: var(--font-mono);
+		box-shadow: var(--glow-primary);
+		transition: box-shadow var(--transition-fast);
 	}
 
 	.brand-name {
@@ -100,6 +122,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+		flex: 1;
 	}
 
 	.nav-item {
@@ -118,9 +141,11 @@
 		font-family: var(--font-sans);
 		transition:
 			color var(--transition-fast),
-			background-color var(--transition-fast);
+			background-color var(--transition-fast),
+			box-shadow var(--transition-fast);
 		white-space: nowrap;
 		overflow: hidden;
+		position: relative;
 	}
 
 	.nav-item:hover {
@@ -131,6 +156,12 @@
 	.nav-item.active {
 		color: var(--color-primary);
 		background-color: var(--color-primary-subtle);
+		box-shadow: inset 2px 0 0 var(--color-primary), var(--glow-primary);
+	}
+
+	.nav-item:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-focus);
 	}
 
 	.nav-icon {
