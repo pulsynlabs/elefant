@@ -52,18 +52,28 @@
 		// Start connection health polling
 		connectionStore.start();
 
-		// Load available providers + check onboarding gate
-		// readConfig() masks keys as '••••••••' when real, '' when unconfigured
-		configService.readConfig().then((config) => {
-			const realProviders = config?.providers?.filter((p) => p.apiKey !== '') ?? [];
-			hasConfig = realProviders.length > 0;
-			if (realProviders.length > 0) {
-				chatStore.setAvailableProviders(
-					realProviders.map((p) => p.name),
-					config?.defaultProvider ?? realProviders[0].name,
-				);
+		// Load config once daemon is reachable, retry until it responds
+		async function loadConfigWhenReady(): Promise<void> {
+			for (let i = 0; i < 30; i++) {
+				const config = await configService.readConfig();
+				if (config !== null) {
+					const realProviders = config.providers.filter((p) => p.apiKey !== '');
+					hasConfig = realProviders.length > 0;
+					if (realProviders.length > 0) {
+						chatStore.setAvailableProviders(
+							realProviders.map((p) => p.name),
+							config.defaultProvider || realProviders[0].name,
+						);
+					}
+					return;
+				}
+				// Daemon not up yet — wait and retry
+				await new Promise<void>((r) => setTimeout(r, 1000));
 			}
-		});
+			// Gave up — show onboarding, user can set up manually
+			hasConfig = false;
+		}
+		void loadConfigWhenReady();
 
 		// Keyboard shortcuts
 		function handleKeydown(event: KeyboardEvent): void {

@@ -10,6 +10,12 @@ export function createApp(
 	toolRegistry: ToolRegistry,
 	hookRegistry: HookRegistry,
 ): Elysia {
+	const CORS_HEADERS = {
+		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+		'Access-Control-Allow-Headers': 'Content-Type, Accept, Authorization',
+		'Access-Control-Max-Age': '86400',
+	} as const
+
 	const app = new Elysia({
 		serve: {
 			maxRequestBodySize: 10 * 1024 * 1024,
@@ -36,6 +42,13 @@ export function createApp(
 
 			set.headers['Access-Control-Allow-Origin'] = origin
 			set.headers['Vary'] = 'Origin'
+			Object.assign(set.headers, CORS_HEADERS)
+
+			// Handle preflight — return 204 immediately
+			if (request.method === 'OPTIONS') {
+				set.status = 204
+				return ''
+			}
 
 			return
 		})
