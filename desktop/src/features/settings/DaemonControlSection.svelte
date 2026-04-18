@@ -19,9 +19,10 @@
 	onMount(async () => {
 		daemonStatus = await daemonLifecycle.getDaemonStatus();
 		const config = await configService.readConfig();
+		// Masked keys are '••••••••' when real, '' when unconfigured
 		configIsPlaceholder =
 			!config?.providers?.length ||
-			config.providers.every((p) => p.apiKey === 'YOUR_API_KEY_HERE');
+			config.providers.every((p) => p.apiKey === '');
 	});
 
 	$effect(() => {

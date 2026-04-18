@@ -53,8 +53,9 @@
 		connectionStore.start();
 
 		// Load available providers + check onboarding gate
+		// readConfig() masks keys as '••••••••' when real, '' when unconfigured
 		configService.readConfig().then((config) => {
-			const realProviders = config?.providers?.filter((p) => p.apiKey !== 'YOUR_API_KEY_HERE') ?? [];
+			const realProviders = config?.providers?.filter((p) => p.apiKey !== '') ?? [];
 			hasConfig = realProviders.length > 0;
 			if (realProviders.length > 0) {
 				chatStore.setAvailableProviders(

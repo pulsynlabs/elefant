@@ -40,24 +40,17 @@
 		error = null;
 
 		try {
-			const config = await configService.getOrCreateConfig();
-			// Replace any placeholder provider
-			const providers = config.providers.filter((p) => p.apiKey !== 'YOUR_API_KEY_HERE');
-			providers.push({
+			await configService.addProvider({
 				name: name.trim() || 'my-provider',
 				baseURL: baseURL.trim(),
 				apiKey: apiKey.trim(),
 				model: model.trim(),
 				format,
 			});
-			config.providers = providers;
-			config.defaultProvider = providers[0].name;
-			await configService.writeConfig(config);
 			step = 'starting';
-			// The daemon is polling for a valid config every 3s — just wait for it
 			await waitForDaemon();
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to save config.';
+			error = e instanceof Error ? e.message : 'Failed to save provider.';
 			saving = false;
 		}
 	}
@@ -88,9 +81,10 @@
 	}
 
 	onMount(async () => {
-		// If they already have a valid config, skip onboarding
+		// If daemon is up and has providers configured, skip onboarding
 		const config = await configService.readConfig();
-		const hasRealProvider = config?.providers?.some((p) => p.apiKey !== 'YOUR_API_KEY_HERE');
+		// Masked keys come back as '••••••••' (non-empty) when real, '' when unconfigured
+		const hasRealProvider = config?.providers?.some((p) => p.apiKey !== '');
 		if (hasRealProvider) {
 			navigationStore.navigate('chat');
 		}

@@ -26,24 +26,19 @@
 		saveStatus = 'saving';
 		try {
 			await settingsStore.setDaemonUrl(daemonUrl);
-
-			const config = await configService.getOrCreateConfig();
-			config.port = port;
-			config.logLevel = logLevel;
-			if (defaultProvider) config.defaultProvider = defaultProvider;
-			await configService.writeConfig(config);
+			await configService.updateConfig({
+				port,
+				logLevel,
+				...(defaultProvider ? { defaultProvider } : {}),
+			});
 
 			saveStatus = 'saved';
 			saveMessage = 'Settings saved';
-			setTimeout(() => {
-				saveStatus = 'idle';
-			}, 2000);
+			setTimeout(() => { saveStatus = 'idle'; }, 2000);
 		} catch (error) {
 			saveStatus = 'error';
 			saveMessage = error instanceof Error ? error.message : 'Failed to save settings';
-			setTimeout(() => {
-				saveStatus = 'idle';
-			}, 4000);
+			setTimeout(() => { saveStatus = 'idle'; }, 4000);
 		}
 	}
 </script>
