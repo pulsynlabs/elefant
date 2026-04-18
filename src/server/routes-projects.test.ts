@@ -216,13 +216,28 @@ describe('mountProjectsSessionsRoutes', () => {
 			);
 			const payload = (await response.json()) as {
 				ok: boolean;
-				data: { id: string; project_id: string };
+				data: { id: string; projectId: string };
 			};
 
 			expect(response.status).toBe(201);
 			expect(payload.ok).toBe(true);
 			expect(typeof payload.data.id).toBe('string');
-			expect(payload.data.project_id).toBe(testProjectId);
+			expect(payload.data.projectId).toBe(testProjectId);
+		});
+
+		it('returns 400 when title is not a string', async () => {
+			const response = await app.handle(
+				new Request(`http://localhost/api/projects/${testProjectId}/sessions`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ title: 123 }),
+				}),
+			);
+			const payload = (await response.json()) as { error: string; message: string };
+
+			expect(response.status).toBe(400);
+			expect(payload.error).toBe('VALIDATION_ERROR');
+			expect(typeof payload.message).toBe('string');
 		});
 
 		it('returns 404 for missing project', async () => {

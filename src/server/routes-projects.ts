@@ -13,11 +13,46 @@ import {
 	insertProject,
 } from '../db/repo/projects.ts';
 import { insertSession, listSessionsByProject } from '../db/repo/sessions.ts';
+import type { ProjectRow } from '../db/schema.ts';
+import type { SessionRow } from '../db/schema.ts';
 import type { ElefantError } from '../types/errors.ts';
+
+// ─── Response Mappers ────────────────────────────────────────────────────────
+// The DB uses snake_case columns (created_at, updated_at, project_id, etc.)
+// but the desktop UI expects camelCase (createdAt, updatedAt, projectId, etc.).
+// These mappers ensure the API contract is camelCase.
+
+export function toProjectResponse(row: ProjectRow) {
+	return {
+		id: row.id,
+		name: row.name,
+		path: row.path,
+		description: row.description,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+	};
+}
+
+export function toSessionResponse(row: SessionRow) {
+	return {
+		id: row.id,
+		projectId: row.project_id,
+		workflowId: row.workflow_id ?? null,
+		phase: row.phase,
+		status: row.status,
+		startedAt: row.started_at,
+		completedAt: row.completed_at ?? null,
+		updatedAt: row.updated_at,
+	};
+}
 
 const ProjectCreateBodySchema = z.object({
 	path: z.string().min(1),
 	name: z.string().optional(),
+});
+
+const SessionCreateBodySchema = z.object({
+	title: z.string().optional(),
 });
 
 function mapErrorToStatus(error: ElefantError): number {
@@ -57,7 +92,7 @@ export function mountProjectsCreateRoute(app: Elysia, db: Database): Elysia {
 
 		if (existing.data) {
 			set.status = 200;
-			return existing.data;
+			return toProjectResponse(existing.data);
 		}
 
 		const bootstrapResult = await ProjectManager.bootstrap(path);
@@ -90,7 +125,7 @@ export function mountProjectsCreateRoute(app: Elysia, db: Database): Elysia {
 		}
 
 		set.status = 201;
-		return insertResult.data;
+		return toProjectResponse(insertResult.data);
 	});
 }
 
@@ -105,7 +140,7 @@ export function mountProjectsListRoute(app: Elysia, db: Database): Elysia {
 	return app.get('/api/projects', () => {
 		const result = listProjects(db);
 		if (result.ok) {
-			return result.data;
+			return result.data.map(toProjectResponse);
 		}
 		return { error: result.error.message };
 	});
@@ -136,7 +171,7 @@ export function mountProjectsUpdateRoute(app: Elysia, db: Database): Elysia {
 			return { ok: false, error: updated.error.message };
 		}
 
-		return { ok: true, data: updated.data };
+		return { ok: true, data: toProjectResponse(updated.data) };
 	});
 }
 
@@ -174,9 +209,15 @@ export function mountProjectsSessionsRoutes(app: Elysia, db: Database): Elysia {
 				return { ok: false, error: sessions.error.message };
 			}
 
-			return { ok: true, data: sessions.data };
+			return { ok: true, data: sessions.data.map(toSessionResponse) };
 		})
-		.post('/api/projects/:id/sessions', ({ params, set }) => {
+		.post('/api/projects/:id/sessions', ({ params, body, set }) => {
+			const parsed = SessionCreateBodySchema.safeParse(body ?? {});
+			if (!parsed.success) {
+				set.status = 400;
+				return { error: 'VALIDATION_ERROR', message: parsed.error.message };
+			}
+
 			const project = getProjectById(db, params.id);
 			if (!project.ok) {
 				set.status = 404;
@@ -194,7 +235,7 @@ export function mountProjectsSessionsRoutes(app: Elysia, db: Database): Elysia {
 			}
 
 			set.status = 201;
-			return { ok: true, data: session.data };
+			return { ok: true, data: toSessionResponse(session.data) };
 		});
 }
 
