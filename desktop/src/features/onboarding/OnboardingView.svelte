@@ -2,6 +2,7 @@
 	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import { connectionStore } from '$lib/stores/connection.svelte.js';
 	import { configService } from '$lib/services/config-service.js';
+	import { daemonLifecycle } from '$lib/services/daemon-lifecycle.js';
 	import { onMount } from 'svelte';
 
 	type Step = 'welcome' | 'provider' | 'starting';
@@ -62,17 +63,27 @@
 	}
 
 	async function waitForDaemon() {
-		// Poll health up to 30s
+		// Start the daemon if it isn't already running
+		const status = await daemonLifecycle.getDaemonStatus();
+		if (status !== 'running') {
+			try {
+				await daemonLifecycle.startDaemon();
+			} catch {
+				// Ignore — daemon may already be starting, or bun isn't on PATH.
+				// The user can start it manually; we'll still proceed to chat.
+			}
+		}
+
+		// Poll health for up to 30s waiting for daemon to come up
 		for (let i = 0; i < 30; i++) {
 			await new Promise<void>((r) => setTimeout(r, 1000));
 			await connectionStore.checkNow();
 			if (connectionStore.isConnected) {
-				// Daemon picked up the config — go to chat
 				navigationStore.navigate('chat');
 				return;
 			}
 		}
-		// Daemon didn't respond — let them proceed anyway
+		// Timed out — go to chat anyway; user can start daemon manually
 		navigationStore.navigate('chat');
 	}
 

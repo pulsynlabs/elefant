@@ -45,10 +45,20 @@ export async function readConfig(): Promise<ElefantConfig | null> {
 }
 
 export async function writeConfig(config: ElefantConfig): Promise<void> {
-	await ensureConfigDir();
+	try {
+		await ensureConfigDir();
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : String(e);
+		throw new Error(`Could not create config directory (~/.config/elefant/): ${msg}`);
+	}
 	const configPath = await getConfigPath();
 	const content = JSON.stringify(config, null, 2);
-	await writeTextFile(configPath, content);
+	try {
+		await writeTextFile(configPath, content);
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : String(e);
+		throw new Error(`Could not write config file (${configPath}): ${msg}`);
+	}
 }
 
 export async function getOrCreateConfig(): Promise<ElefantConfig> {
