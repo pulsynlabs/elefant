@@ -161,7 +161,6 @@
 		font-size: var(--font-size-xs);
 		font-family: var(--font-mono);
 		color: var(--color-text-muted);
-		truncate: ellipsis;
 		overflow: hidden;
 		white-space: nowrap;
 		text-overflow: ellipsis;
