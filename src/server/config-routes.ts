@@ -42,14 +42,15 @@ export function createConfigRoutes<TApp extends Elysia>(app: TApp, providerRoute
 			set.status = 404
 			return { ok: false, error: 'No config file found' }
 		}
-		// Mask API keys before sending to desktop
+		// Mask API keys — send empty string for unconfigured, bullets for real keys
+		const isPlaceholder = (key: string) => key === 'YOUR_API_KEY_HERE' || key === ''
 		return {
 			ok: true,
 			config: {
 				...config,
 				providers: config.providers.map((p) => ({
 					...p,
-					apiKey: p.apiKey === 'YOUR_API_KEY_HERE' ? '' : '•'.repeat(8),
+					apiKey: isPlaceholder(p.apiKey) ? '' : '•'.repeat(8),
 				})),
 			},
 		}
@@ -104,12 +105,20 @@ export function createConfigRoutes<TApp extends Elysia>(app: TApp, providerRoute
 			logLevel: 'info' as const,
 		}
 
-		if (existing.providers.some((p) => p.name === parsed.data.name)) {
-			set.status = 409
-			return { ok: false, error: `Provider "${parsed.data.name}" already exists` }
+		const existingIndex = existing.providers.findIndex((p) => p.name === parsed.data.name)
+		if (existingIndex !== -1) {
+			const existingProvider = existing.providers[existingIndex]
+			// If the existing entry is a placeholder, overwrite it silently
+			if (existingProvider.apiKey === 'YOUR_API_KEY_HERE' || existingProvider.apiKey === '') {
+				existing.providers[existingIndex] = parsed.data
+			} else {
+				set.status = 409
+				return { ok: false, error: `Provider "${parsed.data.name}" already exists` }
+			}
+		} else {
+			existing.providers.push(parsed.data)
 		}
 
-		existing.providers.push(parsed.data)
 		if (!existing.defaultProvider) {
 			existing.defaultProvider = parsed.data.name
 		}
