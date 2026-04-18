@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { HugeiconsIcon, MenuIcon } from "$lib/icons/index.js";
+
 	type Props = {
 		onToggleSidebar?: () => void;
 		children?: import("svelte").Snippet;
@@ -14,18 +16,7 @@
 		aria-label="Toggle sidebar"
 		title="Toggle sidebar"
 	>
-		<svg
-			width="16"
-			height="16"
-			viewBox="0 0 16 16"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="1.5"
-		>
-			<line x1="2" y1="4" x2="14" y2="4" />
-			<line x1="2" y1="8" x2="14" y2="8" />
-			<line x1="2" y1="12" x2="14" y2="12" />
-		</svg>
+		<HugeiconsIcon icon={MenuIcon} size={16} strokeWidth={1.5} />
 	</button>
 
 	<div class="topbar-spacer"></div>

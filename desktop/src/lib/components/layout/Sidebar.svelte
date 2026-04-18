@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { navigationStore } from "$lib/stores/navigation.svelte.js";
+	import { HugeiconsIcon, ChatIcon, SettingsIcon, ModelsIcon, AboutIcon } from "$lib/icons/index.js";
+	import type { IconSvgElement } from "$lib/icons/index.js";
 
 	type Props = {
 		collapsed?: boolean;
@@ -7,19 +9,11 @@
 
 	let { collapsed = false }: Props = $props();
 
-	// Inline SVG icons (Svelte 5 compatible)
-	const icons = {
-		chat: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
-		settings: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
-		models: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 4v16"/><path d="M4 9h16"/></svg>`,
-		about: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
-	};
-
-	const navItems = [
-		{ id: "chat" as const, label: "Chat", icon: icons.chat },
-		{ id: "settings" as const, label: "Settings", icon: icons.settings },
-		{ id: "models" as const, label: "Models", icon: icons.models },
-		{ id: "about" as const, label: "About", icon: icons.about },
+	const navItems: { id: 'chat' | 'settings' | 'models' | 'about'; label: string; icon: IconSvgElement }[] = [
+		{ id: "chat", label: "Chat", icon: ChatIcon },
+		{ id: "settings", label: "Settings", icon: SettingsIcon },
+		{ id: "models", label: "Models", icon: ModelsIcon },
+		{ id: "about", label: "About", icon: AboutIcon },
 	];
 </script>
 
@@ -47,7 +41,7 @@
 						: undefined}
 				>
 					<span class="nav-icon" aria-hidden="true">
-						{@html item.icon}
+						<HugeiconsIcon icon={item.icon} size={18} strokeWidth={1.5} />
 					</span>
 					{#if !collapsed}
 						<span class="nav-label">{item.label}</span>
