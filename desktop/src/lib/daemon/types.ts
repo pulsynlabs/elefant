@@ -67,7 +67,17 @@ export interface ErrorEvent {
 	details?: unknown;
 }
 
-export type ChatStreamEvent = TokenEvent | ToolCallEvent | ToolResultEvent | DoneEvent | ErrorEvent;
+export interface QuestionEvent {
+	type: 'question';
+	questionId: string;
+	question: string;
+	header: string;
+	options: Array<{ label: string; description?: string }>;
+	multiple: boolean;
+	conversationId?: string;
+}
+
+export type ChatStreamEvent = TokenEvent | ToolCallEvent | ToolResultEvent | DoneEvent | ErrorEvent | QuestionEvent;
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting';
 

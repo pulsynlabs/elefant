@@ -105,6 +105,17 @@ function toStreamEvent(parsed: SSEParsedEvent): ChatStreamEvent | null {
 				details: d.details,
 			};
 
+		case 'question':
+			return {
+				type: 'question',
+				questionId: typeof d.questionId === 'string' ? d.questionId : '',
+				question: typeof d.question === 'string' ? d.question : '',
+				header: typeof d.header === 'string' ? d.header : '',
+				options: Array.isArray(d.options) ? d.options as Array<{ label: string; description?: string }> : [],
+				multiple: typeof d.multiple === 'boolean' ? d.multiple : false,
+				conversationId: typeof d.conversationId === 'string' ? d.conversationId : undefined,
+			};
+
 		default:
 			return null;
 	}

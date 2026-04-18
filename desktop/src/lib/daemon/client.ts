@@ -75,6 +75,31 @@ export class DaemonClient {
 		// This is a placeholder that returns empty — the config service reads them directly
 		return [];
 	}
+
+	async answerQuestion(
+		questionId: string,
+		answers: string[]
+	): Promise<{ ok: true } | { ok: false; error: string }> {
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+		try {
+			const response = await fetch(`${this.baseUrl}/tools/question/answer/${questionId}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ answers }),
+				signal: controller.signal,
+			});
+			if (!response.ok) {
+				const text = await response.text().catch(() => `HTTP ${response.status}`);
+				return { ok: false, error: text };
+			}
+			return await response.json() as { ok: true } | { ok: false; error: string };
+		} catch (err) {
+			return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
+		} finally {
+			clearTimeout(timeoutId);
+		}
+	}
 }
 
 // Singleton instance — initialized with default URL, updated from settings
