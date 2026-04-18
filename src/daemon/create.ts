@@ -1,4 +1,5 @@
 import type { ElefantConfig } from '../config/index.ts'
+import { CompactionManager } from '../compaction/manager.ts'
 import { Database } from '../db/database.ts'
 import { HookRegistry } from '../hooks/index.ts'
 import { basename } from 'node:path'
@@ -71,7 +72,7 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 		project: projectInfo,
 		db,
 		state: stateManager,
-	} as Omit<DaemonContext, 'plugins' | 'ws' | 'sse' | 'permissions'>
+	} as Omit<DaemonContext, 'plugins' | 'ws' | 'sse' | 'permissions' | 'compaction'>
 
 	const context = contextBase as DaemonContext
  
@@ -89,12 +90,17 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 	const permissions = new PermissionGate(context, ws)
 	context.permissions = permissions
 
+	// Context compaction manager
+	const compaction = new CompactionManager(context)
+	context.compaction = compaction
+
 	const app = createApp(providerRouter, toolRegistry, hookRegistry, ws, sse)
 
 	ws.startHeartbeat()
 
 	hookRegistry.register('shutdown', async () => {
 		await sessionManager.closeAll()
+		await pluginLoader.unloadAll()
 		ws.stopHeartbeat()
 		sse.destroy()
 		db.close()

@@ -53,10 +53,60 @@ export interface HookContextMap {
 	'stream:start': StreamStartContext;
 	'stream:end': StreamEndContext;
 	shutdown: ShutdownContext;
+	'project:open': {
+		readonly projectId: string;
+		readonly projectPath: string;
+		readonly elefantDir: string;
+	};
+	'project:close': {
+		readonly projectId: string;
+	};
+	'session:start': {
+		readonly sessionId: string;
+		readonly projectId: string;
+		readonly conversationId: string;
+	};
+	'session:end': {
+		readonly sessionId: string;
+		readonly projectId: string;
+		readonly totalTokens?: number;
+	};
+	'session:compact': {
+		readonly messages: readonly import('../types/providers.ts').Message[];
+		readonly tokenCount: number;
+		readonly contextWindow: number;
+		readonly summary?: string;
+	};
+	'context:transform': {
+		readonly system: string[];
+		readonly sessionId: string;
+		readonly phase?: string;
+	};
+	'permission:ask': {
+		readonly tool: string;
+		readonly args: Readonly<Record<string, unknown>>;
+		readonly conversationId: string;
+		readonly risk: 'low' | 'medium' | 'high';
+	};
+	'tool:block': {
+		readonly tool: string;
+		readonly reason: string;
+		readonly conversationId: string;
+	};
+	'tool:allow': {
+		readonly tool: string;
+		readonly conversationId: string;
+	};
 }
 
 export type HookEventName = keyof HookContextMap;
-export type HookHandler<E extends HookEventName> = (context: HookContextMap[E]) => Promise<void>;
+export type HookResult<E extends HookEventName> =
+	| void
+	| { cancel: true }
+	| Partial<HookContextMap[E]>;
+export type HookHandler<E extends HookEventName> = (
+	context: HookContextMap[E],
+) => Promise<HookResult<E>> | HookResult<E>;
 export type Disposer = () => void;
 
 export const HOOK_EVENT_NAMES: readonly HookEventName[] = [
@@ -67,4 +117,13 @@ export const HOOK_EVENT_NAMES: readonly HookEventName[] = [
 	'stream:start',
 	'stream:end',
 	'shutdown',
+	'project:open',
+	'project:close',
+	'session:start',
+	'session:end',
+	'session:compact',
+	'context:transform',
+	'permission:ask',
+	'tool:block',
+	'tool:allow',
 ];

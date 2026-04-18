@@ -74,4 +74,30 @@ describe('HookRegistry', () => {
 		expect(beforeCalls).toBe(0);
 		expect(afterCalls).toBe(1);
 	});
+
+	it('higher priority handlers run before lower priority handlers', async () => {
+		const registry = new HookRegistry();
+		const calls: number[] = [];
+
+		const handler = async () => {
+			calls.push(100);
+		};
+
+		registry.register('tool:before', handler, { priority: 100 });
+		registry.register(
+			'tool:before',
+			async () => {
+				calls.push(10);
+			},
+			{ priority: 10 },
+		);
+
+		await emit(registry, 'tool:before', {
+			toolName: 'bash',
+			args: { command: 'pwd' },
+			conversationId: 'conv-priority',
+		});
+
+		expect(calls).toEqual([10, 100]);
+	});
 });

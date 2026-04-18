@@ -13,6 +13,7 @@ import type { PluginLoader } from '../plugins/loader.ts';
 import type { ElefantWsServer } from '../transport/ws-server.ts';
 import type { SseManager } from '../transport/sse-manager.ts';
 import type { PermissionGate } from '../permissions/gate.ts';
+import type { CompactionManager } from '../compaction/manager.ts';
 
 export interface DaemonContext {
   config: ElefantConfig;
@@ -26,4 +27,5 @@ export interface DaemonContext {
   ws: ElefantWsServer;
   sse: SseManager;
   permissions: PermissionGate;
+  compaction: CompactionManager;
 }
