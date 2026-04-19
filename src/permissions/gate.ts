@@ -1,11 +1,16 @@
 import { insertEvent } from '../db/repo/events.ts';
 import type { DaemonContext } from '../daemon/context.ts';
 import { emit } from '../hooks/emit.ts';
+import type { HookContextMap } from '../hooks/types.ts';
 import type { ElefantWsServer } from '../transport/ws-server.ts';
 import type { ElefantError } from '../types/errors.ts';
 import { err, ok, type Result } from '../types/result.ts';
 import { classify, DEFAULT_CLASSIFIER_RULES } from './classifier.ts';
-import type { ClassifierRule, Decision } from './types.ts';
+import type {
+	ClassifierRule,
+	Decision,
+	Risk,
+} from './types.ts';
 
 export interface PermissionGateOptions {
 	timeoutMs?: number;
@@ -26,6 +31,12 @@ interface ApprovalResponse {
 	reason?: string;
 }
 
+export interface PermissionCheckContext {
+	sessionId?: string;
+	projectId?: string;
+	agent?: string;
+}
+
 export class PermissionGate {
 	private readonly timeoutMs: number;
 	private readonly rules: ClassifierRule[];
@@ -44,25 +55,45 @@ export class PermissionGate {
 		tool: string,
 		args: Record<string, unknown>,
 		conversationId: string,
+		context: PermissionCheckContext = {},
 	): Promise<Result<Decision, ElefantError>> {
 		try {
 			let risk = classify(tool, args, this.rules);
 
-			const hookCtx = await emit(this.ctx.hooks, 'permission:ask', {
+			const hookCtx = await this.emitPermissionAskHooks({
 				tool,
 				args,
 				conversationId,
+				sessionId: context.sessionId,
+				projectId: context.projectId,
+				agent: context.agent,
 				risk,
 			});
-			risk = hookCtx.risk;
+			risk = hookCtx.classification ?? hookCtx.risk;
+			const hookStatus = hookCtx.status;
 
 			let decision: Decision;
 
-			if (risk === 'low') {
+			if (hookStatus === 'deny') {
+				decision = {
+					approved: false,
+					reason: hookCtx.reason ?? 'denied by permission hook',
+					risk,
+					source: 'hook',
+				};
+			} else if (hookStatus === 'allow') {
+				decision = {
+					approved: true,
+					reason: hookCtx.reason ?? 'approved by permission hook',
+					risk,
+					source: 'hook',
+				};
+			} else if (risk === 'low') {
 				decision = {
 					approved: true,
 					reason: 'auto-approved (low risk)',
 					risk,
+					source: 'default',
 				};
 			} else if (risk === 'medium') {
 				console.log(
@@ -72,6 +103,7 @@ export class PermissionGate {
 					approved: true,
 					reason: 'auto-approved (medium risk, logged)',
 					risk,
+					source: 'default',
 				};
 			} else {
 				decision = await this.resolveHighRiskDecision(tool, args, conversationId);
@@ -109,6 +141,7 @@ export class PermissionGate {
 				approved: false,
 				reason: 'high-risk tool requires approval (no WebSocket available)',
 				risk: 'high',
+				source: 'default',
 			};
 		}
 
@@ -131,7 +164,54 @@ export class PermissionGate {
 			reason:
 				result.reason ?? (result.approved ? 'user approved' : 'user denied'),
 			risk: 'high',
+			source: 'user',
 		};
+	}
+
+	private async emitPermissionAskHooks(
+		initialContext: HookContextMap['permission:ask'],
+	): Promise<HookContextMap['permission:ask']> {
+		let context = {
+			...initialContext,
+		} as HookContextMap['permission:ask'];
+
+		const handlers = this.ctx.hooks.getHandlers('permission:ask');
+		for (const handler of handlers) {
+			try {
+				const result = await handler(context);
+				if (result == null) {
+					continue;
+				}
+
+				if (
+					typeof result === 'object' &&
+					'cancel' in result &&
+					result.cancel === true
+				) {
+					break;
+				}
+
+				if (typeof result === 'object') {
+					const statusAlreadySet = context.status !== undefined;
+					const incomingStatus = result.status;
+					const shouldIgnoreIncomingStatus =
+						statusAlreadySet && incomingStatus !== undefined;
+
+					context = {
+						...context,
+						...result,
+						status: context.status ?? result.status,
+						reason: shouldIgnoreIncomingStatus
+							? context.reason
+							: (result.reason ?? context.reason),
+					};
+				}
+			} catch (error) {
+				console.error('[elefant] Hook handler error (permission:ask):', error);
+			}
+		}
+
+		return context;
 	}
 
 	private persistDecision(

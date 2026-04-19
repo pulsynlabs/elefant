@@ -1,5 +1,9 @@
 import type { Message } from '../types/providers.ts';
 import type { ToolResult } from '../types/tools.ts';
+import type {
+	PermissionDecisionStatus,
+	Risk,
+} from '../permissions/types.ts';
 
 export interface ToolBeforeContext {
 	readonly toolName: string;
@@ -86,7 +90,13 @@ export interface HookContextMap {
 		readonly tool: string;
 		readonly args: Readonly<Record<string, unknown>>;
 		readonly conversationId: string;
-		readonly risk: 'low' | 'medium' | 'high';
+		readonly sessionId?: string;
+		readonly projectId?: string;
+		readonly agent?: string;
+		readonly risk: Risk;
+		readonly classification?: Risk;
+		readonly status?: PermissionDecisionStatus;
+		readonly reason?: string;
 	};
 	'tool:block': {
 		readonly tool: string;
