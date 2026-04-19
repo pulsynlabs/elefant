@@ -5,6 +5,11 @@
 // produced — the same pattern used by AgentTaskCard/ChildRunView tests.
 
 import { describe, expect, it } from 'bun:test';
+import {
+	_seedRun,
+	agentRunsStore,
+	resetAgentRunsStore,
+} from '$lib/stores/agent-runs.svelte.js';
 import type { AgentRun } from '$lib/types/agent-run.js';
 import {
 	buildChildRunRowIndent,
@@ -328,5 +333,162 @@ describe('computeRollupVariant — session-row aggregate', () => {
 			() => false,
 		);
 		expect(variant).toBe('unseen');
+	});
+});
+
+// ─── Performance benchmarks (SPEC MH3 risk mitigation) ──────────────────────
+//
+// MH3 stipulates that rendering 5+ concurrent child runs in the sidebar
+// must not cause layout thrash. The pure helpers are the hot path on
+// every SSE-driven rerender, so their wall-clock cost under a realistic
+// worst case bounds the overall update budget.
+//
+// Thresholds are deliberately generous — the helpers are pure O(n) with
+// no allocation hot loops, and a single sidebar update combines one
+// chain computation, one rollup variant, and one active-path walk.
+// A combined budget well under 10ms leaves ample headroom for the
+// surrounding Svelte reactivity pass.
+describe('performance — sidebar hot path', () => {
+	const makeRowChain = (count: number): SidebarChildRunRow[] => {
+		const rows: SidebarChildRunRow[] = [];
+		for (let i = 0; i < count; i += 1) {
+			rows.push({
+				run: makeRun({
+					runId: `child-${i}`,
+					parentRunId: i === 0 ? 'root' : `child-${i - 1}`,
+					title: `Child ${i}`,
+					// Mix statuses so the variant resolver walks every branch.
+					status:
+						i === 0
+							? 'running'
+							: i === 1
+								? 'error'
+								: i === 2
+									? 'done'
+									: 'running',
+				}),
+				depth: i + 1,
+			});
+		}
+		return rows;
+	};
+
+	it('computeSidebarChildRunChain completes in under 5ms for 8 children', () => {
+		// Build an 8-run active path (root + 7 descendants). The chain
+		// helper is invoked on every sidebar re-render for the active
+		// session, so its amortized cost matters most.
+		const root = makeRun({ runId: 'root', parentRunId: null, title: 'Root' });
+		const path: AgentRun[] = [root];
+		for (let i = 0; i < 7; i += 1) {
+			path.push(
+				makeRun({
+					runId: `child-${i}`,
+					parentRunId: i === 0 ? 'root' : `child-${i - 1}`,
+					title: `Child ${i}`,
+				}),
+			);
+		}
+		const sessionRuns = path; // all runs belong to the same session
+
+		// Warm the JIT a few iterations before measuring so a cold-start
+		// spike doesn't pollute the signal.
+		for (let i = 0; i < 10; i += 1) {
+			computeSidebarChildRunChain({
+				isActiveSession: true,
+				currentView: 'chat',
+				currentChildRunId: 'child-6',
+				sessionRuns,
+				activeChildPath: path,
+			});
+		}
+
+		const start = performance.now();
+		const iterations = 1000;
+		for (let i = 0; i < iterations; i += 1) {
+			computeSidebarChildRunChain({
+				isActiveSession: true,
+				currentView: 'chat',
+				currentChildRunId: 'child-6',
+				sessionRuns,
+				activeChildPath: path,
+			});
+		}
+		const elapsed = performance.now() - start;
+		const avgMs = elapsed / iterations;
+
+		// Budget: < 5ms per invocation. 1000 iterations keeps measurement
+		// noise low while keeping the whole test well under a second.
+		expect(avgMs).toBeLessThan(5);
+	});
+
+	it('computeRollupVariant completes in under 2ms for 8 children', () => {
+		const rows = makeRowChain(8);
+
+		// No-attention selectors — exercises the slow path where the
+		// function has to walk every row and compare rank.
+		const noSignal = () => false;
+
+		// Warm-up.
+		for (let i = 0; i < 10; i += 1) {
+			computeRollupVariant(rows, noSignal, noSignal);
+		}
+
+		const start = performance.now();
+		const iterations = 1000;
+		for (let i = 0; i < iterations; i += 1) {
+			computeRollupVariant(rows, noSignal, noSignal);
+		}
+		const elapsed = performance.now() - start;
+		const avgMs = elapsed / iterations;
+
+		// Budget: < 2ms per invocation. Rollup is cheaper than the chain
+		// helper (pure reduction, no slice/map), so the tighter bound
+		// catches a regression if someone adds expensive work here.
+		expect(avgMs).toBeLessThan(2);
+	});
+
+	it('agentRunsStore.activeChildPath returns the correct 4-level chain', () => {
+		// Reset & seed a 4-level deep nesting via the store's public API
+		// so the test exercises the live selector, not a stubbed copy.
+		// MAX_DEPTH in activeChildPath is 4, which matches the default
+		// maxTaskDepth — the deepest chain the daemon ever surfaces.
+		resetAgentRunsStore();
+
+		const rootRun = makeRun({
+			runId: 'root',
+			parentRunId: null,
+			title: 'Root',
+		});
+		const childRun = makeRun({
+			runId: 'child',
+			parentRunId: 'root',
+			title: 'Child',
+		});
+		const grandchildRun = makeRun({
+			runId: 'grandchild',
+			parentRunId: 'child',
+			title: 'Grandchild',
+		});
+		const greatGrandchildRun = makeRun({
+			runId: 'great-grandchild',
+			parentRunId: 'grandchild',
+			title: 'Great-grandchild',
+		});
+
+		_seedRun(rootRun);
+		_seedRun(childRun);
+		_seedRun(grandchildRun);
+		_seedRun(greatGrandchildRun);
+
+		const path = agentRunsStore.activeChildPath('root', 'great-grandchild');
+		expect(path.map((r) => r.runId)).toEqual([
+			'root',
+			'child',
+			'grandchild',
+			'great-grandchild',
+		]);
+
+		// Cleanup so any later suite runs against a clean store.
+		resetAgentRunsStore();
 	});
 });
