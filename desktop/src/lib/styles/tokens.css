@@ -2,35 +2,36 @@
    ELEFANT DESIGN TOKENS
    Single source of truth for all visual properties.
    Dark mode default, light mode via [data-theme="light"]
+   Primary: #4049e1 Electric Indigo
    ========================================= */
 
 /* --- DARK THEME (default) --- */
 :root,
 [data-theme="dark"] {
-	/* Primary — Electric Amber */
-	--color-primary: #F5A623;
-	--color-primary-hover: #E09415;
-	--color-primary-muted: #C47F0E;
-	--color-primary-subtle: #2B1D06;
-	--color-primary-foreground: #1A0E02;
+	/* Primary — Electric Indigo */
+	--color-primary: #4049e1;
+	--color-primary-hover: #3540d4;
+	--color-primary-muted: #2d38c0;
+	--color-primary-subtle: #1a1c3a;
+	--color-primary-foreground: #ffffff;
 
-	/* Backgrounds */
-	--color-bg: #0a0a0a;
-	--color-surface: #111113;
-	--color-surface-elevated: #1a1a1e;
-	--color-surface-hover: #222226;
+	/* Backgrounds — OLED deep with indigo tint */
+	--color-bg: #09090e;
+	--color-surface: #0f0f14;
+	--color-surface-elevated: #161620;
+	--color-surface-hover: #1e1e2a;
 
 	/* Borders */
-	--color-border: #27272a;
-	--color-border-strong: #3f3f46;
-	--color-border-focus: #F5A623;
+	--color-border: #1e1e2a;
+	--color-border-strong: #2d2d3e;
+	--color-border-focus: #4049e1;
 
 	/* Text */
-	--color-text-primary: #fafafa;
-	--color-text-secondary: #a1a1aa;
-	--color-text-muted: #71717a;
-	--color-text-disabled: #52525b;
-	--color-text-inverse: #09090b;
+	--color-text-primary: #f0f0ff;
+	--color-text-secondary: #9898b8;
+	--color-text-muted: #6868a0;
+	--color-text-disabled: #3d3d60;
+	--color-text-inverse: #09090e;
 
 	/* Semantic */
 	--color-success: #22c55e;
@@ -38,33 +39,33 @@
 	--color-error: #ef4444;
 	--color-info: #3b82f6;
 
-	/* Shadows */
-	--shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.4);
-	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-	--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
-	--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
-	--shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.8);
-	--shadow-glow: 0 0 20px rgba(245, 166, 35, 0.2);
+	/* Shadows — indigo-tinted */
+	--shadow-xs: 0 1px 1px rgba(0, 0, 10, 0.5);
+	--shadow-sm: 0 1px 3px rgba(0, 0, 10, 0.6), 0 0 1px rgba(64, 73, 225, 0.05);
+	--shadow-md: 0 4px 8px -1px rgba(0, 0, 10, 0.7), 0 0 2px rgba(64, 73, 225, 0.08);
+	--shadow-lg: 0 10px 20px -3px rgba(0, 0, 10, 0.75), 0 0 4px rgba(64, 73, 225, 0.1);
+	--shadow-xl: 0 20px 30px -5px rgba(0, 0, 10, 0.8), 0 0 8px rgba(64, 73, 225, 0.12);
+	--shadow-glow: 0 0 20px rgba(64, 73, 225, 0.25);
 
 	/* Glass */
-	--blur-sm: 4px;
-	--blur-md: 12px;
-	--blur-lg: 24px;
-	--glass-bg: rgba(17, 17, 19, 0.6);
-	--glass-bg-strong: rgba(17, 17, 19, 0.85);
-	--glass-border: rgba(255, 255, 255, 0.06);
-	--glass-border-strong: rgba(255, 255, 255, 0.12);
-	--glass-inner-glow: rgba(255, 255, 255, 0.03);
+	--blur-sm: 6px;
+	--blur-md: 14px;
+	--blur-lg: 28px;
+	--glass-bg: rgba(15, 15, 20, 0.65);
+	--glass-bg-strong: rgba(15, 15, 20, 0.88);
+	--glass-border: rgba(255, 255, 255, 0.07);
+	--glass-border-strong: rgba(255, 255, 255, 0.13);
+	--glass-inner-glow: rgba(255, 255, 255, 0.04);
 
-	/* Glow */
-	--glow-primary: 0 0 20px rgba(245, 166, 35, 0.25);
-	--glow-primary-strong: 0 0 30px rgba(245, 166, 35, 0.4);
-	--glow-ambient: 0 0 80px rgba(245, 166, 35, 0.06);
-	--glow-focus: 0 0 0 2px rgba(245, 166, 35, 0.4);
+	/* Glow — indigo */
+	--glow-primary: 0 0 20px rgba(64, 73, 225, 0.3);
+	--glow-primary-strong: 0 0 36px rgba(64, 73, 225, 0.5);
+	--glow-ambient: 0 0 90px rgba(64, 73, 225, 0.07);
+	--glow-focus: 0 0 0 2px rgba(64, 73, 225, 0.45);
 
 	/* Texture */
-	--texture-noise-opacity: 0.03;
-	--texture-grid-color: rgba(255, 255, 255, 0.03);
+	--texture-noise-opacity: 0.025;
+	--texture-grid-color: rgba(255, 255, 255, 0.025);
 	--texture-grid-size: 20px;
 
 	/* Elevation / Z-index */
@@ -99,30 +100,30 @@
 
 /* --- LIGHT THEME --- */
 [data-theme="light"] {
-	/* Primary — Electric Amber */
-	--color-primary: #F5A623;
-	--color-primary-hover: #E09415;
-	--color-primary-muted: #C47F0E;
-	--color-primary-subtle: #FEF3E0;
-	--color-primary-foreground: #1A0E02;
+	/* Primary — Electric Indigo */
+	--color-primary: #4049e1;
+	--color-primary-hover: #3540d4;
+	--color-primary-muted: #2d38c0;
+	--color-primary-subtle: #eef0ff;
+	--color-primary-foreground: #ffffff;
 
-	/* Backgrounds */
+	/* Backgrounds — clean white with indigo-tinted elevated surfaces */
 	--color-bg: #ffffff;
 	--color-surface: #f9fafb;
-	--color-surface-elevated: #f3f4f6;
-	--color-surface-hover: #e5e7eb;
+	--color-surface-elevated: #f2f4ff;
+	--color-surface-hover: #eef0ff;
 
-	/* Borders */
-	--color-border: #e4e4e7;
-	--color-border-strong: #d4d4d8;
-	--color-border-focus: #E09415;
+	/* Borders — indigo-tinted for light mode */
+	--color-border: #e8eaf8;
+	--color-border-strong: #d0d4f0;
+	--color-border-focus: #4049e1;
 
 	/* Text */
-	--color-text-primary: #09090b;
-	--color-text-secondary: #52525b;
-	--color-text-muted: #a1a1aa;
-	--color-text-disabled: #d4d4d8;
-	--color-text-inverse: #fafafa;
+	--color-text-primary: #09090e;
+	--color-text-secondary: #3d3d60;
+	--color-text-muted: #6868a0;
+	--color-text-disabled: #adadce;
+	--color-text-inverse: #f0f0ff;
 
 	/* Semantic */
 	--color-success: #16a34a;
@@ -130,36 +131,36 @@
 	--color-error: #dc2626;
 	--color-info: #2563eb;
 
-	/* Shadows */
-	--shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.04);
-	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
-	--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-	--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.12);
-	--shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
-	--shadow-glow: 0 0 20px rgba(245, 166, 35, 0.15);
+	/* Shadows — indigo-tinted, light */
+	--shadow-xs: 0 1px 2px rgba(64, 73, 225, 0.05);
+	--shadow-sm: 0 1px 3px rgba(64, 73, 225, 0.08), 0 1px 2px rgba(64, 73, 225, 0.04);
+	--shadow-md: 0 4px 8px -1px rgba(64, 73, 225, 0.1), 0 2px 4px rgba(64, 73, 225, 0.05);
+	--shadow-lg: 0 10px 20px -3px rgba(64, 73, 225, 0.12), 0 4px 6px rgba(64, 73, 225, 0.06);
+	--shadow-xl: 0 20px 30px -5px rgba(64, 73, 225, 0.14), 0 8px 10px rgba(64, 73, 225, 0.06);
+	--shadow-glow: 0 0 20px rgba(64, 73, 225, 0.15);
 
 	/* Glass */
-	--blur-sm: 4px;
-	--blur-md: 12px;
-	--blur-lg: 24px;
-	--glass-bg: rgba(255, 255, 255, 0.7);
-	--glass-bg-strong: rgba(255, 255, 255, 0.9);
-	--glass-border: rgba(0, 0, 0, 0.06);
-	--glass-border-strong: rgba(0, 0, 0, 0.12);
-	--glass-inner-glow: rgba(255, 255, 255, 0.5);
+	--blur-sm: 6px;
+	--blur-md: 14px;
+	--blur-lg: 28px;
+	--glass-bg: rgba(255, 255, 255, 0.72);
+	--glass-bg-strong: rgba(255, 255, 255, 0.92);
+	--glass-border: rgba(64, 73, 225, 0.08);
+	--glass-border-strong: rgba(64, 73, 225, 0.15);
+	--glass-inner-glow: rgba(255, 255, 255, 0.6);
 
 	/* Glow */
-	--glow-primary: 0 0 20px rgba(245, 166, 35, 0.15);
-	--glow-primary-strong: 0 0 30px rgba(245, 166, 35, 0.25);
-	--glow-ambient: 0 0 80px rgba(245, 166, 35, 0.04);
-	--glow-focus: 0 0 0 2px rgba(245, 166, 35, 0.3);
+	--glow-primary: 0 0 20px rgba(64, 73, 225, 0.18);
+	--glow-primary-strong: 0 0 36px rgba(64, 73, 225, 0.3);
+	--glow-ambient: 0 0 90px rgba(64, 73, 225, 0.05);
+	--glow-focus: 0 0 0 2px rgba(64, 73, 225, 0.35);
 
 	/* Texture */
-	--texture-noise-opacity: 0.02;
-	--texture-grid-color: rgba(0, 0, 0, 0.03);
+	--texture-noise-opacity: 0.018;
+	--texture-grid-color: rgba(0, 0, 0, 0.025);
 	--texture-grid-size: 20px;
 
-	/* Elevation / Z-index (theme-independent, repeated for completeness) */
+	/* Elevation / Z-index */
 	--z-base: 0;
 	--z-dropdown: 10;
 	--z-sticky: 20;
@@ -208,7 +209,7 @@
 }
 
 /* =========================================
-   BORDER RADIUS (expanded with industrial variants)
+   BORDER RADIUS
    ========================================= */
 :root {
 	--radius-none: 0px;
@@ -230,19 +231,22 @@
    ========================================= */
 :root {
 	/* Duration Scale */
+	--duration-micro: 80ms;
 	--duration-instant: 50ms;
 	--duration-fast: 150ms;
 	--duration-base: 250ms;
 	--duration-slow: 400ms;
 
-	/* Easing Curves */
+	/* Easing Curves — premium cubic-beziers, no linear/ease-in-out */
+	--ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
 	--ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
-	--ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
 	--ease-linear-soft: cubic-bezier(0.4, 0, 0.2, 1);
 
 	/* Composed Transition Shorthands */
+	--transition-micro: var(--duration-micro) var(--ease-out-expo);
 	--transition-instant: var(--duration-instant) var(--ease-linear-soft);
-	--transition-fast: var(--duration-fast) var(--ease-out-quart);
+	--transition-fast: var(--duration-fast) var(--ease-out-expo);
 	--transition-base: var(--duration-base) var(--ease-out-quart);
 	--transition-slow: var(--duration-slow) var(--ease-out-quart);
 	--transition-spring: var(--duration-base) var(--ease-spring);
