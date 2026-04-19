@@ -326,17 +326,20 @@
 		position: absolute;
 		top: 0;
 		left: 0;
-		width: 2px;
+		width: 1px;
 		height: 100%;
 		background: linear-gradient(
 			to bottom,
 			transparent 0%,
-			var(--color-primary) 20%,
-			var(--color-primary) 80%,
+			rgba(64, 73, 225, 0.8) 25%,
+			rgba(100, 120, 255, 0.9) 50%,
+			rgba(64, 73, 225, 0.8) 75%,
 			transparent 100%
 		);
-		opacity: 0.6;
+		opacity: 1;
 		pointer-events: none;
+		/* Specular highlight on the sidebar edge */
+		box-shadow: 1px 0 6px rgba(64, 73, 225, 0.25);
 	}
 
 	.sidebar-brand {
@@ -494,14 +497,39 @@
 
 	.nav-item:hover {
 		color: var(--color-text-primary);
-		background-color: var(--color-surface-hover);
+		background: linear-gradient(
+			to bottom,
+			rgba(255, 255, 255, 0.06) 0%,
+			rgba(255, 255, 255, 0.02) 100%
+		);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.08),
+			inset 0 -1px 0 rgba(0, 0, 0, 0.10),
+			0 2px 8px rgba(0, 0, 12, 0.2);
 		transform: translateX(2px);
 	}
 
 	.nav-item.active {
 		color: var(--color-primary);
-		background-color: var(--color-primary-subtle);
-		box-shadow: inset 2px 0 0 var(--color-primary), var(--glow-primary);
+		/* Pressed-glass: recessed into the surface rather than floating above it.
+		   Bevel is inverted — top edge darkens, bottom edge brightens.
+		   No external lift shadow — the item sits below grade. */
+		background: linear-gradient(
+			to bottom,
+			rgba(64, 73, 225, 0.18) 0%,
+			rgba(64, 73, 225, 0.10) 100%
+		);
+		box-shadow:
+			/* left accent bar — the one clear affordance that this is selected */
+			inset 2px 0 0 var(--color-primary),
+			/* top edge darken — pressed in */
+			inset 0 1px 0 rgba(0, 0, 0, 0.28),
+			/* bottom edge subtle lift */
+			inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+			/* inner depth */
+			inset 0 8px 20px rgba(0, 0, 12, 0.12),
+			/* outer indigo glow — soft, not harsh */
+			0 0 12px rgba(64, 73, 225, 0.15);
 		transform: translateX(2px);
 	}
 

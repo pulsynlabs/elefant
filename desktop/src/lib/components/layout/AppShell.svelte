@@ -47,22 +47,34 @@
 		position: relative;
 	}
 
-	/* Ambient glow behind sidebar */
+	/* Aurora light field — gives glass surfaces rich tonal variation to refract */
 	.app-shell::before {
 		content: '';
 		position: absolute;
-		top: -20%;
-		left: -10%;
-		width: 60%;
-		height: 140%;
-		background: radial-gradient(
-			ellipse at 25% 50%,
-			rgba(64, 73, 225, 0.09) 0%,
-			rgba(64, 73, 225, 0.03) 40%,
-			transparent 70%
-		);
+		inset: -20%;
 		pointer-events: none;
 		z-index: 0;
+		/* Primary indigo orb — left-centre (behind sidebar) */
+		background:
+			radial-gradient(circle at 12% 45%, rgba(64, 73, 225, 0.28) 0%, transparent 48%),
+			radial-gradient(circle at 8%  80%, rgba(48, 56, 200, 0.14) 0%, transparent 40%),
+			radial-gradient(circle at 55% 10%, rgba(80, 90, 240, 0.10) 0%, transparent 42%),
+			radial-gradient(circle at 90% 60%, rgba(40, 50, 180, 0.08) 0%, transparent 38%);
+		filter: blur(40px);
+	}
+
+	/* Secondary teal accent orb — top right, very subtle */
+	.app-shell::after {
+		content: '';
+		position: absolute;
+		inset: -20%;
+		pointer-events: none;
+		z-index: 0;
+		background:
+			radial-gradient(circle at 78% 15%, rgba(80, 200, 255, 0.07) 0%, transparent 38%),
+			radial-gradient(circle at 25% 95%, rgba(100, 80, 255, 0.09) 0%, transparent 35%);
+		filter: blur(60px);
+		mix-blend-mode: screen;
 	}
 
 	.app-shell.sidebar-collapsed {
