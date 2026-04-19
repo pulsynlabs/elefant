@@ -90,6 +90,18 @@ export interface AgentRunRow {
 	error_message: string | null;
 }
 
+/** Data payload for `agent_run.status_changed` events. */
+export interface AgentRunStatusChangedData {
+	runId: string;
+	sessionId: string;
+	projectId: string;
+	parentRunId?: string;
+	title: string;
+	previousStatus: AgentRunStatus;
+	nextStatus: AgentRunStatus;
+	reason?: string;
+}
+
 /** Convert a daemon row (snake_case) to the UI `AgentRun` (camelCase). */
 export function agentRunFromRow(row: AgentRunRow): AgentRun {
 	return {

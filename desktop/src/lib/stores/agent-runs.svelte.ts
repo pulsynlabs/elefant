@@ -231,6 +231,7 @@ const AGENT_RUN_EVENT_TYPES = [
 	'agent_run.tool_call',
 	'agent_run.tool_result',
 	'agent_run.question',
+	'agent_run.status_changed',
 	'agent_run.done',
 	'agent_run.error',
 	'agent_run.cancelled',
