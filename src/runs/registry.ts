@@ -1,4 +1,5 @@
 import type { QuestionEmitter } from '../tools/question/emitter.ts'
+import { clearStatusCoalescer } from './events.ts'
 
 export interface RunEntry {
 	controller: AbortController
@@ -64,6 +65,9 @@ export class RunRegistry {
 	forgetRun(runId: string): void {
 		const entry = this.runs.get(runId)
 		this.runs.delete(runId)
+
+		// Clear any pending status change timer for this run
+		clearStatusCoalescer(runId)
 
 		if (entry?.parentRunId) {
 			const siblingRunIds = this.childrenMap.get(entry.parentRunId)

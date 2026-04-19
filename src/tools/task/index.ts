@@ -4,7 +4,7 @@ import type { HookRegistry } from '../../hooks/index.js'
 import type { ProviderRouter } from '../../providers/router.js'
 import { buildInitialMessages } from '../../runs/context.js'
 import { createRun, markRunEnded } from '../../runs/dal.js'
-import { publishRunEvent } from '../../runs/events.js'
+import { publishRunEvent, publishStatusChange, publishToolCallMetadata } from '../../runs/events.js'
 import type { RunRegistry } from '../../runs/registry.js'
 import type { RunContext } from '../../runs/types.js'
 import { runAgentLoop } from '../../server/agent-loop.js'
@@ -34,7 +34,12 @@ export interface TaskParams {
 	context_mode?: 'none' | 'inherit_session' | 'snapshot'
 }
 
+interface TaskExecutionParams extends TaskParams {
+	_toolCallId?: string
+}
+
 export const DEFAULT_MAX_CHILDREN = 4
+export const DEFAULT_MAX_TASK_DEPTH = 4
 
 function readOptionalNumber(value: unknown): number | undefined {
 	return typeof value === 'number' && Number.isFinite(value) ? value : undefined
@@ -73,7 +78,8 @@ Depth and concurrency limits are enforced by agent configuration.`,
 					'Context inheritance: "none" (prompt only), "snapshot" (frozen session history), "inherit_session" (live session history)',
 			},
 		},
-		execute: async (params: TaskParams): Promise<Result<string, ElefantError>> => {
+		execute: async (rawParams: TaskParams): Promise<Result<string, ElefantError>> => {
+			const params = rawParams as TaskExecutionParams
 			const {
 				database,
 				runRegistry,
@@ -93,8 +99,8 @@ Depth and concurrency limits are enforced by agent configuration.`,
 					: null
 
 			// TODO(task-9.4): remove dynamic field access once schema adds explicit fields.
-			const maxDepth = readOptionalNumber(resolvedConfigRecord?.maxTaskDepth)
-			if (maxDepth !== undefined && (currentRun.depth ?? 0) >= maxDepth) {
+			const maxDepth = readOptionalNumber(resolvedConfigRecord?.maxTaskDepth) ?? DEFAULT_MAX_TASK_DEPTH
+			if ((currentRun.depth ?? 0) >= maxDepth) {
 				return err({
 					code: 'VALIDATION_ERROR',
 					message: `Agent depth limit reached: current depth ${currentRun.depth ?? 0} >= maxTaskDepth ${maxDepth} for agent type "${params.agent_type}"`,
@@ -215,10 +221,29 @@ Depth and concurrency limits are enforced by agent configuration.`,
 
 			runRegistry.registerChildren(currentRun.runId, childRunId)
 
-			publishRunEvent(childCtx, sseManager, 'agent_run.spawned', {
-				contextMode,
-				parentRunId: currentRun.runId,
-			})
+		publishRunEvent(childCtx, sseManager, 'agent_run.spawned', {
+			contextMode,
+			parentRunId: currentRun.runId,
+		})
+
+		// Emit status change: null -> running (MH5 contract requirement)
+		// Emit directly (not via publishStatusChange) to bypass coalescing —
+		// the initial spawn transition must be immediate and reliable.
+		publishRunEvent(childCtx, sseManager, 'agent_run.status_changed', {
+			previousStatus: null,
+			nextStatus: 'running',
+		})
+
+		if (typeof params._toolCallId === 'string' && params._toolCallId.length > 0) {
+				publishToolCallMetadata(sseManager, currentRun.projectId, {
+					toolCallId: params._toolCallId,
+					runId: childRunId,
+					parentRunId: currentRun.runId,
+					agentType: params.agent_type,
+					title: params.description,
+					__sessionId: currentRun.sessionId,
+				} as unknown as Parameters<typeof publishToolCallMetadata>[2])
+			}
 
 			void (async () => {
 				let endStatus: 'done' | 'error' = 'done'
@@ -235,10 +260,35 @@ Depth and concurrency limits are enforced by agent configuration.`,
 						// Intentionally drain events; runAgentLoop publishes via SSE internally.
 					}
 					publishRunEvent(childCtx, sseManager, 'agent_run.done', { runId: childRunId })
+
+					// Emit status change: running -> done
+					publishStatusChange(sseManager, {
+						runId: childRunId,
+						sessionId: currentRun.sessionId,
+						projectId: currentRun.projectId,
+						parentRunId: currentRun.runId,
+						agentType: params.agent_type,
+						title: params.description,
+						previousStatus: 'running',
+						nextStatus: 'done',
+					})
 				} catch (e) {
 					endStatus = 'error'
 					errorMessage = e instanceof Error ? e.message : String(e)
 					publishRunEvent(childCtx, sseManager, 'agent_run.error', { runId: childRunId, message: errorMessage })
+
+					// Emit status change: running -> error
+					publishStatusChange(sseManager, {
+						runId: childRunId,
+						sessionId: currentRun.sessionId,
+						projectId: currentRun.projectId,
+						parentRunId: currentRun.runId,
+						agentType: params.agent_type,
+						title: params.description,
+						previousStatus: 'running',
+						nextStatus: 'error',
+						reason: errorMessage,
+					})
 				} finally {
 					markRunEnded(database, childRunId, endStatus, errorMessage)
 					runRegistry.forgetRun(childRunId)

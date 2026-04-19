@@ -47,6 +47,15 @@
 	import type { IconSvgElement } from '$lib/icons/index.js';
 	import ProjectAvatar from '../../../features/projects/ProjectAvatar.svelte';
 	import SidebarProjectRow from './SidebarProjectRow.svelte';
+	import {
+		computeRollupVariant,
+		computeSidebarChildRunChain,
+		computeStatusVariant,
+	} from './sidebar-child-run-chain-state.js';
+	import type {
+		SidebarChildRunRow,
+		SidebarRunStatusVariant,
+	} from './sidebar-child-run-chain-state.js';
 
 	type Props = {
 		collapsed?: boolean;
@@ -57,6 +66,84 @@
 	// Which project rows are currently expanded. Keyed by project id; a project
 	// is expanded iff its id maps to `true` here.
 	let expandedProjectIds = $state<Record<string, boolean>>({});
+
+	// Derived: the list of runs in the active session. Used to find the
+	// session's root run (the ancestor of `currentChildRunId`) so we can
+	// compute the active child-run chain for MH3.
+	const activeSessionRuns = $derived(
+		projectsStore.activeSessionId
+			? agentRunsStore.runsForSession(projectsStore.activeSessionId)
+			: [],
+	);
+
+	// Derived: resolved root run id for the active session's active
+	// child path. Walking up from `currentChildRunId`, we look for the
+	// ancestor that has no parent OR whose parent lives outside this
+	// session. This matches the `runTree` root semantics in the store.
+	const activeRootRunId = $derived.by<string | null>(() => {
+		const currentChildRunId = navigationStore.currentChildRunId;
+		if (!currentChildRunId) return null;
+		const runs = activeSessionRuns;
+		if (runs.length === 0) return null;
+
+		const byId = new Map(runs.map((run) => [run.runId, run]));
+		let cursor = byId.get(currentChildRunId);
+		if (!cursor) return null;
+
+		// Walk up through this session's runs until we reach a run whose
+		// parent is not part of this session — that's our root.
+		while (cursor.parentRunId && byId.has(cursor.parentRunId)) {
+			cursor = byId.get(cursor.parentRunId)!;
+		}
+		return cursor.runId;
+	});
+
+	// Derived: the rows to render as the active child-run chain under
+	// the active session row. Empty when not in chat/child-run view or
+	// when no child is active.
+	const activeChildChainRows = $derived<SidebarChildRunRow[]>(
+		activeRootRunId && projectsStore.activeSessionId
+			? computeSidebarChildRunChain({
+					isActiveSession: true,
+					currentView: navigationStore.current,
+					currentChildRunId: navigationStore.currentChildRunId,
+					sessionRuns: activeSessionRuns,
+					activeChildPath: agentRunsStore.activeChildPath(
+						activeRootRunId,
+						navigationStore.currentChildRunId ?? undefined,
+					),
+				})
+			: [],
+	);
+
+	function handleSelectChildRun(runId: string): void {
+		navigationStore.openChildRun(runId);
+	}
+
+	// Resolve the indicator variant for a single chain row by
+	// consulting the store's `isUnseen` + `isAwaitingQuestion`
+	// selectors. Passed to `SidebarProjectRow` so the presentational
+	// chain component stays pure.
+	function childRunStatusVariant(row: SidebarChildRunRow): SidebarRunStatusVariant {
+		return computeStatusVariant(
+			row.run,
+			agentRunsStore.isUnseen(row.run.runId),
+			agentRunsStore.isAwaitingQuestion(row.run.runId),
+		);
+	}
+
+	// Aggregate rollup indicator for the active session row — reflects
+	// the most attention-worthy state across the whole active chain so
+	// the user can spot a sub-agent issue without expanding anything.
+	const sessionRollupVariant = $derived<SidebarRunStatusVariant>(
+		activeChildChainRows.length > 0
+			? computeRollupVariant(
+					activeChildChainRows,
+					(id) => agentRunsStore.isUnseen(id),
+					(id) => agentRunsStore.isAwaitingQuestion(id),
+				)
+			: 'none',
+	);
 
 	type BottomNavItem = {
 		id: 'settings' | 'models' | 'about' | 'agent-config' | 'agent-runs' | 'worktrees';
@@ -181,6 +268,15 @@
 								onToggle={toggleProject}
 								onSelectSession={openSession}
 								onNewSession={(p) => void createNewSession(p)}
+								childRunChainRows={projectsStore.activeProjectId === project.id
+									? activeChildChainRows
+									: []}
+								activeChildRunId={navigationStore.currentChildRunId}
+								onSelectChildRun={handleSelectChildRun}
+								childRunStatusVariant={childRunStatusVariant}
+								sessionRollupVariant={projectsStore.activeProjectId === project.id
+									? sessionRollupVariant
+									: 'none'}
 							/>
 						</li>
 					{/each}

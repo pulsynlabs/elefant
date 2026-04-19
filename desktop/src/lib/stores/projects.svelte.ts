@@ -172,6 +172,13 @@ async function createSession(projectId: string): Promise<Session> {
 }
 
 function selectSession(sessionId: string): void {
+	// Clear child run stack when switching sessions (MH2)
+	// Import navigationStore dynamically to avoid circular dependency
+	import('./navigation.svelte.js').then((mod) => {
+		mod.navigationStore.clearChildRunStack();
+	}).catch(() => {
+		// Navigation store may not be initialized yet — ignore
+	});
 	activeSessionId = sessionId;
 }
 

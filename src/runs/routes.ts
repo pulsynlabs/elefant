@@ -9,9 +9,9 @@ import type { ProviderRouter } from '../providers/router.ts'
 import { runAgentLoop } from '../server/agent-loop.ts'
 import { createToolRegistryForRun, type ToolRegistry } from '../tools/registry.ts'
 import type { SseManager } from '../transport/sse-manager.ts'
-import { createRun, getRun, listRunsBySession, markRunEnded } from './dal.ts'
+import { createRun, getRun, listChildRunsByParent, listRunsBySession, markRunEnded } from './dal.ts'
 import { buildInitialMessages } from './context.ts'
-import { publishRunEvent } from './events.ts'
+import { publishRunEvent, publishStatusChange } from './events.ts'
 import type { RunRegistry } from './registry.ts'
 import type { RunContext } from './types.ts'
 
@@ -26,6 +26,12 @@ const SpawnRunBodySchema = z.object({
 const ListRunsQuerySchema = z.object({
 	limit: z.coerce.number().int().min(1).max(200).default(50),
 	offset: z.coerce.number().int().min(0).default(0),
+})
+
+const ChildrenPathParamsSchema = z.object({
+	id: z.string().min(1),
+	sessionId: z.string().min(1),
+	runId: z.string().min(1),
 })
 
 export function mountAgentRunRoutes(
@@ -220,6 +226,77 @@ export function mountAgentRunRoutes(
 		}
 	})
 
+	app.get('/api/projects/:id/sessions/:sessionId/runs/:runId/children', ({ params, query, set }) => {
+		const parsedParams = ChildrenPathParamsSchema.safeParse(params)
+		if (!parsedParams.success) {
+			set.status = 400
+			return {
+				ok: false,
+				error: {
+					code: 'VALIDATION_ERROR',
+					message: parsedParams.error.message,
+				},
+			}
+		}
+
+		const parsedQuery = ListRunsQuerySchema.safeParse(query)
+		if (!parsedQuery.success) {
+			set.status = 400
+			return {
+				ok: false,
+				error: {
+					code: 'VALIDATION_ERROR',
+					message: parsedQuery.error.message,
+				},
+			}
+		}
+
+		const { id, sessionId, runId } = parsedParams.data
+		const session = getSessionById(deps.db, sessionId)
+		if (!session.ok || session.data.project_id !== id) {
+			set.status = 404
+			return {
+				ok: false,
+				error: {
+					code: 'FILE_NOT_FOUND',
+					message: 'Session not found for project',
+				},
+			}
+		}
+
+		const run = getRun(deps.db, runId)
+		if (!run.ok || run.data.session_id !== sessionId) {
+			set.status = 404
+			return {
+				ok: false,
+				error: {
+					code: 'FILE_NOT_FOUND',
+					message: 'Run not found for session',
+				},
+			}
+		}
+
+		const listResult = listChildRunsByParent(deps.db, runId, sessionId)
+		if (!listResult.ok) {
+			set.status = 500
+			return {
+				ok: false,
+				error: {
+					code: listResult.error.code,
+					message: listResult.error.message,
+				},
+			}
+		}
+
+		const { limit, offset } = parsedQuery.data
+		const paginatedChildren = listResult.data.slice(offset, offset + limit)
+
+		return {
+			ok: true,
+			data: paginatedChildren,
+		}
+	})
+
 	app.get('/api/agent-runs/:runId', ({ params, set }) => {
 		const run = getRun(deps.db, params.runId)
 		if (!run.ok) {
@@ -288,21 +365,36 @@ export function mountAgentRunRoutes(
 		}
 
 		if (deps.sseManager) {
+			const runContextForCancel = {
+				runId: cancelled.data.run_id,
+				parentRunId: cancelled.data.parent_run_id ?? undefined,
+				agentType: cancelled.data.agent_type,
+				title: cancelled.data.title,
+				sessionId: cancelled.data.session_id,
+				projectId: cancelled.data.project_id,
+				signal: new AbortController().signal,
+				depth: 0,
+			}
+
 			publishRunEvent(
-				{
-					runId: cancelled.data.run_id,
-					parentRunId: cancelled.data.parent_run_id ?? undefined,
-					agentType: cancelled.data.agent_type,
-					title: cancelled.data.title,
-					sessionId: cancelled.data.session_id,
-					projectId: cancelled.data.project_id,
-					signal: new AbortController().signal,
-					depth: 0,
-				},
+				runContextForCancel,
 				deps.sseManager,
 				'agent_run.cancelled',
 				{ reason: 'cancel endpoint called' },
 			)
+
+			// Emit status change: running -> cancelled
+			publishStatusChange(deps.sseManager, {
+				runId: cancelled.data.run_id,
+				sessionId: cancelled.data.session_id,
+				projectId: cancelled.data.project_id,
+				parentRunId: cancelled.data.parent_run_id ?? undefined,
+				agentType: cancelled.data.agent_type,
+				title: cancelled.data.title,
+				previousStatus: 'running',
+				nextStatus: 'cancelled',
+				reason: 'cancel endpoint called',
+			})
 		}
 
 		return {

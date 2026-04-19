@@ -26,6 +26,7 @@
 	import AgentProfilesView from "./features/agent-config/AgentProfilesView.svelte";
 	import AgentRunTabs from "./features/agent-runs/AgentRunTabs.svelte";
 	import WorktreeListPanel from "./features/worktrees/WorktreeListPanel.svelte";
+	import ChildRunView from "./features/agent-runs/ChildRunView.svelte";
 
 	type NavigationRuntime = typeof navigationStore & {
 		initNavigation: (opts: { getActiveProjectId: () => string | null }) => void;
@@ -219,6 +220,8 @@
 		<AgentRunTabs />
 	{:else if currentView === "worktrees"}
 		<WorktreeListPanel />
+	{:else if currentView === "child-run" && navigationStore.currentChildRunId !== null}
+		<ChildRunView runId={navigationStore.currentChildRunId} />
 	{:else}
 		<div class="unknown-view">
 			Unknown view: {currentView}

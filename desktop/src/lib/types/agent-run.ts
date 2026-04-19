@@ -39,10 +39,25 @@ export interface AgentRunEventEnvelope {
 	data: unknown;
 }
 
+/** Metadata attached to a tool_call entry (e.g., for task tool child run linkage). */
+export interface AgentRunToolCallMetadata {
+	runId: string;
+	parentRunId?: string;
+	agentType: string;
+	title: string;
+}
+
 /** An entry in a run's rendered transcript. */
 export type AgentRunTranscriptEntry =
 	| { kind: 'token'; text: string; seq: number }
-	| { kind: 'tool_call'; id: string; name: string; arguments: Record<string, unknown>; seq: number }
+	| {
+			kind: 'tool_call';
+			id: string;
+			name: string;
+			arguments: Record<string, unknown>;
+			seq: number;
+			metadata?: AgentRunToolCallMetadata;
+	  }
 	| {
 			kind: 'tool_result';
 			toolCallId: string;
@@ -88,6 +103,18 @@ export interface AgentRunRow {
 	started_at: string | null;
 	ended_at: string | null;
 	error_message: string | null;
+}
+
+/** Data payload for `agent_run.status_changed` events. */
+export interface AgentRunStatusChangedData {
+	runId: string;
+	sessionId: string;
+	projectId: string;
+	parentRunId?: string;
+	title: string;
+	previousStatus: AgentRunStatus;
+	nextStatus: AgentRunStatus;
+	reason?: string;
 }
 
 /** Convert a daemon row (snake_case) to the UI `AgentRun` (camelCase). */

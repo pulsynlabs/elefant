@@ -31,6 +31,15 @@ let openRunIds = $state<string[]>([]);
 let lastError = $state<string | null>(null);
 let isLoading = $state(false);
 
+// O(1) index for child lookups: parentRunId -> child runIds (unsorted)
+let childrenByParent = $state<Record<string, string[]>>({});
+
+// Status tracking for sidebar indicator dots (MH3)
+// unseenRunIds: runs that have new output since last viewed
+let unseenRunIds = $state<Set<string>>(new Set());
+// awaitingQuestionIds: runs with an outstanding question awaiting user input
+let awaitingQuestionIds = $state<Set<string>>(new Set());
+
 // SSE subscription state (kept at module level — there is at most one
 // active subscription per project at a time).
 let sseSubscription: {
@@ -76,6 +85,68 @@ function runTree(sessionId: string): AgentRunTreeNode[] {
 	return roots;
 }
 
+/**
+ * Returns direct children of a run, sorted by createdAt ASC.
+ * Uses the O(1) childrenByParent index for efficient lookups.
+ */
+function childRunsForRun(runId: string): AgentRun[] {
+	const childIds = childrenByParent[runId] ?? [];
+	return childIds
+		.map((id) => runs[id])
+		.filter((r): r is AgentRun => r !== undefined)
+		.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/**
+ * Returns the chain from rootRunId to activeRunId (inclusive), ordered
+ * from root to active. Returns [] if activeRunId is not a descendant
+ * of rootRunId or if activeRunId is not provided.
+ * Max depth supported: 4 levels (root -> child -> grandchild -> great-grandchild).
+ */
+function activeChildPath(rootRunId: string, activeRunId?: string): AgentRun[] {
+	if (!activeRunId || !runs[activeRunId]) return [];
+
+	// Build path from activeRunId up to root (or until we hit a dead end)
+	const path: AgentRun[] = [];
+	let currentId: string | null = activeRunId;
+	let depth = 0;
+	const MAX_DEPTH = 4;
+
+	while (currentId && depth < MAX_DEPTH) {
+		const currentRun: AgentRun | undefined = runs[currentId];
+		if (!currentRun) break;
+
+		path.unshift(currentRun);
+
+		// Check if we've reached the root
+		if (currentId === rootRunId) {
+			return path;
+		}
+
+		currentId = currentRun.parentRunId;
+		depth++;
+	}
+
+	// If we exited the loop without finding rootRunId, activeRunId is not a descendant
+	return [];
+}
+
+/**
+ * Returns true if the run has unseen output (blue dot indicator).
+ * Cleared when the user navigates to that run via setActiveRun.
+ */
+function isUnseen(runId: string): boolean {
+	return unseenRunIds.has(runId);
+}
+
+/**
+ * Returns true if the run has an outstanding question awaiting answer (yellow dot indicator).
+ * Set when agent_run.question arrives; cleared on next token/tool_call/tool_result.
+ */
+function isAwaitingQuestion(runId: string): boolean {
+	return awaitingQuestionIds.has(runId);
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function clearError(): void {
@@ -93,7 +164,39 @@ function appendToTranscript(runId: string, entry: AgentRunTranscriptEntry): void
 }
 
 function upsertRun(run: AgentRun): void {
+	const existing = runs[run.runId];
 	runs = { ...runs, [run.runId]: run };
+
+	// Maintain childrenByParent index
+	if (existing?.parentRunId !== run.parentRunId) {
+		// Remove from old parent's children list
+		if (existing?.parentRunId) {
+			const oldParentChildren = childrenByParent[existing.parentRunId] ?? [];
+			childrenByParent = {
+				...childrenByParent,
+				[existing.parentRunId]: oldParentChildren.filter((id) => id !== run.runId),
+			};
+		}
+		// Add to new parent's children list
+		if (run.parentRunId) {
+			const newParentChildren = childrenByParent[run.parentRunId] ?? [];
+			if (!newParentChildren.includes(run.runId)) {
+				childrenByParent = {
+					...childrenByParent,
+					[run.parentRunId]: [...newParentChildren, run.runId],
+				};
+			}
+		}
+	} else if (!existing && run.parentRunId) {
+		// New run with a parent — add to index
+		const parentChildren = childrenByParent[run.parentRunId] ?? [];
+		if (!parentChildren.includes(run.runId)) {
+			childrenByParent = {
+				...childrenByParent,
+				[run.parentRunId]: [...parentChildren, run.runId],
+			};
+		}
+	}
 }
 
 function updateRunStatus(
@@ -137,6 +240,8 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 			// If we don't yet have the row from REST, synthesize one from
 			// the envelope so the UI can show the run immediately.
 			if (!runs[runId]) {
+				// Read contextMode from event data if available (MH4)
+				const contextMode = (data.contextMode as AgentRunContextMode) ?? 'none';
 				upsertRun({
 					runId,
 					sessionId: envelope.sessionId,
@@ -145,7 +250,7 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 					agentType: envelope.agentType,
 					title: envelope.title,
 					status: 'running',
-					contextMode: 'none',
+					contextMode,
 					createdAt: envelope.ts,
 					startedAt: envelope.ts,
 					endedAt: null,
@@ -157,6 +262,16 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 		case 'agent_run.token': {
 			const text = typeof data.text === 'string' ? data.text : '';
 			appendToTranscript(runId, { kind: 'token', text, seq });
+			// Mark as unseen if this run is not currently active (MH3 blue dot)
+			if (activeRunId !== runId) {
+				unseenRunIds = new Set([...unseenRunIds, runId]);
+			}
+			// Clear awaiting question flag — agent moved past the question (MH3 yellow dot)
+			if (awaitingQuestionIds.has(runId)) {
+				const next = new Set(awaitingQuestionIds);
+				next.delete(runId);
+				awaitingQuestionIds = next;
+			}
 			break;
 		}
 		case 'agent_run.tool_call': {
@@ -170,6 +285,16 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 						: {},
 				seq,
 			});
+			// Mark as unseen if this run is not currently active (MH3 blue dot)
+			if (activeRunId !== runId) {
+				unseenRunIds = new Set([...unseenRunIds, runId]);
+			}
+			// Clear awaiting question flag — agent moved past the question (MH3 yellow dot)
+			if (awaitingQuestionIds.has(runId)) {
+				const next = new Set(awaitingQuestionIds);
+				next.delete(runId);
+				awaitingQuestionIds = next;
+			}
 			break;
 		}
 		case 'agent_run.tool_result': {
@@ -180,6 +305,52 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 				isError: typeof data.isError === 'boolean' ? data.isError : false,
 				seq,
 			});
+			// Mark as unseen if this run is not currently active (MH3 blue dot)
+			if (activeRunId !== runId) {
+				unseenRunIds = new Set([...unseenRunIds, runId]);
+			}
+			// Clear awaiting question flag — agent moved past the question (MH3 yellow dot)
+			if (awaitingQuestionIds.has(runId)) {
+				const next = new Set(awaitingQuestionIds);
+				next.delete(runId);
+				awaitingQuestionIds = next;
+			}
+			break;
+		}
+		case 'agent_run.tool_call_metadata': {
+			// Merge metadata onto existing tool_call entry by toolCallId.
+			// Preferred routing uses envelope.runId = parent run id, but we
+			// also support fallback lookup via data.parentRunId for older
+			// producers that emitted envelope.runId = child run id.
+			const toolCallId = typeof data.toolCallId === 'string' ? data.toolCallId : '';
+			const parentRunId = typeof data.parentRunId === 'string' ? data.parentRunId : '';
+			const targetRunId = transcripts[runId]
+				? runId
+				: (parentRunId && transcripts[parentRunId] ? parentRunId : runId);
+			const existingTranscript = transcripts[targetRunId];
+			if (!existingTranscript || !toolCallId) break;
+
+			const entryIndex = existingTranscript.findIndex(
+				(e) => e.kind === 'tool_call' && e.id === toolCallId,
+			);
+			if (entryIndex === -1) break;
+
+			const entry = existingTranscript[entryIndex];
+			if (entry.kind !== 'tool_call') break;
+
+			// Merge metadata fields
+			const metadata = {
+				runId: typeof data.runId === 'string' ? data.runId : '',
+				parentRunId: typeof data.parentRunId === 'string' ? data.parentRunId : undefined,
+				agentType: typeof data.agentType === 'string' ? data.agentType : '',
+				title: typeof data.title === 'string' ? data.title : '',
+			};
+
+			// Create updated entry with metadata
+			const updatedEntry = { ...entry, metadata };
+			const updatedTranscript = [...existingTranscript];
+			updatedTranscript[entryIndex] = updatedEntry;
+			transcripts = { ...transcripts, [targetRunId]: updatedTranscript };
 			break;
 		}
 		case 'agent_run.question': {
@@ -193,9 +364,12 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 				multiple: typeof data.multiple === 'boolean' ? data.multiple : false,
 				seq,
 			});
+			// Set awaiting question flag (MH3 yellow dot indicator)
+			awaitingQuestionIds = new Set([...awaitingQuestionIds, runId]);
 			break;
 		}
-		case 'agent_run.done': {
+		case 'agent_run.done':
+		case 'agent_run.completed': {
 			updateRunStatus(runId, 'done');
 			appendToTranscript(runId, {
 				kind: 'terminal',
@@ -217,6 +391,49 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 			appendToTranscript(runId, { kind: 'terminal', status: 'cancelled', message: reason, seq });
 			break;
 		}
+		case 'agent_run.status_changed': {
+			// Parse status change data with safe fallbacks
+			const nextStatus = (data.nextStatus as AgentRun['status']) ?? 'running';
+			const previousStatus = (data.previousStatus as AgentRun['status']) ?? 'running';
+
+			// Idempotent: if status already matches nextStatus, no-op
+			const existing = runs[runId];
+			if (existing && existing.status === nextStatus) {
+				break;
+			}
+
+			// If run doesn't exist yet, create a minimal entry
+			// (handles case where status_changed arrives before spawned event)
+			if (!existing) {
+				upsertRun({
+					runId,
+					sessionId: envelope.sessionId,
+					projectId: envelope.projectId,
+					parentRunId: envelope.parentRunId,
+					agentType: envelope.agentType,
+					title: envelope.title,
+					status: nextStatus,
+					contextMode: 'none',
+					createdAt: envelope.ts,
+					startedAt: previousStatus === 'running' ? envelope.ts : null,
+					endedAt: ['done', 'error', 'cancelled'].includes(nextStatus) ? envelope.ts : null,
+					errorMessage: null,
+				});
+			} else {
+				// Update existing run status
+				runs = {
+					...runs,
+					[runId]: {
+						...existing,
+						status: nextStatus,
+						startedAt: existing.startedAt ?? (nextStatus === 'running' ? envelope.ts : null),
+						endedAt: existing.endedAt ?? (['done', 'error', 'cancelled'].includes(nextStatus) ? envelope.ts : null),
+					},
+				};
+			}
+			// Note: NO transcript entry appended — status_changed is metadata only
+			break;
+		}
 		default:
 			// Unknown agent_run.* type — ignore gracefully.
 			break;
@@ -230,8 +447,11 @@ const AGENT_RUN_EVENT_TYPES = [
 	'agent_run.token',
 	'agent_run.tool_call',
 	'agent_run.tool_result',
+	'agent_run.tool_call_metadata',
 	'agent_run.question',
+	'agent_run.status_changed',
 	'agent_run.done',
+	'agent_run.completed', // Alias for done (MH5 contract)
 	'agent_run.error',
 	'agent_run.cancelled',
 ] as const;
@@ -434,6 +654,12 @@ async function cancel(runId: string): Promise<boolean> {
 
 function setActiveRun(runId: string | null): void {
 	activeRunId = runId;
+	// Clear unseen flag when user navigates to this run (MH3 blue dot)
+	if (runId && unseenRunIds.has(runId)) {
+		const next = new Set(unseenRunIds);
+		next.delete(runId);
+		unseenRunIds = next;
+	}
 }
 
 function openRun(runId: string): void {
@@ -460,6 +686,9 @@ export function resetAgentRunsStore(): void {
 	openRunIds = [];
 	lastError = null;
 	isLoading = false;
+	childrenByParent = {};
+	unseenRunIds = new Set();
+	awaitingQuestionIds = new Set();
 }
 
 /** Seed a run row without hitting the daemon. */
@@ -495,6 +724,10 @@ export const agentRunsStore = {
 	},
 	runsForSession,
 	runTree,
+	childRunsForRun,
+	activeChildPath,
+	isUnseen,
+	isAwaitingQuestion,
 	refreshSession,
 	spawn,
 	cancel,

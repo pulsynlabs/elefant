@@ -63,3 +63,23 @@ export interface AgentRunEventEnvelope {
 	type: string
 	data: unknown
 }
+
+export interface AgentRunStatusChangedData {
+	runId: string
+	sessionId: string
+	projectId: string
+	parentRunId?: string
+	agentType: string
+	title: string
+	previousStatus: AgentRunStatus
+	nextStatus: AgentRunStatus
+	reason?: string
+}
+
+export type AgentRunToolCallMetadataData = {
+	toolCallId: string
+	runId: string
+	parentRunId?: string
+	agentType: string
+	title: string
+}

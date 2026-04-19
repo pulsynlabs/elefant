@@ -108,6 +108,32 @@ export function listRunsBySession(
 	}
 }
 
+export function listChildRunsByParent(
+	db: Database,
+	parentRunId: string,
+	sessionId: string,
+): Result<AgentRunRow[], ElefantError> {
+	try {
+		const rows = db.db
+			.query(
+				`SELECT *
+				 FROM agent_runs
+				 WHERE parent_run_id = ?
+				   AND session_id = ?
+				 ORDER BY created_at ASC, run_id ASC`,
+			)
+			.all(parentRunId, sessionId)
+
+		return ok(rows.map((row) => AgentRunRowSchema.parse(row)))
+	} catch (error) {
+		return err({
+			code: 'TOOL_EXECUTION_FAILED',
+			message: String(error),
+			details: error,
+		})
+	}
+}
+
 export function updateRunStatus(
 	db: Database,
 	runId: string,
