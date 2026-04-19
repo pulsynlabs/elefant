@@ -176,19 +176,32 @@ Depth and concurrency limits are enforced by agent configuration.`,
 				? null
 				: currentRun.runId
 
-			const createResult = createRun(database, {
-				run_id: childRunId,
-				session_id: currentRun.sessionId,
-				project_id: currentRun.projectId,
-				parent_run_id: persistedParentRunId,
-				agent_type: params.agent_type,
-				title: params.description,
-				status: 'running',
-				context_mode: contextMode,
-				started_at: new Date().toISOString(),
-			})
-			if (!createResult.ok) {
-				return err(createResult.error)
+			// Persist to DB when we have real FK-valid session/project IDs.
+			// Chat sessions use synthetic IDs (projectId='chat') that aren't in
+			// the DB — in that case we skip persistence and run in-memory only.
+			// The child agent still executes; it just won't appear in the runs list.
+			const hasPersistableContext =
+				currentRun.projectId !== 'chat' &&
+				currentRun.sessionId !== 'chat' &&
+				!currentRun.projectId.startsWith('chat:') &&
+				!currentRun.sessionId.startsWith('chat:')
+
+			if (hasPersistableContext) {
+				const createResult = createRun(database, {
+					run_id: childRunId,
+					session_id: currentRun.sessionId,
+					project_id: currentRun.projectId,
+					parent_run_id: persistedParentRunId,
+					agent_type: params.agent_type,
+					title: params.description,
+					status: 'running',
+					context_mode: contextMode,
+					started_at: new Date().toISOString(),
+				})
+				if (!createResult.ok) {
+					// Log but don't abort — child can still run without a DB row
+					console.error(`[task] createRun failed (non-fatal): ${createResult.error.message}`)
+				}
 			}
 
 			runRegistry.registerRun(childRunId, {
