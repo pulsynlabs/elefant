@@ -221,12 +221,20 @@ Depth and concurrency limits are enforced by agent configuration.`,
 
 			runRegistry.registerChildren(currentRun.runId, childRunId)
 
-			publishRunEvent(childCtx, sseManager, 'agent_run.spawned', {
-				contextMode,
-				parentRunId: currentRun.runId,
-			})
+		publishRunEvent(childCtx, sseManager, 'agent_run.spawned', {
+			contextMode,
+			parentRunId: currentRun.runId,
+		})
 
-			if (typeof params._toolCallId === 'string' && params._toolCallId.length > 0) {
+		// Emit status change: null -> running (MH5 contract requirement)
+		// Emit directly (not via publishStatusChange) to bypass coalescing —
+		// the initial spawn transition must be immediate and reliable.
+		publishRunEvent(childCtx, sseManager, 'agent_run.status_changed', {
+			previousStatus: null,
+			nextStatus: 'running',
+		})
+
+		if (typeof params._toolCallId === 'string' && params._toolCallId.length > 0) {
 				publishToolCallMetadata(sseManager, currentRun.projectId, {
 					toolCallId: params._toolCallId,
 					runId: childRunId,

@@ -1106,19 +1106,30 @@ describe('e2e integration — spawn → card → navigate → back', () => {
 			expect(spawnedEnvelope.parentRunId).toBe(parentRunId)
 			expect(spawnedEnvelope.data.contextMode).toBe('inherit_session')
 
+			// Step 3b: Verify agent_run.status_changed null -> running (MH5 contract)
+			const spawnStatusChangeFrames = frames.filter(
+				(f) =>
+					f.event === 'agent_run.status_changed' &&
+					f.data.includes(`"runId":"${childRunId}"`) &&
+					f.data.includes('"previousStatus":null') &&
+					f.data.includes('"nextStatus":"running"'),
+			)
+			expect(spawnStatusChangeFrames.length).toBeGreaterThanOrEqual(1)
+
 			// Step 4: Verify agent_run.status_changed for child completion (MH5)
 			// The child run goes from running -> done, so we should see a status_changed event
 			// Note: status_changed is tested extensively in events.test.ts; here we verify
 			// it's present in the full journey but don't fail if timing causes it to be missed
-			const statusChangedFrames = frames.filter(
+			const completionStatusFrames = frames.filter(
 				(f) =>
 					f.event === 'agent_run.status_changed' &&
-					f.data.includes(`"runId":"${childRunId}"`),
+					f.data.includes(`"runId":"${childRunId}"`) &&
+					f.data.includes('"nextStatus":"done"'),
 			)
 			// Status changed event is emitted but may arrive after done due to async timing
 			// The key verification is that the child completed (done event above)
-			if (statusChangedFrames.length > 0) {
-				const statusData = JSON.parse(statusChangedFrames[0].data) as {
+			if (completionStatusFrames.length > 0) {
+				const statusData = JSON.parse(completionStatusFrames[0].data) as {
 					data: { previousStatus: string; nextStatus: string }
 				}
 				expect(statusData.data.previousStatus).toBe('running')

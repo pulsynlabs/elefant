@@ -368,7 +368,8 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 			awaitingQuestionIds = new Set([...awaitingQuestionIds, runId]);
 			break;
 		}
-		case 'agent_run.done': {
+		case 'agent_run.done':
+		case 'agent_run.completed': {
 			updateRunStatus(runId, 'done');
 			appendToTranscript(runId, {
 				kind: 'terminal',
@@ -450,6 +451,7 @@ const AGENT_RUN_EVENT_TYPES = [
 	'agent_run.question',
 	'agent_run.status_changed',
 	'agent_run.done',
+	'agent_run.completed', // Alias for done (MH5 contract)
 	'agent_run.error',
 	'agent_run.cancelled',
 ] as const;
