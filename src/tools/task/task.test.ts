@@ -304,6 +304,36 @@ describe('createTaskTool', () => {
 		expect(metadata.data.parentRunId).toBe('parent-run-id')
 		expect(metadata.data.agentType).toBe('researcher')
 		expect(metadata.data.title).toBe('metadata test')
+
+		const dbRow = database.db
+			.query('SELECT run_id FROM agent_runs WHERE run_id = ?')
+			.get(metadata.data.runId) as { run_id: string } | null
+		expect(dbRow).toBeDefined()
+		expect(dbRow?.run_id).toBe(metadata.data.runId)
+		database.close()
+	})
+
+	it('does not publish agent_run.tool_call_metadata when depth validation rejects spawn', async () => {
+		const { deps, publishedEvents, database } = buildDeps({ currentDepth: 4 })
+		const tool = createTaskTool(deps)
+
+		const result = await tool.execute({
+			description: 'depth-rejected metadata test',
+			prompt: 'do something',
+			agent_type: 'researcher',
+			_toolCallId: 'tool-call-depth-rejected',
+		} as unknown as Parameters<typeof tool.execute>[0])
+
+		expect(result.ok).toBe(false)
+		if (result.ok) return
+
+		expect(result.error.code).toBe('VALIDATION_ERROR')
+		expect(publishedEvents.some((event) => event.type === 'agent_run.tool_call_metadata')).toBe(false)
+
+		const inserted = database.db
+			.query('SELECT COUNT(*) as count FROM agent_runs WHERE parent_run_id = ?')
+			.get('parent-run-id') as { count: number }
+		expect(inserted.count).toBe(0)
 		database.close()
 	})
 
