@@ -1,5 +1,13 @@
 import { describe, it, expect } from "bun:test";
-import { configSchema, providerSchema } from "./schema.ts";
+import {
+	configSchema,
+	providerSchema,
+	toolPolicyConfigSchema,
+	agentRuntimeLimitsSchema,
+	agentBehaviorConfigSchema,
+	agentProfileSchema,
+	defaultAgentProfiles,
+} from "./schema.ts";
 
 describe("providerSchema", () => {
 	it("accepts valid provider config", () => {
@@ -209,6 +217,89 @@ describe("configSchema", () => {
 		};
 
 		const result = configSchema.safeParse(invalidConfig);
+		expect(result.success).toBe(true);
+	});
+
+	it('accepts optional agents record', () => {
+		const result = configSchema.safeParse({
+			providers: [],
+			defaultProvider: '',
+			agents: {
+				executor: defaultAgentProfiles.executor,
+			},
+		});
+
+		expect(result.success).toBe(true);
+	});
+
+	it('rejects unknown top-level fields in strict mode', () => {
+		const result = configSchema.safeParse({
+			providers: [],
+			defaultProvider: '',
+			unexpected: true,
+		});
+
+		expect(result.success).toBe(false);
+	});
+});
+
+describe('agent config schemas', () => {
+	it('accepts valid tool policy', () => {
+		const result = toolPolicyConfigSchema.safeParse({
+			mode: 'manual',
+			allowedTools: ['read', 'glob'],
+			perToolApproval: { bash: true },
+		});
+
+		expect(result.success).toBe(true);
+	});
+
+	it('fails tool policy for invalid enum', () => {
+		const result = toolPolicyConfigSchema.safeParse({
+			mode: 'invalid',
+		});
+
+		expect(result.success).toBe(false);
+	});
+
+	it('fails runtime limits for wrong type', () => {
+		const result = agentRuntimeLimitsSchema.safeParse({
+			maxIterations: '10',
+			timeoutMs: 1000,
+			maxConcurrency: 1,
+		});
+
+		expect(result.success).toBe(false);
+	});
+
+	it('fails profile when required field missing', () => {
+		const result = agentProfileSchema.safeParse({
+			id: 'executor',
+			kind: 'executor',
+			enabled: true,
+			behavior: {},
+			limits: {
+				maxIterations: 12,
+				timeoutMs: 30000,
+				maxConcurrency: 1,
+			},
+			tools: {
+				mode: 'auto',
+			},
+		});
+
+		expect(result.success).toBe(false);
+	});
+
+	it('accepts valid behavior config', () => {
+		const result = agentBehaviorConfigSchema.safeParse({
+			provider: 'openai',
+			model: 'gpt-4o-mini',
+			workflowMode: 'standard',
+			workflowDepth: 'deep',
+			autopilot: false,
+		});
+
 		expect(result.success).toBe(true);
 	});
 });
