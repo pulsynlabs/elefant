@@ -111,10 +111,12 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 32px;
-		font-weight: var(--font-weight-bold);
-		font-family: var(--font-mono);
+		font-size: 28px;
+		font-weight: var(--font-weight-normal);
+		font-family: var(--font-serif);
+		font-style: italic;
 		flex-shrink: 0;
+		box-shadow: var(--glow-primary), var(--shadow-md);
 	}
 
 	.brand-info {
@@ -124,11 +126,13 @@
 	}
 
 	.brand-name {
-		font-size: var(--font-size-4xl);
-		font-weight: var(--font-weight-bold);
+		font-size: var(--font-size-3xl);
+		font-weight: var(--font-weight-normal);
+		font-family: var(--font-serif);
+		font-style: italic;
 		color: var(--color-text-primary);
 		letter-spacing: var(--tracking-tight);
-		line-height: 1;
+		line-height: var(--line-height-tight);
 	}
 
 	.brand-tagline {

@@ -61,8 +61,12 @@
 	}
 
 	.settings-title {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-primary);
+		font-size: var(--font-size-xs);
+		font-family: var(--font-mono);
+		font-weight: var(--font-weight-semibold);
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-text-muted);
 	}
 
 	.settings-layout {
@@ -93,22 +97,27 @@
 		background: transparent;
 		color: var(--color-text-secondary);
 		cursor: pointer;
+		font-family: var(--font-sans);
+		font-size: var(--font-size-md);
 		transition:
-			color var(--transition-fast),
-			background-color var(--transition-fast),
-			box-shadow var(--transition-fast);
+			color var(--duration-fast) var(--ease-out-expo),
+			background-color var(--duration-fast) var(--ease-out-expo),
+			box-shadow var(--duration-fast) var(--ease-out-expo),
+			transform var(--duration-fast) var(--ease-spring);
 	}
 
 	.settings-nav-item:hover {
 		color: var(--color-text-primary);
 		background-color: var(--color-surface-hover);
+		transform: translateX(2px);
 	}
 
 	.settings-nav-item.active {
 		color: var(--color-primary);
 		background-color: var(--color-primary-subtle);
 		font-weight: var(--font-weight-medium);
-		box-shadow: var(--glow-primary);
+		box-shadow: inset 2px 0 0 var(--color-primary), var(--glow-primary);
+		transform: translateX(2px);
 	}
 
 	.settings-content {

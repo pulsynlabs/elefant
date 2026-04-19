@@ -315,7 +315,7 @@
 
 	.picker-title {
 		font-size: var(--font-size-4xl);
-		font-weight: var(--font-weight-bold);
+		font-weight: var(--font-weight-normal);
 		color: var(--color-text-primary);
 		letter-spacing: var(--tracking-tight);
 		line-height: var(--line-height-tight);
