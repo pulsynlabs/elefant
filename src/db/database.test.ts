@@ -34,6 +34,7 @@ describe('Database', () => {
 
 		expect(rows.map((row) => row.name)).toEqual([
 			'_migrations',
+			'agent_runs',
 			'checkpoints',
 			'events',
 			'memory_entries',
@@ -88,6 +89,6 @@ describe('Database', () => {
 		}[];
 		secondOpen.close();
 
-		expect(rows).toEqual([{ version: 1 }]);
+		expect(rows).toEqual([{ version: 1 }, { version: 2 }]);
 	});
 });
