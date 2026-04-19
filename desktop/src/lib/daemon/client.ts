@@ -1,10 +1,7 @@
 import type {
 	HealthResponse,
-	ChatRequest,
-	ChatStreamEvent,
 	ProviderEntry,
 } from './types.js';
-import { parseSSEStream } from './sse-parser.js';
 
 // Default daemon URL — consumed by events.ts (SSE) and approvals.ts (WebSocket).
 // Keep in sync with `settingsStore.daemonUrl` when users customise the port.
@@ -20,8 +17,9 @@ export const DAEMON_URL = 'http://localhost:1337';
 //   import type { App } from '@elefant/daemon';
 //   export const api = treaty<App>(DAEMON_URL);
 //
-// SSE streams (chat, project events) should still use the native `fetch` /
-// `EventSource` paths — treaty does not wrap streaming responses cleanly.
+// SSE streams (project events, agent-run transcripts) should still use the
+// native `fetch` / `EventSource` paths — treaty does not wrap streaming
+// responses cleanly.
 
 export class DaemonClient {
 	private baseUrl: string;
@@ -59,32 +57,6 @@ export class DaemonClient {
 		} finally {
 			clearTimeout(timeoutId);
 		}
-	}
-
-	async *streamChat(
-		request: ChatRequest,
-		signal?: AbortSignal
-	): AsyncGenerator<ChatStreamEvent> {
-		const response = await fetch(`${this.baseUrl}/api/chat`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Accept': 'text/event-stream',
-			},
-			body: JSON.stringify(request),
-			signal,
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text().catch(() => 'Unknown error');
-			throw new Error(`Chat request failed: HTTP ${response.status} — ${errorText}`);
-		}
-
-		if (!response.body) {
-			throw new Error('No response body for SSE stream');
-		}
-
-		yield* parseSSEStream(response.body);
 	}
 
 	async getProviders(): Promise<ProviderEntry[]> {
