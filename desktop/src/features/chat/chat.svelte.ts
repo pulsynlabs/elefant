@@ -187,7 +187,8 @@ export function getApiMessages(): Array<{ role: string; content: string }> {
  * Kept pure / dependency-free so it can be unit-tested without a
  * component test runner.
  */
-export function buildChatRequestFields(): {
+export function buildChatRequestFields(sessionId?: string | null): {
+	sessionId?: string;
 	provider?: string;
 	maxIterations: number;
 	maxTokens?: number;
@@ -205,6 +206,7 @@ export function buildChatRequestFields(): {
 				: undefined;
 
 	return {
+		...(sessionId ? { sessionId } : {}),
 		provider,
 		maxIterations: agentOverride.maxIterations ?? maxIterations,
 		maxTokens: resolvedMaxTokens,

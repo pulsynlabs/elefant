@@ -29,6 +29,7 @@ export interface ToolCallPayload {
 
 export interface ChatRequest {
 	messages: MessageRole[];
+	sessionId?: string;
 	provider?: string;
 	maxIterations?: number;
 	maxTokens?: number;

@@ -9,10 +9,28 @@
 	import { getDaemonClient } from '$lib/daemon/client.js';
 	import type { MessageRole } from '$lib/daemon/types.js';
 	import type { AgentRunOverride } from '$lib/types/agent-config.js';
+	import { projectsStore } from '$lib/stores/projects.svelte.js';
 
 	let showAdvanced = $state(false);
 	let showOverrideDialog = $state(false);
 	let abortController: AbortController | null = null;
+
+	// Clear the in-memory message list whenever the active session changes so
+	// the user always sees a clean slate for the session they just switched to.
+	// Use a local tracker to avoid clearing on the initial mount.
+	let _lastSessionId = $state<string | null>(projectsStore.activeSessionId);
+	$effect(() => {
+		const current = projectsStore.activeSessionId;
+		if (current !== _lastSessionId) {
+			_lastSessionId = current;
+			// Stop any in-flight stream before clearing
+			if (abortController) {
+				abortController.abort();
+				abortController = null;
+			}
+			chatStore.clearConversation();
+		}
+	});
 
 	function openOverride(): void {
 		showOverrideDialog = true;
@@ -49,9 +67,9 @@
 			// Build the request payload through the store helper so the
 			// AdvancedOptions fields and any per-run AgentOverrideDialog
 			// override flow through a single, testable code path.
-			const fields = chatStore.buildChatRequestFields();
-			const stream = client.streamChat(
-				{ messages: apiMessages, ...fields },
+		const fields = chatStore.buildChatRequestFields(projectsStore.activeSessionId);
+		const stream = client.streamChat(
+			{ messages: apiMessages, ...fields },
 				abortController.signal,
 			);
 

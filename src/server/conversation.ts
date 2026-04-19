@@ -27,6 +27,7 @@ const messageSchema = z.object({
 
 const chatRequestSchema = z.object({
 	messages: z.array(messageSchema).min(1),
+	sessionId: z.string().min(1).optional(),
 	provider: z.string().min(1).optional(),
 	maxIterations: z.number().int().positive().max(200).optional(),
 	maxTokens: z.number().int().positive().optional(),
@@ -254,7 +255,9 @@ export function createConversationRoute<TApp extends Elysia>(
 			}
 		}
 
-		const sessionId = crypto.randomUUID()
+		// Use the caller-supplied sessionId so the desktop can associate a chat
+		// with a persisted session. Fall back to a fresh UUID for CLI/API callers.
+		const sessionId = parsed.data.sessionId ?? crypto.randomUUID()
 		const runId = `chat:${sessionId}:${crypto.randomUUID()}`
 		const abortController = new AbortController()
 		const stream = createSSEStream(
