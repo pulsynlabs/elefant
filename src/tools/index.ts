@@ -17,7 +17,7 @@ export {
   type BinaryResult,
 } from './binary.js';
 export { grepTool, type GrepParams } from './grep.js';
-export { ToolRegistry, createToolRegistry } from './registry.ts';
+export { ToolRegistry, createToolRegistry, createToolRegistryForRun, type ToolRegistryRunDeps } from './registry.ts';
 
 // New tools (Wave 1-4)
 export { applyPatchTool, type ApplyPatchParams } from './apply_patch/index.js';
@@ -33,3 +33,7 @@ export { questionTool, type QuestionParams, type Question, type QuestionOption }
 export { skillTool, type SkillParams } from './skill/index.js';
 export { lspTool, type LspParams, type LspOperation } from './lsp/index.js';
 export { createToolListTool, type ToolListParams } from './tool_list/index.js';
+
+// Task and wait_on_run tools (per-run registry only)
+export { createTaskTool, type TaskParams, type TaskToolDeps, DEFAULT_MAX_CHILDREN } from './task/index.js';
+export { createWaitOnRunTool, type WaitOnRunParams, type WaitOnRunDeps, type WaitOnRunResult } from './wait_on_run/index.js';

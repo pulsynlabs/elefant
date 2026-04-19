@@ -42,6 +42,8 @@ const agentProfileSchema = z.object({
 	behavior: agentBehaviorConfigSchema,
 	limits: agentRuntimeLimitsSchema,
 	tools: toolPolicyConfigSchema,
+	maxTaskDepth: z.number().int().min(0).optional(),
+	maxChildren: z.number().int().min(1).optional(),
 }).strict();
 
 const configSchema = z.object({

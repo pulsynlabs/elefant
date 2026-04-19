@@ -37,6 +37,7 @@ function createRunContext(runId: string) {
 	return {
 		runId,
 		parentRunId: undefined,
+		depth: 0,
 		agentType: scope ?? 'test',
 		title: suffix ?? 'test-run',
 		sessionId: `session-${runId}`,

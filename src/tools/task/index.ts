@@ -221,6 +221,9 @@ Depth and concurrency limits are enforced by agent configuration.`,
 			})
 
 			void (async () => {
+				let endStatus: 'done' | 'error' = 'done'
+				let errorMessage: string | undefined
+
 				try {
 					for await (const _ of runAgentLoop(providerRouter, toolRegistry, {
 						messages: initialMessages,
@@ -231,13 +234,13 @@ Depth and concurrency limits are enforced by agent configuration.`,
 					})) {
 						// Intentionally drain events; runAgentLoop publishes via SSE internally.
 					}
-					markRunEnded(database, childRunId, 'done')
 					publishRunEvent(childCtx, sseManager, 'agent_run.done', { runId: childRunId })
 				} catch (e) {
-					const message = e instanceof Error ? e.message : String(e)
-					markRunEnded(database, childRunId, 'error', message)
-					publishRunEvent(childCtx, sseManager, 'agent_run.error', { runId: childRunId, message })
+					endStatus = 'error'
+					errorMessage = e instanceof Error ? e.message : String(e)
+					publishRunEvent(childCtx, sseManager, 'agent_run.error', { runId: childRunId, message: errorMessage })
 				} finally {
+					markRunEnded(database, childRunId, endStatus, errorMessage)
 					runRegistry.forgetRun(childRunId)
 				}
 			})()

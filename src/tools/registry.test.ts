@@ -5,7 +5,7 @@ import type { ToolDefinition } from '../types/tools.ts'
 import { createToolRegistry, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all 14 tools', () => {
+	it('registers all 15 tools', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
@@ -21,11 +21,12 @@ describe('ToolRegistry', () => {
 			'skill',
 			'todoread',
 			'todowrite',
+			'tool_list',
 			'webfetch',
 			'websearch',
 			'write',
 		])
-		expect(names.length).toBe(14)
+		expect(names.length).toBe(15)
 	})
 
 	it('execute() calls the matching tool', async () => {

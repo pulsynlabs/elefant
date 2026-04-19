@@ -8,6 +8,7 @@ describe('publishRunEvent', () => {
 		const runContext: RunContext = {
 			runId: crypto.randomUUID(),
 			parentRunId: crypto.randomUUID(),
+			depth: 0,
 			agentType: 'executor',
 			title: 'Event test',
 			sessionId: crypto.randomUUID(),

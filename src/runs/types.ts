@@ -43,6 +43,7 @@ export type InsertAgentRun = z.infer<typeof InsertAgentRunSchema>
 export interface RunContext {
 	runId: string
 	parentRunId?: string
+	depth: number
 	agentType: string
 	title: string
 	sessionId: string

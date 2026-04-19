@@ -1,12 +1,13 @@
 import type { Elysia } from 'elysia'
 import { z } from 'zod'
 
+import type { ConfigManager } from '../config/loader.js'
 import type { Database } from '../db/database.ts'
 import { getSessionById } from '../db/repo/sessions.ts'
 import type { HookRegistry } from '../hooks/index.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import { runAgentLoop } from '../server/agent-loop.ts'
-import type { ToolRegistry } from '../tools/registry.ts'
+import { createToolRegistryForRun, type ToolRegistry } from '../tools/registry.ts'
 import type { SseManager } from '../transport/sse-manager.ts'
 import { createRun, getRun, listRunsBySession, markRunEnded } from './dal.ts'
 import { buildInitialMessages } from './context.ts'
@@ -36,6 +37,7 @@ export function mountAgentRunRoutes(
 		hookRegistry: HookRegistry
 		runRegistry: RunRegistry
 		sseManager?: SseManager
+		configManager: ConfigManager
 	},
 ): Elysia {
 	app.post('/api/projects/:id/sessions/:sessionId/agent-runs', ({ params, body, set }) => {
@@ -90,6 +92,7 @@ export function mountAgentRunRoutes(
 		const runContext: RunContext = {
 			runId,
 			parentRunId: parsedBody.data.parentRunId,
+			depth: 0,
 			agentType: parsedBody.data.agentType,
 			title: parsedBody.data.title,
 			sessionId: params.sessionId,
@@ -101,9 +104,14 @@ export function mountAgentRunRoutes(
 			controller,
 			startedAt: new Date(),
 			questionEmitter: () => undefined,
+			parentRunId: parsedBody.data.parentRunId,
 			agentType: parsedBody.data.agentType,
 			title: parsedBody.data.title,
 		})
+
+		if (parsedBody.data.parentRunId) {
+			deps.runRegistry.registerChildren(parsedBody.data.parentRunId, runId)
+		}
 
 		if (deps.sseManager) {
 			publishRunEvent(runContext, deps.sseManager, 'agent_run.spawned', {
@@ -127,11 +135,22 @@ export function mountAgentRunRoutes(
 			{ role: 'user' as const, content: parsedBody.data.prompt },
 		]
 
+		// Create per-run tool registry with task and wait_on_run tools
+		const runToolRegistry = createToolRegistryForRun({
+			hookRegistry: deps.hookRegistry,
+			database: deps.db,
+			runRegistry: deps.runRegistry,
+			sseManager: deps.sseManager,
+			providerRouter: deps.providerRouter,
+			configManager: deps.configManager,
+			currentRun: runContext,
+		})
+
 		void (async () => {
 			try {
-				for await (const _event of runAgentLoop(deps.providerRouter, deps.toolRegistry, {
+				for await (const _event of runAgentLoop(deps.providerRouter, runToolRegistry, {
 					messages,
-					tools: deps.toolRegistry.getAll(),
+					tools: runToolRegistry.getAll(),
 					hookRegistry: deps.hookRegistry,
 					runContext,
 					sseManager: deps.sseManager,
@@ -278,6 +297,7 @@ export function mountAgentRunRoutes(
 					sessionId: cancelled.data.session_id,
 					projectId: cancelled.data.project_id,
 					signal: new AbortController().signal,
+					depth: 0,
 				},
 				deps.sseManager,
 				'agent_run.cancelled',
