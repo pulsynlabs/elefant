@@ -240,6 +240,8 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 			// If we don't yet have the row from REST, synthesize one from
 			// the envelope so the UI can show the run immediately.
 			if (!runs[runId]) {
+				// Read contextMode from event data if available (MH4)
+				const contextMode = (data.contextMode as AgentRunContextMode) ?? 'none';
 				upsertRun({
 					runId,
 					sessionId: envelope.sessionId,
@@ -248,7 +250,7 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 					agentType: envelope.agentType,
 					title: envelope.title,
 					status: 'running',
-					contextMode: 'none',
+					contextMode,
 					createdAt: envelope.ts,
 					startedAt: envelope.ts,
 					endedAt: null,
