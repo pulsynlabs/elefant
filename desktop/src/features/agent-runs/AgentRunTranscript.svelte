@@ -12,13 +12,10 @@
 		AgentRunStatus,
 		AgentRunTranscriptEntry,
 	} from '$lib/types/agent-run.js';
-	import type {
-		ChatMessage,
-		ContentBlock,
-		ToolCallDisplay,
-	} from '../chat/types.js';
 	import StreamingMessage from '../chat/StreamingMessage.svelte';
 	import ToolCallCard from '../chat/ToolCallCard.svelte';
+	import AgentTaskCard from './AgentTaskCard.svelte';
+	import { computeRenderBlocks } from './agent-run-transcript-blocks.js';
 
 	type Props = {
 		runId?: string;
@@ -36,104 +33,19 @@
 		effectiveRunId ? agentRunsStore.transcripts[effectiveRunId] ?? [] : [],
 	);
 
+	const renderBlocks = $derived(computeRenderBlocks(entries));
+
 	/**
-	 * Group transcript entries into chunks the UI can render:
-	 *   - consecutive `token` events fold into a single streaming
-	 *     assistant message (so fenced code still works)
-	 *   - `tool_call` / `tool_result` pair up into a ToolCallDisplay
-	 *   - `question` and `terminal` become their own blocks
+	 * Open a child run spawned via the `task` tool.
+	 *
+	 * Stubbed for now — wave 6 wires this through `navigationStore` so
+	 * clicks push a child-run view onto the nav stack. Keeping the
+	 * signature stable here so the inline AgentTaskCard never needs to
+	 * change when navigation lands.
 	 */
-	type RenderBlock =
-		| { kind: 'text'; id: string; message: ChatMessage }
-		| { kind: 'tool'; id: string; toolCall: ToolCallDisplay }
-		| {
-				kind: 'question';
-				id: string;
-				question: string;
-				options: Array<{ label: string; description?: string }>;
-				multiple: boolean;
-		  }
-		| { kind: 'terminal'; id: string; status: AgentRunStatus; message: string };
-
-	const renderBlocks = $derived<RenderBlock[]>(computeRenderBlocks(entries));
-
-	function computeRenderBlocks(source: AgentRunTranscriptEntry[]): RenderBlock[] {
-		const out: RenderBlock[] = [];
-		const toolCallsById = new Map<string, ToolCallDisplay>();
-		let currentText: { id: string; text: string } | null = null;
-
-		const flushText = (): void => {
-			if (!currentText) return;
-			const blocks: ContentBlock[] = [{ type: 'text', text: currentText.text }];
-			const message: ChatMessage = {
-				id: currentText.id,
-				role: 'assistant',
-				content: currentText.text,
-				blocks,
-				timestamp: new Date(),
-			};
-			out.push({ kind: 'text', id: currentText.id, message });
-			currentText = null;
-		};
-
-		for (const entry of source) {
-			switch (entry.kind) {
-				case 'token': {
-					if (!currentText) {
-						currentText = { id: `text-${entry.seq}`, text: entry.text };
-					} else {
-						currentText.text += entry.text;
-					}
-					break;
-				}
-				case 'tool_call': {
-					flushText();
-					const display: ToolCallDisplay = {
-						id: entry.id,
-						name: entry.name,
-						arguments: entry.arguments,
-					};
-					toolCallsById.set(entry.id, display);
-					out.push({ kind: 'tool', id: `tool-${entry.id}`, toolCall: display });
-					break;
-				}
-				case 'tool_result': {
-					const existing = toolCallsById.get(entry.toolCallId);
-					if (existing) {
-						existing.result = {
-							toolCallId: entry.toolCallId,
-							content: entry.content,
-							isError: entry.isError,
-						};
-					}
-					break;
-				}
-				case 'question': {
-					flushText();
-					out.push({
-						kind: 'question',
-						id: `q-${entry.questionId}-${entry.seq}`,
-						question: entry.question,
-						options: entry.options,
-						multiple: entry.multiple,
-					});
-					break;
-				}
-				case 'terminal': {
-					flushText();
-					out.push({
-						kind: 'terminal',
-						id: `terminal-${entry.seq}`,
-						status: entry.status,
-						message: entry.message,
-					});
-					break;
-				}
-			}
-		}
-
-		flushText();
-		return out;
+	function openChildRun(childRunId: string): void {
+		// eslint-disable-next-line no-console
+		console.log('navigate to child run:', childRunId);
 	}
 
 	function terminalHeading(status: AgentRunStatus): string {
@@ -185,6 +97,15 @@
 							<StreamingMessage message={block.message} />
 						{:else if block.kind === 'tool'}
 							<ToolCallCard toolCall={block.toolCall} />
+						{:else if block.kind === 'task'}
+							<AgentTaskCard
+								title={block.title}
+								agentType={block.agentType}
+								toolCallId={block.toolCallId}
+								parentRunId={effectiveRunId ?? ''}
+								resolvedRunId={block.resolvedRunId}
+								onOpenChildRun={openChildRun}
+							/>
 						{:else if block.kind === 'question'}
 							<div class="question-card" role="region" aria-label="Agent question">
 								<h3 class="question-heading">Question</h3>
