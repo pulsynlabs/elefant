@@ -16,8 +16,11 @@ export interface ToolExecutor {
 export interface AgentLoopOptions {
 	messages: Message[]
 	tools: ToolDefinition[]
+	sessionId?: string
+	state?: unknown
 	provider?: string
 	maxIterations?: number
+	contextWindowTokens?: number
 	maxTokens?: number
 	temperature?: number
 	topP?: number
@@ -41,6 +44,13 @@ function createToolResult(toolCallId: string, content: string, isError: boolean)
 		content,
 		isError,
 	}
+}
+
+function cloneMessages(messages: Message[]): Message[] {
+	return messages.map((message) => ({
+		...message,
+		toolCalls: message.toolCalls ? [...message.toolCalls] : undefined,
+	}))
 }
 
 function toToolArguments(
@@ -68,8 +78,8 @@ export async function* runAgentLoop(
 	let messages = [...options.messages]
 	let iterations = 0
 	let tokenCount = estimateTokenCount(messages)
-	const contextWindow = 200_000
-	const sessionId = options.conversationId
+	const contextWindow = options.contextWindowTokens ?? 200_000
+	const sessionId = options.sessionId ?? options.conversationId
 	const maxIterations = options.maxIterations ?? 50
 	const runQuestionEmitter = createQuestionEmitter(
 		options.conversationId,
@@ -111,7 +121,23 @@ export async function* runAgentLoop(
 		let finishReason: 'stop' | 'tool_calls' | 'length' | 'error' = 'stop'
 		let assistantText = ''
 
-		for await (const event of adapterResult.data.sendMessage(messages, options.tools, {
+		// system:transform ordering: [fixed system header] → [injected blocks, deterministic] → [rest of messages]
+		const outgoingMessagesBase = cloneMessages(messages)
+		const transformedContext = await emit(options.hookRegistry, 'system:transform', {
+			messages: outgoingMessagesBase,
+			sessionId,
+			conversationId: options.conversationId,
+			state: options.state ?? null,
+			budgets: {
+				tokens: Math.max(0, contextWindow - tokenCount),
+			},
+		})
+		const outgoingMessages =
+			Array.isArray(transformedContext.messages) && transformedContext.messages.length > 0
+				? transformedContext.messages
+				: outgoingMessagesBase
+
+		for await (const event of adapterResult.data.sendMessage(outgoingMessages, options.tools, {
 			signal: options.signal,
 			provider: options.provider,
 			maxTokens: options.maxTokens,
