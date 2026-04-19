@@ -182,6 +182,7 @@ describe('createConversationRoute', () => {
 		)
 
 		expect(response.status).toBe(200)
+		await response.text() // Consume stream to ensure adapter is called
 		expect(receivedOptions).toBeDefined()
 		expect(receivedOptions?.maxTokens).toBe(50)
 		expect(receivedOptions?.temperature).toBe(0.5)
