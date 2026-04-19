@@ -33,6 +33,7 @@ import { mountAgentRunRoutes } from './routes.ts'
 import { createRun, listChildRunsByParent } from './dal.ts'
 import { buildInitialMessages } from './context.ts'
 import type { Message } from '../types/providers.ts'
+import { ConfigManager } from '../config/loader.ts'
 
 const tempDirs: string[] = []
 
@@ -225,6 +226,12 @@ function createFixture(): Fixture {
 	const sse = new SseManager(db)
 	const app = new Elysia()
 	mountProjectEventsRoute(app, sse)
+
+	// Create a ConfigManager with a mock project path resolver
+	const configManager = new ConfigManager({
+		projectPathResolver: () => ({ ok: true, data: '/tmp/test-project' }),
+	})
+
 	mountAgentRunRoutes(app, {
 		db,
 		providerRouter: createTaggedRouter(),
@@ -232,6 +239,7 @@ function createFixture(): Fixture {
 		hookRegistry: new HookRegistry(),
 		runRegistry: new RunRegistry(),
 		sseManager: sse,
+		configManager,
 	})
 
 	return {
@@ -728,5 +736,265 @@ describe('run tree chain regression', () => {
 
 		expect(noneSource.contextMode).toBe('none')
 		expect(noneSource.getMessages()).toEqual([])
+	})
+})
+
+/**
+ * Provider adapter that emits a task tool call when the prompt contains [task].
+ * This allows testing the full task tool execution path including metadata emission.
+ * Uses a flag to ensure the task is only emitted once (prevents infinite loops).
+ */
+function createTaskToolMockRouter(): ProviderRouter {
+	let taskEmitted = false
+
+	const adapter: ProviderAdapter = {
+		name: 'task-mock',
+		async *sendMessage(
+			messages,
+			_tools,
+			options?: SendMessageOptions,
+		): AsyncGenerator<StreamEvent> {
+			const prompt = messages.map((m) => m.content).join('\n')
+
+			// Only emit task on first call, then emit stop to end the loop
+			if (prompt.includes('[task]') && !taskEmitted) {
+				taskEmitted = true
+				// Emit a task tool call
+				const toolCallId = `call_${crypto.randomUUID().slice(0, 8)}`
+				yield {
+					type: 'tool_call_complete',
+					toolCall: {
+						id: toolCallId,
+						name: 'task',
+						arguments: {
+							description: 'Test child task',
+							prompt: 'TAG::CHILD::2',
+							agent_type: 'executor',
+							context_mode: 'none',
+						},
+					},
+				}
+				yield { type: 'done', finishReason: 'tool_calls' }
+				return
+			}
+
+			// Default: just emit some text and done with stop (ends the loop)
+			yield { type: 'text_delta', text: 'Task spawned successfully' }
+			yield { type: 'done', finishReason: 'stop' }
+		},
+	}
+
+	return {
+		getAdapter: () => ({ ok: true, data: adapter }),
+		listProviders: () => ['task-mock'],
+	} as unknown as ProviderRouter
+}
+
+describe('task tool metadata end-to-end', () => {
+	it('emits agent_run.tool_call_metadata with correct fields', async () => {
+		// Create fixture with task-mock provider
+		const db = new Database(createTempDbPath())
+		const projectId = crypto.randomUUID()
+		const sessionId = crypto.randomUUID()
+
+		db.db.run(
+			'INSERT INTO projects (id, name, path, description) VALUES (?, ?, ?, ?)',
+			[projectId, 'Metadata test project', '/tmp/metadata-test', null],
+		)
+		db.db.run(
+			'INSERT INTO sessions (id, project_id, workflow_id, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+			[sessionId, projectId, null, 'execute', 'running', new Date().toISOString(), null],
+		)
+
+		const sse = new SseManager(db)
+		const app = new Elysia()
+		mountProjectEventsRoute(app, sse)
+
+		// Create a ConfigManager with a mock project path resolver
+		const configManager = new ConfigManager({
+			projectPathResolver: () => ({ ok: true, data: '/tmp/test-project' }),
+		})
+
+		mountAgentRunRoutes(app, {
+			db,
+			providerRouter: createTaskToolMockRouter(),
+			toolRegistry: new ToolRegistry(new HookRegistry()),
+			hookRegistry: new HookRegistry(),
+			runRegistry: new RunRegistry(),
+			sseManager: sse,
+			configManager,
+		})
+
+		try {
+			// Spawn a parent run that will call the task tool (prompt contains [task])
+			const spawnResponse = await app.handle(
+				new Request(
+					`http://localhost/api/projects/${projectId}/sessions/${sessionId}/agent-runs`,
+					{
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({
+							agentType: 'executor',
+							title: 'Parent run',
+							contextMode: 'none',
+							prompt: '[task] spawn a child',
+						}),
+					},
+				),
+			)
+			expect(spawnResponse.status).toBe(200)
+			const spawnPayload = (await spawnResponse.json()) as { ok: boolean; data: { runId: string } }
+			expect(spawnPayload.ok).toBe(true)
+			const parentRunId = spawnPayload.data.runId
+
+			// Subscribe to events before the run starts producing them
+			const sseResponse = await app.handle(
+				new Request(`http://localhost/api/projects/${projectId}/events`),
+			)
+
+			// Capture events until we see the tool_call_metadata event or timeout
+			// Note: tool_call_metadata is emitted with the CHILD runId, not the parent
+			const frames = await readSseFrames(
+				sseResponse,
+				(_frame, all) => {
+					return all.some((f) => f.event === 'agent_run.tool_call_metadata')
+				},
+				{ timeoutMs: 4_000, maxFrames: 200 },
+			)
+
+			// Find the tool_call_metadata event (emitted with child runId)
+			const metadataFrame = frames.find((f) => f.event === 'agent_run.tool_call_metadata')
+			expect(metadataFrame).toBeDefined()
+
+			// Parse the metadata event data
+			const metadataData = JSON.parse(metadataFrame!.data) as {
+				data: {
+					toolCallId: string
+					runId: string
+					parentRunId: string
+					agentType: string
+					title: string
+				}
+			}
+
+			// Assert all four metadata fields are present and valid
+			expect(metadataData.data.toolCallId).toBeDefined()
+			expect(metadataData.data.toolCallId.length).toBeGreaterThan(0)
+			expect(metadataData.data.runId).toBeDefined()
+			expect(metadataData.data.runId.length).toBeGreaterThan(0)
+			expect(metadataData.data.parentRunId).toBe(parentRunId)
+			expect(metadataData.data.agentType).toBe('executor')
+			expect(metadataData.data.title).toBeDefined()
+			expect(metadataData.data.title.length).toBeGreaterThan(0)
+
+			// Verify the child runId exists in the database
+			const childRunId = metadataData.data.runId
+			const childRunResult = db.db
+				.query('SELECT run_id, parent_run_id, agent_type, title FROM agent_runs WHERE run_id = ?')
+				.get(childRunId) as { run_id: string; parent_run_id: string; agent_type: string; title: string } | null
+
+			expect(childRunResult).toBeDefined()
+			expect(childRunResult!.parent_run_id).toBe(parentRunId)
+			expect(childRunResult!.agent_type).toBe('executor')
+
+			// Verify the metadata event correlates to a tool_call event
+			const toolCallFrame = frames.find(
+				(f) =>
+					f.event === 'agent_run.tool_call' &&
+					f.data.includes(`"id":"${metadataData.data.toolCallId}"`),
+			)
+			expect(toolCallFrame).toBeDefined()
+		} finally {
+			sse.destroy()
+			db.close()
+		}
+	})
+
+	it('does not emit tool_call_metadata when depth validation rejects spawn', async () => {
+		const db = new Database(createTempDbPath())
+		const projectId = crypto.randomUUID()
+		const sessionId = crypto.randomUUID()
+
+		db.db.run(
+			'INSERT INTO projects (id, name, path, description) VALUES (?, ?, ?, ?)',
+			[projectId, 'Depth test project', '/tmp/depth-test', null],
+		)
+		db.db.run(
+			'INSERT INTO sessions (id, project_id, workflow_id, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+			[sessionId, projectId, null, 'execute', 'running', new Date().toISOString(), null],
+		)
+
+		// Create a chain of 4 runs (depth 0-3) - this should succeed
+		const runIds: string[] = []
+		for (let i = 0; i < 4; i++) {
+			const runId = crypto.randomUUID()
+			const result = createRun(db, {
+				run_id: runId,
+				session_id: sessionId,
+				project_id: projectId,
+				parent_run_id: i === 0 ? null : runIds[i - 1],
+				agent_type: 'executor',
+				title: `Run at depth ${i}`,
+				status: 'running',
+				context_mode: 'none',
+			})
+			expect(result.ok).toBe(true)
+			runIds.push(runId)
+		}
+
+		const sse = new SseManager(db)
+		const app = new Elysia()
+		mountProjectEventsRoute(app, sse)
+		mountAgentRunRoutes(app, {
+			db,
+			providerRouter: createTaggedRouter(),
+			toolRegistry: new ToolRegistry(new HookRegistry()),
+			hookRegistry: new HookRegistry(),
+			runRegistry: new RunRegistry(),
+			sseManager: sse,
+		})
+
+		// Try to spawn a child at depth 4 (which should be rejected by DEFAULT_MAX_TASK_DEPTH=4)
+		const deepParentId = runIds[3] // depth 3
+		const response = await app.handle(
+			new Request(
+				`http://localhost/api/projects/${projectId}/sessions/${sessionId}/agent-runs`,
+				{
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						agentType: 'executor',
+						title: 'Deep child',
+						contextMode: 'none',
+						prompt: 'TAG::DEEP::1',
+						parentRunId: deepParentId,
+					}),
+				},
+			),
+		)
+
+		expect(response.status).toBe(200)
+		const payload = (await response.json()) as { ok: boolean; data: { runId: string } }
+		expect(payload.ok).toBe(true)
+
+		// Subscribe to events
+		const sseResponse = await app.handle(
+			new Request(`http://localhost/api/projects/${projectId}/events`),
+		)
+
+		// Capture events for a short time
+		const frames = await readSseFrames(
+			sseResponse,
+			(_frame, all) => all.length >= 20,
+			{ timeoutMs: 2_000, maxFrames: 50 },
+		)
+
+		// Verify no tool_call_metadata events were emitted for the rejected spawn
+		// The task tool should not emit metadata when depth validation fails
+		const metadataEvents = frames.filter((f) => f.event === 'agent_run.tool_call_metadata')
+		expect(metadataEvents.length).toBe(0)
+
+		sse.destroy()
+		db.close()
 	})
 })

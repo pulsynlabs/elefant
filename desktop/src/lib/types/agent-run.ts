@@ -39,10 +39,25 @@ export interface AgentRunEventEnvelope {
 	data: unknown;
 }
 
+/** Metadata attached to a tool_call entry (e.g., for task tool child run linkage). */
+export interface AgentRunToolCallMetadata {
+	runId: string;
+	parentRunId?: string;
+	agentType: string;
+	title: string;
+}
+
 /** An entry in a run's rendered transcript. */
 export type AgentRunTranscriptEntry =
 	| { kind: 'token'; text: string; seq: number }
-	| { kind: 'tool_call'; id: string; name: string; arguments: Record<string, unknown>; seq: number }
+	| {
+			kind: 'tool_call';
+			id: string;
+			name: string;
+			arguments: Record<string, unknown>;
+			seq: number;
+			metadata?: AgentRunToolCallMetadata;
+	  }
 	| {
 			kind: 'tool_result';
 			toolCallId: string;

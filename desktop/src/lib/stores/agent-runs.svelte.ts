@@ -182,6 +182,35 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 			});
 			break;
 		}
+		case 'agent_run.tool_call_metadata': {
+			// Merge metadata onto existing tool_call entry by toolCallId
+			const toolCallId = typeof data.toolCallId === 'string' ? data.toolCallId : '';
+			const existingTranscript = transcripts[runId];
+			if (!existingTranscript || !toolCallId) break;
+
+			const entryIndex = existingTranscript.findIndex(
+				(e) => e.kind === 'tool_call' && e.id === toolCallId,
+			);
+			if (entryIndex === -1) break;
+
+			const entry = existingTranscript[entryIndex];
+			if (entry.kind !== 'tool_call') break;
+
+			// Merge metadata fields
+			const metadata = {
+				runId: typeof data.runId === 'string' ? data.runId : '',
+				parentRunId: typeof data.parentRunId === 'string' ? data.parentRunId : undefined,
+				agentType: typeof data.agentType === 'string' ? data.agentType : '',
+				title: typeof data.title === 'string' ? data.title : '',
+			};
+
+			// Create updated entry with metadata
+			const updatedEntry = { ...entry, metadata };
+			const updatedTranscript = [...existingTranscript];
+			updatedTranscript[entryIndex] = updatedEntry;
+			transcripts = { ...transcripts, [runId]: updatedTranscript };
+			break;
+		}
 		case 'agent_run.question': {
 			appendToTranscript(runId, {
 				kind: 'question',
@@ -273,6 +302,7 @@ const AGENT_RUN_EVENT_TYPES = [
 	'agent_run.token',
 	'agent_run.tool_call',
 	'agent_run.tool_result',
+	'agent_run.tool_call_metadata',
 	'agent_run.question',
 	'agent_run.status_changed',
 	'agent_run.done',

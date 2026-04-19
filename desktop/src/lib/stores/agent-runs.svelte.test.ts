@@ -379,4 +379,120 @@ describe('agentRunsStore', () => {
 			expect(agentRunsStore.openRunIds).toEqual(['r1']);
 		});
 	});
+
+	describe('agent_run.tool_call_metadata', () => {
+		it('merges metadata onto existing tool_call entry by toolCallId', () => {
+			_seedRun(makeRun({ runId: 'run-a' }));
+
+			// First, add a tool_call entry
+			agentRunsStore.applyRunEvent(
+				makeEnvelope({
+					runId: 'run-a',
+					type: 'agent_run.tool_call',
+					seq: 1,
+					data: {
+						id: 'tc-1',
+						name: 'task',
+						arguments: { description: 'Test task', agent_type: 'executor' },
+					},
+				}),
+			);
+
+			// Verify the entry exists without metadata
+			let entries = agentRunsStore.transcripts['run-a'] ?? [];
+			expect(entries).toHaveLength(1);
+			expect(entries[0].kind).toBe('tool_call');
+			if (entries[0].kind === 'tool_call') {
+				expect(entries[0].metadata).toBeUndefined();
+			}
+
+			// Now send the metadata event
+			agentRunsStore.applyRunEvent(
+				makeEnvelope({
+					runId: 'run-a',
+					type: 'agent_run.tool_call_metadata',
+					seq: 2,
+					data: {
+						toolCallId: 'tc-1',
+						runId: 'child-run-123',
+						parentRunId: 'run-a',
+						agentType: 'executor',
+						title: 'Child run',
+					},
+				}),
+			);
+
+			// Verify metadata was merged
+			entries = agentRunsStore.transcripts['run-a'] ?? [];
+			expect(entries).toHaveLength(1);
+			expect(entries[0].kind).toBe('tool_call');
+			if (entries[0].kind === 'tool_call') {
+				expect(entries[0].metadata).toBeDefined();
+				expect(entries[0].metadata!.runId).toBe('child-run-123');
+				expect(entries[0].metadata!.parentRunId).toBe('run-a');
+				expect(entries[0].metadata!.agentType).toBe('executor');
+				expect(entries[0].metadata!.title).toBe('Child run');
+			}
+		});
+
+		it('ignores metadata for non-existent toolCallId', () => {
+			_seedRun(makeRun({ runId: 'run-a' }));
+
+			// Add a tool_call entry with a different id
+			agentRunsStore.applyRunEvent(
+				makeEnvelope({
+					runId: 'run-a',
+					type: 'agent_run.tool_call',
+					seq: 1,
+					data: {
+						id: 'tc-1',
+						name: 'task',
+						arguments: { description: 'Test task' },
+					},
+				}),
+			);
+
+			// Send metadata for a different toolCallId
+			agentRunsStore.applyRunEvent(
+				makeEnvelope({
+					runId: 'run-a',
+					type: 'agent_run.tool_call_metadata',
+					seq: 2,
+					data: {
+						toolCallId: 'tc-nonexistent',
+						runId: 'child-run-123',
+						agentType: 'executor',
+						title: 'Child run',
+					},
+				}),
+			);
+
+			// Verify the original entry still has no metadata
+			const entries = agentRunsStore.transcripts['run-a'] ?? [];
+			expect(entries).toHaveLength(1);
+			expect(entries[0].kind).toBe('tool_call');
+			if (entries[0].kind === 'tool_call') {
+				expect(entries[0].metadata).toBeUndefined();
+			}
+		});
+
+		it('ignores metadata for non-existent runId', () => {
+			// Send metadata for a run that doesn't exist
+			expect(() =>
+				agentRunsStore.applyRunEvent(
+					makeEnvelope({
+						runId: 'nonexistent-run',
+						type: 'agent_run.tool_call_metadata',
+						seq: 1,
+						data: {
+							toolCallId: 'tc-1',
+							runId: 'child-run-123',
+							agentType: 'executor',
+							title: 'Child run',
+						},
+					}),
+				),
+			).not.toThrow();
+		});
+	});
 });
