@@ -1,99 +1,286 @@
 /* =========================================
-   GLASS MATERIAL SYSTEM
-   Frosted glass utility classes for the Elefant UI
-   Inspiration: Apple Liquid Glass — dimensional materiality
+   LIQUID GLASS MATERIAL SYSTEM
+   Premium glass for Elefant — Chromium / Tauri WebView
 
-   Three tiers:
-   - glass-sm: subtle, minimal blur (TopBar, chips)
-   - glass-md: medium blur (Sidebar, cards, panels)
-   - glass-lg: heavy blur (modals, overlays)
+   Architecture: four-layer stack per surface
+     Layer 0 (::before): SVG refraction + backdrop-filter grading
+     Layer 1 (element): tint + outer lift shadow + inner bevel shadows
+     Layer 2 (::after): diagonal specular sheen + top-edge highlight
+     Layer 3: content (children, z-index above layers)
 
-   Premium addition:
-   - glass-double-bezel / glass-double-bezel-inner:
-     Physical "glass plate in aluminum tray" surface.
-     Outer shell (hairline + padding) wrapping inner core
-     (backdrop-blur + inner highlight + edge refraction).
+   Three surface tiers:
+     .glass-sm  — subtle (TopBar, chips, pills)
+     .glass-md  — medium (Sidebar, cards, panels)
+     .glass-lg  — heavy (modals, overlays, command palette)
+
+   Premium surface:
+     .glass-double-bezel / .glass-double-bezel-inner
+
+   IMPORTANT: Do NOT place glass elements inside a parent with opacity < 1.
+   This creates a backdrop root and breaks refraction sampling.
    ========================================= */
 
-.glass-sm {
+/* ─── SHARED FOUNDATION ──────────────────────────────────────────────────── */
+
+.glass-sm,
+.glass-md,
+.glass-lg {
+	position: relative;
+	isolation: isolate; /* contain mix-blend-mode on ::after sheen */
+}
+
+/* Layer 0: refraction + color grading */
+.glass-sm::before,
+.glass-md::before,
+.glass-lg::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
+	pointer-events: none;
+}
+
+/* Layer 2: specular sheen — applied only to md and lg tiers */
+.glass-md::after,
+.glass-lg::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	border-radius: inherit;
+	pointer-events: none;
+
+	background:
+		/* top-edge highlight strip */
+		linear-gradient(to bottom,
+			rgba(255, 255, 255, 0.28) 0%,
+			rgba(255, 255, 255, 0.00) 20%),
+		/* diagonal specular sweep — directional light from top-left */
+		linear-gradient(135deg,
+			rgba(255, 255, 255, 0.18) 0%,
+			rgba(255, 255, 255, 0.06) 25%,
+			rgba(255, 255, 255, 0.00) 60%);
+
+	mix-blend-mode: screen;
+}
+
+/* Children must sit above both backdrop and sheen layers */
+.glass-sm > *,
+.glass-md > *,
+.glass-lg > * {
+	position: relative;
+	z-index: 2;
+}
+
+/* ─── TIER: SM (TopBar, pills, chips) ────────────────────────────────────── */
+
+.glass-sm::before {
 	background: var(--glass-bg);
-	backdrop-filter: blur(var(--blur-sm));
-	-webkit-backdrop-filter: blur(var(--blur-sm));
+	backdrop-filter:
+		blur(var(--blur-sm))
+		saturate(1.4)
+		brightness(1.06);
+	-webkit-backdrop-filter:
+		blur(var(--blur-sm))
+		saturate(1.4)
+		brightness(1.06);
+}
+
+.glass-sm {
 	border: 1px solid var(--glass-border);
-	box-shadow: inset 0 1px 0 var(--glass-inner-glow);
+	box-shadow:
+		inset 0 1px 0 var(--glass-inner-glow),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.14);
+}
+
+/* ─── TIER: MD (Sidebar, cards, panels) ─────────────────────────────────── */
+
+.glass-md::before {
+	background: var(--glass-bg);
+	backdrop-filter:
+		url(#lg-refraction)
+		blur(var(--blur-md))
+		saturate(1.65)
+		brightness(1.12)
+		contrast(1.10);
+	-webkit-backdrop-filter:
+		url(#lg-refraction)
+		blur(var(--blur-md))
+		saturate(1.65)
+		brightness(1.12)
+		contrast(1.10);
 }
 
 .glass-md {
-	background: var(--glass-bg);
-	backdrop-filter: blur(var(--blur-md));
-	-webkit-backdrop-filter: blur(var(--blur-md));
 	border: 1px solid var(--glass-border);
 	box-shadow:
+		0 8px 24px -4px rgba(0, 0, 12, 0.55),
 		inset 0 1px 0 var(--glass-inner-glow),
-		var(--shadow-md);
+		inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+}
+
+/* ─── TIER: LG (Modals, overlays, command palette) ──────────────────────── */
+
+.glass-lg::before {
+	background: var(--glass-bg-strong);
+	backdrop-filter:
+		url(#lg-refraction)
+		blur(var(--blur-lg))
+		saturate(1.7)
+		brightness(1.15)
+		contrast(1.12);
+	-webkit-backdrop-filter:
+		url(#lg-refraction)
+		blur(var(--blur-lg))
+		saturate(1.7)
+		brightness(1.15)
+		contrast(1.12);
 }
 
 .glass-lg {
-	background: var(--glass-bg-strong);
-	backdrop-filter: blur(var(--blur-lg));
-	-webkit-backdrop-filter: blur(var(--blur-lg));
 	border: 1px solid var(--glass-border-strong);
 	box-shadow:
+		0 20px 48px -8px rgba(0, 0, 12, 0.65),
+		0 4px 12px -2px rgba(0, 0, 12, 0.4),
 		inset 0 1px 0 var(--glass-inner-glow),
-		inset 0 -1px 0 rgba(0, 0, 0, 0.08),
-		var(--shadow-xl);
+		inset 0 -1px 0 rgba(0, 0, 0, 0.22);
 }
 
-/* =========================================
-   DOUBLE-BEZEL: Premium "physical object" surface
-   Two-layer architecture: outer shell + inner core.
-   Wrap content with .glass-double-bezel as parent,
-   and .glass-double-bezel-inner as the direct content container.
-   ========================================= */
+/* ─── LIGHT THEME OVERRIDES ─────────────────────────────────────────────── */
+
+[data-theme="light"] .glass-sm::before {
+	background: var(--glass-bg);
+	backdrop-filter:
+		blur(var(--blur-sm))
+		saturate(1.25)
+		brightness(1.01);
+	-webkit-backdrop-filter:
+		blur(var(--blur-sm))
+		saturate(1.25)
+		brightness(1.01);
+}
+
+[data-theme="light"] .glass-md::before {
+	background: var(--glass-bg);
+	backdrop-filter:
+		url(#lg-refraction)
+		blur(var(--blur-md))
+		saturate(1.35)
+		brightness(1.02)
+		contrast(1.05);
+	-webkit-backdrop-filter:
+		url(#lg-refraction)
+		blur(var(--blur-md))
+		saturate(1.35)
+		brightness(1.02)
+		contrast(1.05);
+}
+
+[data-theme="light"] .glass-md::after,
+[data-theme="light"] .glass-lg::after {
+	/* In light mode the sheen is lighter so reduce it */
+	opacity: 0.5;
+}
+
+[data-theme="light"] .glass-md,
+[data-theme="light"] .glass-lg {
+	box-shadow:
+		0 4px 16px -2px rgba(64, 73, 225, 0.10),
+		inset 0 1px 0 rgba(255, 255, 255, 0.8),
+		inset 0 -1px 0 rgba(64, 73, 225, 0.08);
+}
+
+/* ─── DOUBLE-BEZEL (premium machined surface) ────────────────────────────── */
 
 .glass-double-bezel {
-	/* Outer shell — hairline border ring, minimal background, padding gap */
 	background: rgba(255, 255, 255, 0.025);
 	border: 1px solid var(--glass-border);
 	padding: 2px;
 	border-radius: inherit;
+	isolation: isolate;
 }
 
 .glass-double-bezel-inner {
-	/* Inner core — main glass surface with edge-refraction highlight */
+	position: relative;
+	isolation: isolate;
+	overflow: clip;
+}
+
+.glass-double-bezel-inner::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
 	background: var(--glass-bg);
-	backdrop-filter: blur(var(--blur-md));
-	-webkit-backdrop-filter: blur(var(--blur-md));
+	backdrop-filter:
+		url(#lg-refraction)
+		blur(var(--blur-md))
+		saturate(1.65)
+		brightness(1.12)
+		contrast(1.10);
+	-webkit-backdrop-filter:
+		url(#lg-refraction)
+		blur(var(--blur-md))
+		saturate(1.65)
+		brightness(1.12)
+		contrast(1.10);
+}
+
+.glass-double-bezel-inner {
 	border: 1px solid var(--glass-border-strong);
 	box-shadow:
 		inset 0 1px 0 var(--glass-inner-glow),
-		inset 0 -1px 0 rgba(0, 0, 0, 0.06),
-		inset 1px 0 0 rgba(255, 255, 255, 0.02),
-		var(--shadow-sm);
+		inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+		inset 1px 0 0 rgba(255, 255, 255, 0.03),
+		0 4px 12px rgba(0, 0, 12, 0.4);
 	border-radius: calc(inherit - 2px);
-	overflow: hidden;
 }
 
-/* Fallback for environments without backdrop-filter */
-@supports not (backdrop-filter: blur(1px)) {
-	.glass-sm,
-	.glass-md,
-	.glass-lg,
-	.glass-double-bezel-inner {
-		background: var(--color-surface);
-		border: 1px solid var(--color-border);
-		backdrop-filter: none;
-	}
+.glass-double-bezel-inner > * {
+	position: relative;
+	z-index: 2;
 }
 
-/* Glass hover enhancement */
+/* ─── INTERACTIVE STATES ─────────────────────────────────────────────────── */
+
+.glass-interactive {
+	cursor: pointer;
+	transition:
+		box-shadow var(--duration-fast) var(--ease-out-expo),
+		transform var(--duration-fast) var(--ease-spring),
+		border-color var(--duration-fast) var(--ease-out-expo);
+}
+
 .glass-interactive:hover {
-	background: var(--glass-bg-strong);
-	transition: background var(--transition-fast);
+	border-color: var(--glass-border-strong);
+	box-shadow:
+		0 12px 32px -4px rgba(0, 0, 12, 0.6),
+		inset 0 1px 0 rgba(255, 255, 255, 0.18),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.2);
 }
 
-/* Glass focus ring using indigo glow */
 .glass-interactive:focus-visible {
 	outline: none;
 	box-shadow: var(--glow-focus);
+}
+
+/* ─── FALLBACK: no backdrop-filter support ───────────────────────────────── */
+
+@supports not (backdrop-filter: blur(1px)) {
+	.glass-sm::before,
+	.glass-md::before,
+	.glass-lg::before,
+	.glass-double-bezel-inner::before {
+		background: var(--color-surface);
+		backdrop-filter: none;
+	}
+
+	.glass-sm,
+	.glass-md,
+	.glass-lg {
+		border: 1px solid var(--color-border);
+		box-shadow: none;
+	}
 }
