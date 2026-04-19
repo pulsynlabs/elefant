@@ -1,58 +1,13 @@
 <script lang="ts">
 	import type { ChatMessage } from './types.js';
 	import ToolCallCard from './ToolCallCard.svelte';
-	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import MarkdownRenderer from './MarkdownRenderer.svelte';
 
 	type Props = {
 		message: ChatMessage;
 	};
 
 	let { message }: Props = $props();
-
-	interface TextPart {
-		type: 'text';
-		content: string;
-	}
-
-	interface CodePart {
-		type: 'code';
-		content: string;
-		language: string;
-	}
-
-	type ParsedPart = TextPart | CodePart;
-
-	// Parse text blocks for code fences
-	function parseTextBlock(text: string): ParsedPart[] {
-		const parts: ParsedPart[] = [];
-		const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
-		let lastIndex = 0;
-		let match: RegExpExecArray | null;
-
-		while ((match = codeBlockRegex.exec(text)) !== null) {
-			if (match.index > lastIndex) {
-				const textContent = text.slice(lastIndex, match.index);
-				if (textContent.trim()) parts.push({ type: 'text', content: textContent });
-			}
-			parts.push({
-				type: 'code',
-				content: match[2] ?? '',
-				language: match[1] || 'text',
-			});
-			lastIndex = match.index + match[0].length;
-		}
-
-		if (lastIndex < text.length) {
-			const remaining = text.slice(lastIndex);
-			if (remaining.trim()) parts.push({ type: 'text', content: remaining });
-		}
-
-		if (parts.length === 0 && text.trim()) {
-			parts.push({ type: 'text', content: text });
-		}
-
-		return parts;
-	}
 </script>
 
 <div class="streaming-message">
@@ -64,27 +19,13 @@
 	{:else if message.blocks && message.blocks.length > 0}
 		{#each message.blocks as block, i (block.type === 'tool_call' ? block.toolCall.id : `block-${i}`)}
 			{#if block.type === 'text'}
-				{@const parts = parseTextBlock(block.text)}
-				{#each parts as part, j (`${i}-${j}`)}
-					{#if part.type === 'code'}
-						<CodeBlock code={part.content} language={part.language} />
-					{:else}
-						<p class="text-content">{part.content}</p>
-					{/if}
-				{/each}
+				<MarkdownRenderer source={block.text} streaming={message.isStreaming ?? false} />
 			{:else if block.type === 'tool_call'}
 				<ToolCallCard toolCall={block.toolCall} />
 			{/if}
 		{/each}
 	{:else if message.content}
-		{@const parts = parseTextBlock(message.content)}
-		{#each parts as part, i (`fallback-${i}`)}
-			{#if part.type === 'code'}
-				<CodeBlock code={part.content} language={part.language} />
-			{:else}
-				<p class="text-content">{part.content}</p>
-			{/if}
-		{/each}
+		<MarkdownRenderer source={message.content} streaming={message.isStreaming ?? false} />
 	{/if}
 
 	{#if message.isStreaming}
@@ -98,15 +39,6 @@
 		flex-direction: column;
 		gap: var(--space-3);
 		color: var(--color-text-primary);
-	}
-
-	.text-content {
-		font-size: var(--font-size-md);
-		line-height: var(--line-height-relaxed);
-		color: var(--color-text-primary);
-		white-space: pre-wrap;
-		word-break: break-word;
-		margin: 0;
 	}
 
 	.error-content {
@@ -138,6 +70,12 @@
 		}
 		50% {
 			opacity: 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.cursor {
+			animation: none;
 		}
 	}
 </style>
