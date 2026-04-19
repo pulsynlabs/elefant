@@ -75,7 +75,13 @@ export function createApp(
 	// Register question tool route for HITL interactions
 	registerQuestionRoute(app as unknown as Elysia)
 
-	const baseApp = registerServerRoutes(app as unknown as Elysia, providerRouter, toolRegistry, hookRegistry)
+	const baseApp = registerServerRoutes(
+		app as unknown as Elysia,
+		providerRouter,
+		toolRegistry,
+		hookRegistry,
+		db,
+	)
 
 	// Mount transport routes when available
 	if (ws) mountWsRoute(baseApp, ws)
