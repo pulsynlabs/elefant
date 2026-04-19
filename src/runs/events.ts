@@ -172,9 +172,15 @@ export function publishToolCallMetadata(
 		return
 	}
 
+	// Route metadata to the PARENT transcript stream when available.
+	// The tool_call entry we need to enrich lives on the parent run.
+	const transcriptRunId = data.parentRunId && data.parentRunId.length > 0
+		? data.parentRunId
+		: data.runId
+
 	publishRunEvent(
 		{
-			runId: data.runId,
+			runId: transcriptRunId,
 			parentRunId: data.parentRunId,
 			depth: 0,
 			agentType: data.agentType,

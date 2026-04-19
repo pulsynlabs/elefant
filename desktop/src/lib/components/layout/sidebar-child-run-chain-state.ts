@@ -145,16 +145,13 @@ export function buildChildRunRowIndent(depth: number): string {
  * Priority order is explicit and deliberate — the dot at the top of
  * the priority stack always wins. From highest to lowest:
  *
- *   1. `running`  — live work in progress dominates any other signal;
- *                   the pulsing spinner is the load-bearing cue that
- *                   something is happening *right now*.
- *   2. `blocked`  — the run is waiting for the user to answer a
- *                   question. If the agent has stopped to ask, that
- *                   outranks stale error/unseen signals on other
- *                   rows in the chain.
- *   3. `error`    — terminal failure state the user needs to see.
- *   4. `unseen`   — passive "new output here" hint; overridden by any
- *                   active state above.
+ *   1. `blocked`  — the run is waiting for the user to answer a
+ *                   question and needs immediate attention.
+ *   2. `error`    — terminal failure state the user needs to see.
+ *   3. `unseen`   — non-focused run produced new output; this should
+ *                   stay visible even while the run is still running.
+ *   4. `running`  — live work in progress when no higher-priority
+ *                   attention signal exists.
  *   5. `none`     — nothing to signal (includes `done`, `cancelled`,
  *                   and any status we don't surface with a dot).
  *
@@ -167,17 +164,17 @@ export function computeStatusVariant(
 	isUnseen: boolean,
 	isAwaitingQuestion: boolean,
 ): SidebarRunStatusVariant {
-	// 1. Running beats everything — the pulse conveys liveness.
-	if (run.status === 'running') return 'running';
-
-	// 2. Blocked beats error/unseen — actionable user-facing signal.
+	// 1. Blocked is the highest-priority actionable signal.
 	if (isAwaitingQuestion) return 'blocked';
 
-	// 3. Error is next — terminal failure surfaces clearly.
+	// 2. Error is next — terminal failure surfaces clearly.
 	if (run.status === 'error') return 'error';
 
-	// 4. Unseen output is the softest signal.
+	// 3. Unseen output should remain visible while run is non-focused.
 	if (isUnseen) return 'unseen';
+
+	// 4. Running is the baseline liveness indicator.
+	if (run.status === 'running') return 'running';
 
 	// 5. Everything else (done, cancelled, quiet running-with-no-signal)
 	// renders without a dot.
@@ -201,10 +198,10 @@ export function computeRollupVariant(
 ): SidebarRunStatusVariant {
 	// Priority rank (lower = higher priority).
 	const rank: Record<SidebarRunStatusVariant, number> = {
-		running: 0,
-		blocked: 1,
-		error: 2,
-		unseen: 3,
+		blocked: 0,
+		error: 1,
+		unseen: 2,
+		running: 3,
 		none: 4,
 	};
 
@@ -217,8 +214,8 @@ export function computeRollupVariant(
 		);
 		if (rank[variant] < rank[best]) {
 			best = variant;
-			// Early-out on the strongest signal — nothing beats running.
-			if (best === 'running') break;
+			// Early-out on the strongest signal — nothing beats blocked.
+			if (best === 'blocked') break;
 		}
 	}
 	return best;

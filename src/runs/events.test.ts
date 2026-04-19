@@ -111,6 +111,7 @@ describe('publishToolCallMetadata', () => {
 		expect(captured[0]?.eventType).toBe('agent_run.tool_call_metadata')
 
 		const envelope = captured[0]?.data as {
+			runId: string
 			type: string
 			data: {
 				toolCallId: string
@@ -122,6 +123,7 @@ describe('publishToolCallMetadata', () => {
 		}
 
 		expect(envelope.type).toBe('agent_run.tool_call_metadata')
+		expect(envelope.runId).toBe('parent-run-1')
 		expect(envelope.data.toolCallId).toBe('call-1')
 		expect(envelope.data.runId).toBe('child-run-1')
 		expect(envelope.data.parentRunId).toBe('parent-run-1')

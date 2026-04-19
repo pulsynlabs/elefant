@@ -318,9 +318,16 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 			break;
 		}
 		case 'agent_run.tool_call_metadata': {
-			// Merge metadata onto existing tool_call entry by toolCallId
+			// Merge metadata onto existing tool_call entry by toolCallId.
+			// Preferred routing uses envelope.runId = parent run id, but we
+			// also support fallback lookup via data.parentRunId for older
+			// producers that emitted envelope.runId = child run id.
 			const toolCallId = typeof data.toolCallId === 'string' ? data.toolCallId : '';
-			const existingTranscript = transcripts[runId];
+			const parentRunId = typeof data.parentRunId === 'string' ? data.parentRunId : '';
+			const targetRunId = transcripts[runId]
+				? runId
+				: (parentRunId && transcripts[parentRunId] ? parentRunId : runId);
+			const existingTranscript = transcripts[targetRunId];
 			if (!existingTranscript || !toolCallId) break;
 
 			const entryIndex = existingTranscript.findIndex(
@@ -343,7 +350,7 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 			const updatedEntry = { ...entry, metadata };
 			const updatedTranscript = [...existingTranscript];
 			updatedTranscript[entryIndex] = updatedEntry;
-			transcripts = { ...transcripts, [runId]: updatedTranscript };
+			transcripts = { ...transcripts, [targetRunId]: updatedTranscript };
 			break;
 		}
 		case 'agent_run.question': {

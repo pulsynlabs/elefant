@@ -205,26 +205,31 @@ describe('computeStatusVariant — per-row indicator logic', () => {
 });
 
 describe('computeStatusVariant — priority order', () => {
-	it('running outranks blocked, error, and unseen', () => {
+	it('blocked outranks running, error, and unseen', () => {
 		const run = makeRun({ status: 'running' });
-		// Even with blocked + unseen both set, running dominates.
-		expect(computeStatusVariant(run, true, true)).toBe('running');
-	});
-
-	it('blocked outranks error and unseen (non-running run)', () => {
-		const run = makeRun({ status: 'error' });
-		// Error on status + awaiting question + unseen → blocked wins.
+		// While awaiting an answer, blocked must win even if still running.
 		expect(computeStatusVariant(run, true, true)).toBe('blocked');
 	});
 
-	it('error outranks unseen when not running and not blocked', () => {
+	it('error outranks running when not blocked', () => {
 		const run = makeRun({ status: 'error' });
-		expect(computeStatusVariant(run, true, false)).toBe('error');
+		expect(computeStatusVariant(run, false, false)).toBe('error');
 	});
 
-	it('unseen beats none when the run is otherwise quiet', () => {
-		const run = makeRun({ status: 'done' });
+	it('unseen outranks running when not blocked or errored', () => {
+		const run = makeRun({ status: 'running' });
 		expect(computeStatusVariant(run, true, false)).toBe('unseen');
+	});
+
+	it('running is used when there is no higher-priority signal', () => {
+		const run = makeRun({ status: 'running' });
+		expect(computeStatusVariant(run, false, false)).toBe('running');
+	});
+
+	it('blocked outranks error and unseen', () => {
+		const run = makeRun({ status: 'error' });
+		// Error on status + awaiting question + unseen → blocked wins.
+		expect(computeStatusVariant(run, true, true)).toBe('blocked');
 	});
 });
 
@@ -256,24 +261,11 @@ describe('computeRollupVariant — session-row aggregate', () => {
 		expect(variant).toBe('none');
 	});
 
-	it('picks "running" when any row is running (highest priority)', () => {
+	it('picks "blocked" when any row is awaiting a question (highest priority)', () => {
 		const rows = [
 			rowFor(makeRun({ runId: 'a', status: 'done' })),
 			rowFor(makeRun({ runId: 'b', status: 'running' })),
 			rowFor(makeRun({ runId: 'c', status: 'error' })),
-		];
-		const variant = computeRollupVariant(
-			rows,
-			() => false,
-			() => false,
-		);
-		expect(variant).toBe('running');
-	});
-
-	it('picks "blocked" when no row is running but one is awaiting a question', () => {
-		const rows = [
-			rowFor(makeRun({ runId: 'a', status: 'done' })),
-			rowFor(makeRun({ runId: 'b', status: 'error' })),
 		];
 		const awaiting = new Set(['a']);
 		const variant = computeRollupVariant(
@@ -284,9 +276,22 @@ describe('computeRollupVariant — session-row aggregate', () => {
 		expect(variant).toBe('blocked');
 	});
 
-	it('picks "error" over "unseen" when both are present and no higher signal', () => {
+	it('picks "error" when no row is blocked', () => {
 		const rows = [
-			rowFor(makeRun({ runId: 'a', status: 'error' })),
+			rowFor(makeRun({ runId: 'a', status: 'done' })),
+			rowFor(makeRun({ runId: 'b', status: 'error' })),
+		];
+		const variant = computeRollupVariant(
+			rows,
+			() => false,
+			() => false,
+		);
+		expect(variant).toBe('error');
+	});
+
+	it('picks "unseen" over "running" when no blocked/error is present', () => {
+		const rows = [
+			rowFor(makeRun({ runId: 'a', status: 'running' })),
 			rowFor(makeRun({ runId: 'b', status: 'done' })),
 		];
 		const unseen = new Set(['b']);
@@ -295,7 +300,20 @@ describe('computeRollupVariant — session-row aggregate', () => {
 			(id) => unseen.has(id),
 			() => false,
 		);
-		expect(variant).toBe('error');
+		expect(variant).toBe('unseen');
+	});
+
+	it('picks "running" when no blocked/error/unseen rows exist', () => {
+		const rows = [
+			rowFor(makeRun({ runId: 'a', status: 'done' })),
+			rowFor(makeRun({ runId: 'b', status: 'running' })),
+		];
+		const variant = computeRollupVariant(
+			rows,
+			() => false,
+			() => false,
+		);
+		expect(variant).toBe('running');
 	});
 
 	it('picks "unseen" as the softest non-none rollup signal', () => {
