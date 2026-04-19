@@ -5,11 +5,27 @@
 	import ProviderSelector from './ProviderSelector.svelte';
 	import AdvancedOptions from './AdvancedOptions.svelte';
 	import ConnectionBanner from './ConnectionBanner.svelte';
+	import AgentOverrideDialog from '../agent-config/AgentOverrideDialog.svelte';
 	import { getDaemonClient } from '$lib/daemon/client.js';
 	import type { MessageRole } from '$lib/daemon/types.js';
+	import type { AgentRunOverride } from '$lib/types/agent-config.js';
 
 	let showAdvanced = $state(false);
+	let showOverrideDialog = $state(false);
 	let abortController: AbortController | null = null;
+
+	function openOverride(): void {
+		showOverrideDialog = true;
+	}
+
+	function closeOverride(): void {
+		showOverrideDialog = false;
+	}
+
+	function applyOverride(next: AgentRunOverride): void {
+		chatStore.setAgentOverride(next);
+		showOverrideDialog = false;
+	}
 
 	async function handleSend(content: string): Promise<void> {
 		if (chatStore.isStreaming || !content.trim()) return;
@@ -30,16 +46,12 @@
 		const client = getDaemonClient();
 
 		try {
+			// Build the request payload through the store helper so the
+			// AdvancedOptions fields and any per-run AgentOverrideDialog
+			// override flow through a single, testable code path.
+			const fields = chatStore.buildChatRequestFields();
 			const stream = client.streamChat(
-				{
-					messages: apiMessages,
-					provider: chatStore.selectedProvider ?? undefined,
-					maxIterations: chatStore.maxIterations,
-					maxTokens: chatStore.maxTokens > 0 ? chatStore.maxTokens : undefined,
-					temperature: chatStore.temperature,
-					topP: chatStore.topP,
-					timeoutMs: chatStore.timeoutMs,
-				},
+				{ messages: apiMessages, ...fields },
 				abortController.signal,
 			);
 
@@ -106,14 +118,26 @@
 
 	<!-- Input area -->
 	<div class="chat-input-area">
-		<button
-			class="advanced-toggle mono-label"
-			onclick={() => (showAdvanced = !showAdvanced)}
-			aria-label="Toggle advanced options"
-			aria-expanded={showAdvanced}
-		>
-			{showAdvanced ? '▲' : '▼'} Options
-		</button>
+		<div class="composer-actions">
+			<button
+				class="advanced-toggle mono-label"
+				onclick={() => (showAdvanced = !showAdvanced)}
+				aria-label="Toggle advanced options"
+				aria-expanded={showAdvanced}
+			>
+				{showAdvanced ? '▲' : '▼'} Options
+			</button>
+			<button
+				type="button"
+				class="override-toggle mono-label"
+				class:override-toggle-active={chatStore.hasAgentOverride}
+				onclick={openOverride}
+				aria-label="Open per-run override dialog"
+				aria-haspopup="dialog"
+			>
+				Override{chatStore.hasAgentOverride ? ' ●' : ''}
+			</button>
+		</div>
 		<MessageInput
 			disabled={chatStore.isStreaming}
 			streaming={chatStore.isStreaming}
@@ -122,6 +146,15 @@
 		/>
 	</div>
 </div>
+
+{#if showOverrideDialog}
+	<AgentOverrideDialog
+		initialOverride={chatStore.getAgentOverride()}
+		availableProviders={chatStore.availableProviders}
+		onConfirm={applyOverride}
+		onCancel={closeOverride}
+	/>
+{/if}
 
 <style>
 	.chat-view {
@@ -171,17 +204,50 @@
 		gap: var(--space-2);
 	}
 
-	.advanced-toggle {
+	.composer-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.advanced-toggle,
+	.override-toggle {
 		background: none;
-		border: none;
+		border: 1px solid transparent;
 		cursor: pointer;
 		color: var(--color-text-muted);
 		text-align: left;
-		padding: var(--space-1) 0;
-		transition: color var(--transition-fast);
+		padding: var(--space-1) var(--space-2);
+		border-radius: var(--radius-sm);
+		transition:
+			color var(--transition-fast),
+			border-color var(--transition-fast),
+			background-color var(--transition-fast);
 	}
 
-	.advanced-toggle:hover {
+	.advanced-toggle:hover,
+	.override-toggle:hover {
 		color: var(--color-text-secondary);
+	}
+
+	.advanced-toggle:focus-visible,
+	.override-toggle:focus-visible {
+		outline: none;
+		border-color: var(--color-primary);
+		box-shadow: var(--glow-focus);
+	}
+
+	.override-toggle-active {
+		color: var(--color-warning, #b88400);
+		border-color: color-mix(
+			in srgb,
+			var(--color-warning, #b88400) 40%,
+			transparent
+		);
+		background-color: color-mix(
+			in srgb,
+			var(--color-warning, #b88400) 10%,
+			transparent
+		);
 	}
 </style>

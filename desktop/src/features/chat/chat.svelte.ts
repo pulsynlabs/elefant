@@ -1,5 +1,6 @@
 import type { ChatMessage, ContentBlock, ToolCallDisplay } from './types.js';
 import type { QuestionEvent } from '$lib/daemon/types.js';
+import type { AgentRunOverride } from '$lib/types/agent-config.js';
 
 function generateId(): string {
 	return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -19,6 +20,11 @@ let timeoutMs = $state(60000);
 // Available providers (populated from config)
 let availableProviders = $state<string[]>([]);
 let defaultProvider = $state<string | null>(null);
+
+// Per-run agent override applied to the NEXT chat POST. Confirmed via
+// AgentOverrideDialog from the composer. Each field is optional so the
+// UI can clear individual slots without nuking the whole override.
+let agentOverride = $state<AgentRunOverride>({});
 
 export function setAvailableProviders(providers: string[], def: string | null): void {
 	availableProviders = providers;
@@ -171,6 +177,63 @@ export function getApiMessages(): Array<{ role: string; content: string }> {
 	}));
 }
 
+/**
+ * Build the chat-request payload fields contributed by this store.
+ *
+ * Field precedence: agent override (set via AgentOverrideDialog) wins
+ * over the AdvancedOptions values. Fields set to `0` or `undefined` are
+ * omitted rather than sent as falsy so the daemon uses its defaults.
+ *
+ * Kept pure / dependency-free so it can be unit-tested without a
+ * component test runner.
+ */
+export function buildChatRequestFields(): {
+	provider?: string;
+	maxIterations: number;
+	maxTokens?: number;
+	temperature: number;
+	topP: number;
+	timeoutMs: number;
+} {
+	const provider = agentOverride.provider ?? selectedProvider ?? undefined;
+
+	const resolvedMaxTokens =
+		agentOverride.maxTokens !== undefined
+			? agentOverride.maxTokens
+			: maxTokens > 0
+				? maxTokens
+				: undefined;
+
+	return {
+		provider,
+		maxIterations: agentOverride.maxIterations ?? maxIterations,
+		maxTokens: resolvedMaxTokens,
+		temperature: agentOverride.temperature ?? temperature,
+		topP: agentOverride.topP ?? topP,
+		timeoutMs: agentOverride.timeoutMs ?? timeoutMs,
+	};
+}
+
+/** Snapshot the active override for display / diffing. */
+export function getAgentOverride(): AgentRunOverride {
+	return { ...agentOverride };
+}
+
+/** Replace the active override. Passing `{}` clears it. */
+export function setAgentOverride(next: AgentRunOverride): void {
+	agentOverride = { ...next };
+}
+
+/** Clear all override fields. */
+export function clearAgentOverride(): void {
+	agentOverride = {};
+}
+
+/** True when any override field is currently set. */
+export function hasAgentOverride(): boolean {
+	return Object.values(agentOverride).some((v) => v !== undefined);
+}
+
 export const chatStore = {
 	get messages() {
 		return messages;
@@ -202,6 +265,12 @@ export const chatStore = {
 	get defaultProvider() {
 		return defaultProvider;
 	},
+	get agentOverride() {
+		return agentOverride;
+	},
+	get hasAgentOverride() {
+		return hasAgentOverride();
+	},
 	setProvider: (p: string | null) => {
 		selectedProvider = p;
 	},
@@ -220,6 +289,10 @@ export const chatStore = {
 	setTimeoutMs: (n: number) => {
 		timeoutMs = n;
 	},
+	setAgentOverride,
+	clearAgentOverride,
+	getAgentOverride,
+	buildChatRequestFields,
 	addUserMessage,
 	startAssistantMessage,
 	appendToken,
