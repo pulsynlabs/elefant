@@ -10,6 +10,8 @@ import { registerServerRoutes } from './routes.ts'
 import { registerQuestionRoute } from '../tools/question/route.ts'
 import { mountWsRoute } from './routes-ws.ts'
 import { mountProjectEventsRoute, mountProjectsRoutes } from './routes-projects.ts'
+import { RunRegistry } from '../runs/registry.ts'
+import { mountAgentRunRoutes } from '../runs/routes.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,
@@ -83,12 +85,24 @@ export function createApp(
 		db,
 	)
 
+	const runRegistry = new RunRegistry()
+
 	// Mount transport routes when available
 	if (ws) mountWsRoute(baseApp, ws)
 	if (sse) mountProjectEventsRoute(baseApp, sse)
 
 	// Mount project CRUD routes
 	mountProjectsRoutes(baseApp, db)
+
+	// Mount agent run routes
+	mountAgentRunRoutes(baseApp, {
+		db,
+		providerRouter,
+		toolRegistry,
+		hookRegistry,
+		runRegistry,
+		sseManager: sse,
+	})
 
 	return baseApp
 }
