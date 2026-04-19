@@ -42,6 +42,7 @@ describe('runAgentLoop', () => {
 				messages: [{ role: 'user', content: 'hi' }],
 				tools: EMPTY_TOOLS,
 				hookRegistry: new HookRegistry(),
+				conversationId: 'conv-text-only',
 			}),
 		)
 
@@ -88,6 +89,7 @@ describe('runAgentLoop', () => {
 				messages: [{ role: 'user', content: 'run tool' }],
 				tools: EMPTY_TOOLS,
 				hookRegistry: hooks,
+				conversationId: 'conv-tool-result',
 			}),
 		)
 
@@ -142,6 +144,7 @@ describe('runAgentLoop', () => {
 				tools: EMPTY_TOOLS,
 				maxIterations: 2,
 				hookRegistry: new HookRegistry(),
+				conversationId: 'conv-max-iterations',
 			}),
 		)
 
@@ -200,7 +203,7 @@ describe('runAgentLoop', () => {
 				await emit(hooks, 'tool:before', {
 					toolName: 'hook-tool',
 					args: hookArgs,
-					conversationId: 'default',
+					conversationId: 'conv-hooks',
 				})
 
 				await emit(hooks, 'tool:after', {
@@ -212,7 +215,7 @@ describe('runAgentLoop', () => {
 						isError: false,
 					},
 					durationMs: 1,
-					conversationId: 'default',
+					conversationId: 'conv-hooks',
 				})
 
 				return { ok: true, data: 'ok' }
@@ -224,6 +227,7 @@ describe('runAgentLoop', () => {
 				messages: [{ role: 'user', content: 'hooks' }],
 				tools: EMPTY_TOOLS,
 				hookRegistry: hooks,
+				conversationId: 'conv-hooks',
 			}),
 		)
 
@@ -235,5 +239,151 @@ describe('runAgentLoop', () => {
 			'message:before',
 			'message:after',
 		])
+	})
+
+	it('keeps hook conversation ids isolated across parallel runs', async () => {
+		const hooks = new HookRegistry()
+		const hookConversationIds: string[] = []
+
+		hooks.register('tool:before', async (payload) => {
+			hookConversationIds.push(payload.conversationId)
+		})
+
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(): AsyncGenerator<StreamEvent> {
+				yield {
+					type: 'tool_call_complete',
+					toolCall: {
+						id: 'parallel-call',
+						name: 'parallel-tool',
+						arguments: {},
+					},
+				}
+				yield { type: 'done', finishReason: 'tool_calls' }
+			},
+		}
+
+		const registry: ToolExecutor = {
+			execute: async (_name, args) => {
+				const hookArgs = typeof args === 'object' && args !== null
+					? (args as Record<string, unknown>)
+					: {}
+
+				await emit(hooks, 'tool:before', {
+					toolName: 'parallel-tool',
+					args: hookArgs,
+					conversationId:
+						typeof hookArgs.conversationId === 'string'
+							? hookArgs.conversationId
+							: 'missing-conversation-id',
+				})
+
+				return { ok: true, data: 'ok' }
+			},
+		}
+
+		await Promise.all([
+			collectEvents(
+				runAgentLoop(createRouter(adapter), registry, {
+					messages: [{ role: 'user', content: 'run a' }],
+					tools: EMPTY_TOOLS,
+					hookRegistry: hooks,
+					maxIterations: 1,
+					conversationId: 'conv-a',
+				}),
+			),
+			collectEvents(
+				runAgentLoop(createRouter(adapter), registry, {
+					messages: [{ role: 'user', content: 'run b' }],
+					tools: EMPTY_TOOLS,
+					hookRegistry: hooks,
+					maxIterations: 1,
+					conversationId: 'conv-b',
+				}),
+			),
+		])
+
+		expect(hookConversationIds).toContain('conv-a')
+		expect(hookConversationIds).toContain('conv-b')
+	})
+
+	it('uses per-run question emitters for concurrent loops', async () => {
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(): AsyncGenerator<StreamEvent> {
+				yield {
+					type: 'tool_call_complete',
+					toolCall: {
+						id: 'question-call',
+						name: 'question',
+						arguments: {},
+					},
+				}
+				yield { type: 'done', finishReason: 'tool_calls' }
+			},
+		}
+
+		const emittedA: string[] = []
+		const emittedB: string[] = []
+
+		const registry: ToolExecutor = {
+			execute: async (_name, args) => {
+				const toolArgs = typeof args === 'object' && args !== null
+					? (args as {
+						_questionEmitter?: (payload: {
+							questionId: string
+							question: string
+							header: string
+							options: Array<{ label: string; description?: string }>
+							multiple: boolean
+							conversationId?: string
+						}) => void
+						conversationId?: string
+					})
+					: {}
+
+				toolArgs._questionEmitter?.({
+					questionId: 'q-1',
+					question: 'Select option',
+					header: 'Header',
+					options: [{ label: 'One' }],
+					multiple: false,
+					conversationId: toolArgs.conversationId,
+				})
+
+				return { ok: true, data: 'ok' }
+			},
+		}
+
+		await Promise.all([
+			collectEvents(
+				runAgentLoop(createRouter(adapter), registry, {
+					messages: [{ role: 'user', content: 'run question a' }],
+					tools: EMPTY_TOOLS,
+					hookRegistry: new HookRegistry(),
+					maxIterations: 1,
+					conversationId: 'conv-question-a',
+					questionEmitter: (payload) => {
+						emittedA.push(payload.conversationId ?? 'missing')
+					},
+				}),
+			),
+			collectEvents(
+				runAgentLoop(createRouter(adapter), registry, {
+					messages: [{ role: 'user', content: 'run question b' }],
+					tools: EMPTY_TOOLS,
+					hookRegistry: new HookRegistry(),
+					maxIterations: 1,
+					conversationId: 'conv-question-b',
+					questionEmitter: (payload) => {
+						emittedB.push(payload.conversationId ?? 'missing')
+					},
+				}),
+			),
+		])
+
+		expect(emittedA).toEqual(['conv-question-a'])
+		expect(emittedB).toEqual(['conv-question-b'])
 	})
 })
