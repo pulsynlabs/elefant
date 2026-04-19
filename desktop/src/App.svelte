@@ -11,6 +11,7 @@
 	import { connectionStore } from "$lib/stores/connection.svelte.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { projectsStore } from "$lib/stores/projects.svelte.js";
+	import { agentRunsStore } from "$lib/stores/agent-runs.svelte.js";
 	import { chatStore } from "./features/chat/chat.svelte.js";
 	import { daemonLifecycle } from "$lib/services/daemon-lifecycle.js";
 	import { configService } from "$lib/services/config-service.js";
@@ -136,7 +137,10 @@
 						navigationStore.navigate("settings");
 					} else if (shortcut.action === "new-chat") {
 						event.preventDefault();
-						chatStore.clearConversation();
+						// A fresh chat is really a fresh agent run — drop the
+						// active run so the ChatView renders its empty state
+						// and the next send spawns a new run.
+						agentRunsStore.setActiveRun(null);
 						navigationStore.navigate("chat");
 					}
 				}

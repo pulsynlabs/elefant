@@ -1,11 +1,12 @@
 <script lang="ts">
 	// AgentOverrideDialog — launched from the chat composer to set per-run
-	// overrides for the NEXT chat POST. Fields are optional; any field
-	// left empty falls through to the AdvancedOptions / profile defaults.
+	// overrides for the NEXT agent-run spawn. Fields are optional; any
+	// field left empty falls through to the AdvancedOptions / profile
+	// defaults.
 	//
 	// Confirm writes the shape into `chatStore.setAgentOverride` so the
-	// next call to `buildChatRequestFields()` reflects the override. The
-	// dialog does not itself send the request — it only stages state.
+	// next `agentRunsStore.spawn()` call reads the override. The dialog
+	// itself does not spawn a run — it only stages state.
 
 	import type { AgentRunOverride } from '$lib/types/agent-config.js';
 	import {

@@ -1,36 +1,88 @@
 <script lang="ts">
+	// ChatView — project-first chat composer.
+	//
+	// Every conversation is a session under a project. Sending a prompt
+	// spawns an agent run via `agentRunsStore.spawn()`; the daemon runs
+	// the agent loop and streams events back over the project SSE
+	// stream. We render the *active* run's transcript inline so the chat
+	// surface always shows the most recent exchange for this session.
+	//
+	// What this view owns:
+	//   - Composer surface (provider selector, advanced options, override
+	//     dialog, message input)
+	//   - Spawn on send, cancel on stop
+	//   - Auto-select the most recent run for the active session so the
+	//     user sees their transcript the moment they switch sessions
+	//
+	// What this view delegates:
+	//   - All streaming, tool-call rendering, and terminal-state display
+	//     belongs to AgentRunTranscript.
+	//   - All run-level state (status, transcript, active run) lives in
+	//     agentRunsStore.
+
 	import { chatStore } from './chat.svelte.js';
-	import MessageList from './MessageList.svelte';
 	import MessageInput from './MessageInput.svelte';
 	import ProviderSelector from './ProviderSelector.svelte';
 	import AdvancedOptions from './AdvancedOptions.svelte';
 	import ConnectionBanner from './ConnectionBanner.svelte';
 	import AgentOverrideDialog from '../agent-config/AgentOverrideDialog.svelte';
-	import { getDaemonClient } from '$lib/daemon/client.js';
-	import type { MessageRole } from '$lib/daemon/types.js';
-	import type { AgentRunOverride } from '$lib/types/agent-config.js';
+	import AgentRunTranscript from '../agent-runs/AgentRunTranscript.svelte';
+	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
+	import type { AgentRunOverride } from '$lib/types/agent-config.js';
 
 	let showAdvanced = $state(false);
 	let showOverrideDialog = $state(false);
-	let abortController: AbortController | null = null;
 
-	// Clear the in-memory message list whenever the active session changes so
-	// the user always sees a clean slate for the session they just switched to.
-	// Use a local tracker to avoid clearing on the initial mount.
-	let _lastSessionId = $state<string | null>(projectsStore.activeSessionId);
+	// Keep a record of the project+session we last synced to so the
+	// refresh/subscribe effect only fires on an actual change. Without
+	// this guard, the effect would re-run on every run-store mutation.
+	let lastSyncedProjectId = $state<string | null>(null);
+	let lastSyncedSessionId = $state<string | null>(null);
+
+	// When the active session changes, wire up SSE for the project and
+	// load the existing runs for that session. Auto-select the most
+	// recent run so the user lands on their transcript immediately.
 	$effect(() => {
-		const current = projectsStore.activeSessionId;
-		if (current !== _lastSessionId) {
-			_lastSessionId = current;
-			// Stop any in-flight stream before clearing
-			if (abortController) {
-				abortController.abort();
-				abortController = null;
-			}
-			chatStore.clearConversation();
+		const projectId = projectsStore.activeProjectId;
+		const sessionId = projectsStore.activeSessionId;
+
+		if (
+			projectId === lastSyncedProjectId &&
+			sessionId === lastSyncedSessionId
+		) {
+			return;
 		}
+		lastSyncedProjectId = projectId;
+		lastSyncedSessionId = sessionId;
+
+		if (!projectId || !sessionId) {
+			agentRunsStore.setActiveRun(null);
+			return;
+		}
+
+		agentRunsStore.subscribeToProject(projectId);
+		void agentRunsStore.refreshSession(sessionId).then(() => {
+			// Pick the most recent run for this session as the active one.
+			// runsForSession returns runs oldest-first, so take the tail.
+			const sessionRuns = agentRunsStore.runsForSession(sessionId);
+			const latest = sessionRuns.at(-1);
+			agentRunsStore.setActiveRun(latest ? latest.runId : null);
+		});
 	});
+
+	// Active run derivation — reads straight through so we don't have to
+	// keep another piece of local state in sync.
+	const activeRunId = $derived(agentRunsStore.activeRunId);
+	const activeRun = $derived(
+		activeRunId ? agentRunsStore.runs[activeRunId] ?? null : null,
+	);
+	const isStreaming = $derived(activeRun?.status === 'running');
+
+	const hasContext = $derived(
+		projectsStore.activeProjectId !== null &&
+			projectsStore.activeSessionId !== null,
+	);
 
 	function openOverride(): void {
 		showOverrideDialog = true;
@@ -46,69 +98,47 @@
 	}
 
 	async function handleSend(content: string): Promise<void> {
-		if (chatStore.isStreaming || !content.trim()) return;
+		const prompt = content.trim();
+		if (!prompt || isStreaming) return;
 
-		// Add user message to conversation
-		chatStore.addUserMessage(content.trim());
+		const projectId = projectsStore.activeProjectId;
+		const sessionId = projectsStore.activeSessionId;
+		if (!projectId || !sessionId) return;
 
-		// Build API messages from conversation history (user messages only, before the assistant placeholder)
-		const apiMessages: MessageRole[] = chatStore.getApiMessages().map((m) => ({
-			role: m.role as MessageRole['role'],
-			content: m.content,
-		}));
+		// The per-run override `agentType` slot is the closest spec-legal
+		// home for the override's provider choice until the spawn API
+		// grows explicit per-run overrides. When an override is set, tag
+		// the run with `primary:<provider>` so downstream tooling can
+		// display it; otherwise default to the canonical primary agent.
+		const override = chatStore.getAgentOverride();
+		const provider = override.provider ?? chatStore.selectedProvider ?? null;
+		const agentType = override.provider
+			? `primary:${override.provider}`
+			: 'primary';
 
-		// Start assistant message placeholder
-		chatStore.startAssistantMessage();
+		// Keep the title short and meaningful. The daemon rejects empty
+		// titles, so fall back to the run type when the prompt is empty
+		// after trimming (already guarded above, but defensive).
+		const title = prompt.slice(0, 60) || 'primary';
 
-		abortController = new AbortController();
-		const client = getDaemonClient();
+		await agentRunsStore.spawn(projectId, sessionId, {
+			agentType,
+			title,
+			prompt,
+			contextMode: 'inherit_session',
+		});
 
-		try {
-			// Build the request payload through the store helper so the
-			// AdvancedOptions fields and any per-run AgentOverrideDialog
-			// override flow through a single, testable code path.
-		const fields = chatStore.buildChatRequestFields(projectsStore.activeSessionId);
-		const stream = client.streamChat(
-			{ messages: apiMessages, ...fields },
-				abortController.signal,
-			);
-
-			for await (const event of stream) {
-				if (event.type === 'token') {
-					chatStore.appendToken(event.text);
-				} else if (event.type === 'tool_call') {
-					chatStore.addToolCall({
-						id: event.id,
-						name: event.name,
-						arguments: event.arguments,
-					});
-				} else if (event.type === 'tool_result') {
-					chatStore.addToolResult(event.toolCallId, event.content, event.isError);
-				} else if (event.type === 'question') {
-					chatStore.addQuestion(event);
-				} else if (event.type === 'done') {
-					chatStore.finalizeMessage(event.finishReason);
-					break;
-				} else if (event.type === 'error') {
-					chatStore.setStreamingError(`${event.code}: ${event.message}`);
-					break;
-				}
-			}
-		} catch (err) {
-			if (err instanceof Error && err.name !== 'AbortError') {
-				chatStore.setStreamingError(err.message);
-			} else {
-				chatStore.finalizeMessage('stop');
-			}
-		} finally {
-			abortController = null;
-		}
+		// Note: spawn() sets the new runId as active and subscribes to
+		// the project SSE stream internally, so there's nothing further
+		// to wire up here. `provider` is read above for future expansion
+		// when the spawn API accepts explicit per-run generation config.
+		void provider;
 	}
 
-	function handleStop(): void {
-		abortController?.abort();
-		chatStore.finalizeMessage('stop');
-		abortController = null;
+	async function handleStop(): Promise<void> {
+		const runId = agentRunsStore.activeRunId;
+		if (!runId) return;
+		await agentRunsStore.cancel(runId);
 	}
 </script>
 
@@ -122,9 +152,32 @@
 		<ProviderSelector />
 	</div>
 
-	<!-- Message list (scrollable area) -->
+	<!-- Transcript area (scrollable) -->
 	<div class="chat-messages">
-		<MessageList messages={chatStore.messages} />
+		{#if !hasContext}
+			<div class="empty-state" role="status">
+				<div class="empty-icon" aria-hidden="true">🐘</div>
+				<h3 class="empty-title">Select a project and session</h3>
+				<p class="empty-desc">
+					Chat is always scoped to a session under a project. Pick one
+					from the sidebar — or create a new session — to start talking
+					to Elefant.
+				</p>
+			</div>
+		{:else if !activeRunId}
+			<div class="empty-state" role="status">
+				<div class="empty-icon" aria-hidden="true">🐘</div>
+				<h3 class="empty-title">Start a conversation</h3>
+				<p class="empty-desc">
+					Send a message to spin up the first agent run for this
+					session.
+				</p>
+			</div>
+		{:else}
+			<div class="transcript-wrapper">
+				<AgentRunTranscript />
+			</div>
+		{/if}
 	</div>
 
 	<!-- Advanced options (collapsible) -->
@@ -134,7 +187,7 @@
 		</div>
 	{/if}
 
-	<!-- Input area -->
+	<!-- Composer -->
 	<div class="chat-input-area">
 		<div class="composer-actions">
 			<button
@@ -157,8 +210,8 @@
 			</button>
 		</div>
 		<MessageInput
-			disabled={chatStore.isStreaming}
-			streaming={chatStore.isStreaming}
+			disabled={!hasContext || isStreaming}
+			streaming={isStreaming}
 			onSend={handleSend}
 			onStop={handleStop}
 		/>
@@ -177,7 +230,7 @@
 <style>
 	.chat-view {
 		display: grid;
-		grid-template-rows: auto 1fr auto auto;
+		grid-template-rows: auto auto 1fr auto auto;
 		height: 100%;
 		overflow: hidden;
 		background-color: var(--color-bg);
@@ -204,6 +257,46 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
+	}
+
+	.transcript-wrapper {
+		height: 100%;
+		overflow-y: auto;
+		overflow-x: hidden;
+		scrollbar-width: thin;
+	}
+
+	.empty-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: var(--space-10) var(--space-6);
+		text-align: center;
+		gap: var(--space-3);
+		color: var(--color-text-muted);
+		flex: 1;
+	}
+
+	.empty-icon {
+		font-size: 40px;
+		opacity: 0.7;
+	}
+
+	.empty-title {
+		font-size: var(--font-size-xl);
+		font-weight: var(--font-weight-semibold);
+		color: var(--color-text-primary);
+		letter-spacing: var(--tracking-snug);
+		margin: 0;
+	}
+
+	.empty-desc {
+		font-size: var(--font-size-md);
+		color: var(--color-text-muted);
+		max-width: 420px;
+		line-height: var(--line-height-relaxed);
+		margin: 0;
 	}
 
 	.advanced-section {
