@@ -349,6 +349,203 @@ describe('agentRunsStore', () => {
 		});
 	});
 
+	describe('childRunsForRun', () => {
+		it('returns empty array for run with no children', () => {
+			_seedRun(makeRun({ runId: 'parent', parentRunId: null }));
+			expect(agentRunsStore.childRunsForRun('parent')).toEqual([]);
+		});
+
+		it('returns single child', () => {
+			_seedRun(makeRun({ runId: 'parent', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'child', parentRunId: 'parent' }));
+
+			const children = agentRunsStore.childRunsForRun('parent');
+			expect(children).toHaveLength(1);
+			expect(children[0].runId).toBe('child');
+		});
+
+		it('returns multiple children sorted by createdAt ASC', () => {
+			_seedRun(makeRun({ runId: 'parent', parentRunId: null }));
+			_seedRun(
+				makeRun({
+					runId: 'child-2',
+					parentRunId: 'parent',
+					createdAt: '2026-04-18T00:00:02.000Z',
+				}),
+			);
+			_seedRun(
+				makeRun({
+					runId: 'child-1',
+					parentRunId: 'parent',
+					createdAt: '2026-04-18T00:00:01.000Z',
+				}),
+			);
+			_seedRun(
+				makeRun({
+					runId: 'child-3',
+					parentRunId: 'parent',
+					createdAt: '2026-04-18T00:00:03.000Z',
+				}),
+			);
+
+			const children = agentRunsStore.childRunsForRun('parent');
+			expect(children.map((c) => c.runId)).toEqual(['child-1', 'child-2', 'child-3']);
+		});
+
+		it('excludes grandchildren (direct children only)', () => {
+			_seedRun(makeRun({ runId: 'grandparent', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'parent', parentRunId: 'grandparent' }));
+			_seedRun(makeRun({ runId: 'child', parentRunId: 'parent' }));
+
+			const grandparentChildren = agentRunsStore.childRunsForRun('grandparent');
+			expect(grandparentChildren.map((c) => c.runId)).toEqual(['parent']);
+
+			const parentChildren = agentRunsStore.childRunsForRun('parent');
+			expect(parentChildren.map((c) => c.runId)).toEqual(['child']);
+		});
+
+		it('returns empty array for unknown runId', () => {
+			expect(agentRunsStore.childRunsForRun('nonexistent')).toEqual([]);
+		});
+	});
+
+	describe('activeChildPath', () => {
+		it('returns empty array when activeRunId is not provided', () => {
+			_seedRun(makeRun({ runId: 'root', parentRunId: null }));
+			expect(agentRunsStore.activeChildPath('root')).toEqual([]);
+		});
+
+		it('returns empty array when activeRunId is unknown', () => {
+			_seedRun(makeRun({ runId: 'root', parentRunId: null }));
+			expect(agentRunsStore.activeChildPath('root', 'nonexistent')).toEqual([]);
+		});
+
+		it('returns [root] when root is the active run (root-only path)', () => {
+			_seedRun(makeRun({ runId: 'root', parentRunId: null }));
+			const path = agentRunsStore.activeChildPath('root', 'root');
+			expect(path.map((r) => r.runId)).toEqual(['root']);
+		});
+
+		it('returns [root, child] when child is active', () => {
+			_seedRun(makeRun({ runId: 'root', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'child', parentRunId: 'root' }));
+			const path = agentRunsStore.activeChildPath('root', 'child');
+			expect(path.map((r) => r.runId)).toEqual(['root', 'child']);
+		});
+
+		it('returns 3-level chain [root, parent, child]', () => {
+			_seedRun(makeRun({ runId: 'root', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'parent', parentRunId: 'root' }));
+			_seedRun(makeRun({ runId: 'child', parentRunId: 'parent' }));
+			const path = agentRunsStore.activeChildPath('root', 'child');
+			expect(path.map((r) => r.runId)).toEqual(['root', 'parent', 'child']);
+		});
+
+		it('returns 4-level chain (max depth)', () => {
+			_seedRun(makeRun({ runId: 'level-1', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'level-2', parentRunId: 'level-1' }));
+			_seedRun(makeRun({ runId: 'level-3', parentRunId: 'level-2' }));
+			_seedRun(makeRun({ runId: 'level-4', parentRunId: 'level-3' }));
+			const path = agentRunsStore.activeChildPath('level-1', 'level-4');
+			expect(path.map((r) => r.runId)).toEqual(['level-1', 'level-2', 'level-3', 'level-4']);
+		});
+
+		it('returns empty array when activeRunId is not a descendant of rootRunId', () => {
+			_seedRun(makeRun({ runId: 'root-a', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'root-b', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'child-of-b', parentRunId: 'root-b' }));
+
+			// child-of-b is not a descendant of root-a
+			expect(agentRunsStore.activeChildPath('root-a', 'child-of-b')).toEqual([]);
+		});
+
+		it('returns empty array when activeRunId is in a different branch', () => {
+			_seedRun(makeRun({ runId: 'root', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'branch-a', parentRunId: 'root' }));
+			_seedRun(makeRun({ runId: 'branch-b', parentRunId: 'root' }));
+			_seedRun(makeRun({ runId: 'child-of-a', parentRunId: 'branch-a' }));
+
+			// child-of-a is not a descendant of branch-b
+			expect(agentRunsStore.activeChildPath('branch-b', 'child-of-a')).toEqual([]);
+		});
+	});
+
+	describe('childrenByParent index', () => {
+		it('is correctly maintained after upsert via _seedRun', () => {
+			_seedRun(makeRun({ runId: 'parent', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'child', parentRunId: 'parent' }));
+
+			// childRunsForRun uses the index internally
+			const children = agentRunsStore.childRunsForRun('parent');
+			expect(children.map((c) => c.runId)).toEqual(['child']);
+		});
+
+		it('is correctly maintained after upsert via applyRunEvent (agent_run.spawned)', () => {
+			// First seed the parent
+			_seedRun(makeRun({ runId: 'parent', parentRunId: null }));
+
+			// Then spawn a child via event
+			agentRunsStore.applyRunEvent(
+				makeEnvelope({
+					runId: 'child',
+					type: 'agent_run.spawned',
+					parentRunId: 'parent',
+					data: { runId: 'child' },
+				}),
+			);
+
+			const children = agentRunsStore.childRunsForRun('parent');
+			expect(children.map((c) => c.runId)).toEqual(['child']);
+		});
+
+		it('is correctly maintained after upsert via applyRunEvent (agent_run.status_changed)', () => {
+			// Seed parent first
+			_seedRun(makeRun({ runId: 'parent', parentRunId: null }));
+
+			// Status change for a new child (creates minimal entry)
+			agentRunsStore.applyRunEvent(
+				makeEnvelope({
+					runId: 'child',
+					type: 'agent_run.status_changed',
+					parentRunId: 'parent',
+					data: { previousStatus: 'running', nextStatus: 'done' },
+				}),
+			);
+
+			const children = agentRunsStore.childRunsForRun('parent');
+			expect(children.map((c) => c.runId)).toEqual(['child']);
+		});
+
+		it('does not stale after resetAgentRunsStore', () => {
+			_seedRun(makeRun({ runId: 'parent', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'child', parentRunId: 'parent' }));
+
+			expect(agentRunsStore.childRunsForRun('parent')).toHaveLength(1);
+
+			resetAgentRunsStore();
+
+			// After reset, the index should be empty
+			expect(agentRunsStore.childRunsForRun('parent')).toEqual([]);
+		});
+
+		it('handles parent reassignment (rare but supported)', () => {
+			_seedRun(makeRun({ runId: 'old-parent', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'new-parent', parentRunId: null }));
+			_seedRun(makeRun({ runId: 'child', parentRunId: 'old-parent' }));
+
+			// Child is under old-parent
+			expect(agentRunsStore.childRunsForRun('old-parent').map((c) => c.runId)).toEqual(['child']);
+			expect(agentRunsStore.childRunsForRun('new-parent')).toEqual([]);
+
+			// Reassign child to new-parent (rare edge case)
+			_seedRun(makeRun({ runId: 'child', parentRunId: 'new-parent' }));
+
+			// Index should reflect the move
+			expect(agentRunsStore.childRunsForRun('old-parent')).toEqual([]);
+			expect(agentRunsStore.childRunsForRun('new-parent').map((c) => c.runId)).toEqual(['child']);
+		});
+	});
+
 	describe('tab management', () => {
 		it('openRun + setActiveRun + closeRun follow a coherent lifecycle', () => {
 			_seedRun(makeRun({ runId: 'r1' }));

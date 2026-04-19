@@ -31,6 +31,9 @@ let openRunIds = $state<string[]>([]);
 let lastError = $state<string | null>(null);
 let isLoading = $state(false);
 
+// O(1) index for child lookups: parentRunId -> child runIds (unsorted)
+let childrenByParent = $state<Record<string, string[]>>({});
+
 // SSE subscription state (kept at module level — there is at most one
 // active subscription per project at a time).
 let sseSubscription: {
@@ -76,6 +79,52 @@ function runTree(sessionId: string): AgentRunTreeNode[] {
 	return roots;
 }
 
+/**
+ * Returns direct children of a run, sorted by createdAt ASC.
+ * Uses the O(1) childrenByParent index for efficient lookups.
+ */
+function childRunsForRun(runId: string): AgentRun[] {
+	const childIds = childrenByParent[runId] ?? [];
+	return childIds
+		.map((id) => runs[id])
+		.filter((r): r is AgentRun => r !== undefined)
+		.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/**
+ * Returns the chain from rootRunId to activeRunId (inclusive), ordered
+ * from root to active. Returns [] if activeRunId is not a descendant
+ * of rootRunId or if activeRunId is not provided.
+ * Max depth supported: 4 levels (root -> child -> grandchild -> great-grandchild).
+ */
+function activeChildPath(rootRunId: string, activeRunId?: string): AgentRun[] {
+	if (!activeRunId || !runs[activeRunId]) return [];
+
+	// Build path from activeRunId up to root (or until we hit a dead end)
+	const path: AgentRun[] = [];
+	let currentId: string | null = activeRunId;
+	let depth = 0;
+	const MAX_DEPTH = 4;
+
+	while (currentId && depth < MAX_DEPTH) {
+		const currentRun: AgentRun | undefined = runs[currentId];
+		if (!currentRun) break;
+
+		path.unshift(currentRun);
+
+		// Check if we've reached the root
+		if (currentId === rootRunId) {
+			return path;
+		}
+
+		currentId = currentRun.parentRunId;
+		depth++;
+	}
+
+	// If we exited the loop without finding rootRunId, activeRunId is not a descendant
+	return [];
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function clearError(): void {
@@ -93,7 +142,39 @@ function appendToTranscript(runId: string, entry: AgentRunTranscriptEntry): void
 }
 
 function upsertRun(run: AgentRun): void {
+	const existing = runs[run.runId];
 	runs = { ...runs, [run.runId]: run };
+
+	// Maintain childrenByParent index
+	if (existing?.parentRunId !== run.parentRunId) {
+		// Remove from old parent's children list
+		if (existing?.parentRunId) {
+			const oldParentChildren = childrenByParent[existing.parentRunId] ?? [];
+			childrenByParent = {
+				...childrenByParent,
+				[existing.parentRunId]: oldParentChildren.filter((id) => id !== run.runId),
+			};
+		}
+		// Add to new parent's children list
+		if (run.parentRunId) {
+			const newParentChildren = childrenByParent[run.parentRunId] ?? [];
+			if (!newParentChildren.includes(run.runId)) {
+				childrenByParent = {
+					...childrenByParent,
+					[run.parentRunId]: [...newParentChildren, run.runId],
+				};
+			}
+		}
+	} else if (!existing && run.parentRunId) {
+		// New run with a parent — add to index
+		const parentChildren = childrenByParent[run.parentRunId] ?? [];
+		if (!parentChildren.includes(run.runId)) {
+			childrenByParent = {
+				...childrenByParent,
+				[run.parentRunId]: [...parentChildren, run.runId],
+			};
+		}
+	}
 }
 
 function updateRunStatus(
@@ -534,6 +615,7 @@ export function resetAgentRunsStore(): void {
 	openRunIds = [];
 	lastError = null;
 	isLoading = false;
+	childrenByParent = {};
 }
 
 /** Seed a run row without hitting the daemon. */
@@ -569,6 +651,8 @@ export const agentRunsStore = {
 	},
 	runsForSession,
 	runTree,
+	childRunsForRun,
+	activeChildPath,
 	refreshSession,
 	spawn,
 	cancel,
