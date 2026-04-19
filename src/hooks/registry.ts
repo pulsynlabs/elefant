@@ -26,6 +26,7 @@ function createEmptyStore(): HandlerStore {
 		'session:end': [],
 		'session:compact': [],
 		'context:transform': [],
+		'system:transform': [],
 		'permission:ask': [],
 		'tool:block': [],
 		'tool:allow': [],

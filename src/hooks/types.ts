@@ -86,6 +86,15 @@ export interface HookContextMap {
 		readonly sessionId: string;
 		readonly phase?: string;
 	};
+	'system:transform': {
+		readonly messages: Message[];
+		readonly sessionId: string;
+		readonly conversationId: string;
+		readonly state: unknown;
+		readonly budgets: {
+			readonly tokens: number;
+		};
+	};
 	'permission:ask': {
 		readonly tool: string;
 		readonly args: Readonly<Record<string, unknown>>;
@@ -133,6 +142,7 @@ export const HOOK_EVENT_NAMES: readonly HookEventName[] = [
 	'session:end',
 	'session:compact',
 	'context:transform',
+	'system:transform',
 	'permission:ask',
 	'tool:block',
 	'tool:allow',
