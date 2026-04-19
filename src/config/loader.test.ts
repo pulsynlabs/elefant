@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { loadConfig } from "./loader.ts";
+import { ConfigManager, loadConfig, loadConfigFromPath } from "./loader.ts";
+import { defaultAgentProfiles } from "./schema.ts";
+import { Database } from "../db/database.ts";
+import { insertProject } from "../db/repo/projects.ts";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -510,5 +513,260 @@ export default {
 				expect(result.error.message).toContain("port");
 			}
 		});
+	});
+});
+
+describe('ConfigManager.resolve', () => {
+	let tempDir: string;
+	let db: Database;
+	let projectId: string;
+	let projectPath: string;
+	let globalConfigPath: string;
+
+	beforeEach(() => {
+		tempDir = mkdtempSync(join(tmpdir(), 'elefant-config-manager-'));
+		projectPath = join(tempDir, 'project-a');
+		mkdirSync(join(projectPath, '.elefant'), { recursive: true });
+		globalConfigPath = join(tempDir, 'global.config.json');
+
+		db = new Database(':memory:');
+		projectId = crypto.randomUUID();
+		insertProject(db, {
+			id: projectId,
+			name: 'Project A',
+			path: projectPath,
+		});
+	});
+
+	afterEach(() => {
+		db.close();
+		rmSync(tempDir, { recursive: true, force: true });
+	});
+
+	function createManager() {
+		return new ConfigManager({
+			globalConfigPath,
+			projectPathResolver: (id) => {
+				const row = db.db.query('SELECT path FROM projects WHERE id = ?').get(id) as
+					| { path: string }
+					| null;
+
+				if (!row) {
+					return { ok: false as const, error: { code: 'FILE_NOT_FOUND' as const, message: 'Project not found' } };
+				}
+
+				return { ok: true as const, data: row.path };
+			},
+		});
+	}
+
+	it('uses global profile when only global exists', async () => {
+		writeFileSync(
+			globalConfigPath,
+			JSON.stringify({
+				agents: {
+					executor: {
+						...defaultAgentProfiles.executor,
+						limits: {
+							...defaultAgentProfiles.executor.limits,
+							maxIterations: 20,
+						},
+					},
+				},
+			}),
+		);
+
+		const result = await createManager().resolve('executor', projectId);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data.limits.maxIterations).toBe(20);
+			expect(result.data._sources['limits.maxIterations']).toBe('global');
+		}
+	});
+
+	it('project config overrides global config', async () => {
+		writeFileSync(
+			globalConfigPath,
+			JSON.stringify({
+				agents: {
+					executor: {
+						...defaultAgentProfiles.executor,
+						limits: {
+							...defaultAgentProfiles.executor.limits,
+							maxIterations: 20,
+						},
+					},
+				},
+			}),
+		);
+
+		writeFileSync(
+			join(projectPath, '.elefant', 'config.json'),
+			JSON.stringify({
+				agents: {
+					executor: {
+						...defaultAgentProfiles.executor,
+						limits: {
+							...defaultAgentProfiles.executor.limits,
+							maxIterations: 7,
+						},
+					},
+				},
+			}),
+		);
+
+		const result = await createManager().resolve('executor', projectId);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data.limits.maxIterations).toBe(7);
+			expect(result.data._sources['limits.maxIterations']).toBe('project');
+		}
+	});
+
+	it('override wins over project and global', async () => {
+		writeFileSync(
+			globalConfigPath,
+			JSON.stringify({
+				agents: {
+					executor: {
+						...defaultAgentProfiles.executor,
+						limits: {
+							...defaultAgentProfiles.executor.limits,
+							maxIterations: 20,
+						},
+					},
+				},
+			}),
+		);
+
+		writeFileSync(
+			join(projectPath, '.elefant', 'config.json'),
+			JSON.stringify({
+				agents: {
+					executor: {
+						...defaultAgentProfiles.executor,
+						limits: {
+							...defaultAgentProfiles.executor.limits,
+							maxIterations: 7,
+						},
+					},
+				},
+			}),
+		);
+
+		const result = await createManager().resolve('executor', projectId, {
+			limits: {
+				maxIterations: 3,
+			},
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data.limits.maxIterations).toBe(3);
+			expect(result.data._sources['limits.maxIterations']).toBe('override');
+		}
+	});
+
+	it('falls back to default for unspecified fields', async () => {
+		const result = await createManager().resolve('executor', projectId);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data.tools.mode).toBe(defaultAgentProfiles.executor.tools.mode);
+			expect(result.data._sources['tools.mode']).toBe('default');
+		}
+	});
+});
+
+describe('loadConfigFromPath validation failures', () => {
+	let tempDir: string;
+
+	beforeEach(() => {
+		tempDir = mkdtempSync(join(tmpdir(), 'elefant-config-validate-'));
+	});
+
+	afterEach(() => {
+		rmSync(tempDir, { recursive: true, force: true });
+	});
+
+	it('fails when required profile field is missing', async () => {
+		const path = join(tempDir, 'config.json');
+		writeFileSync(path, JSON.stringify({ agents: { executor: { id: 'executor' } } }));
+
+		const result = await loadConfigFromPath(path);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('CONFIG_INVALID');
+			expect(result.error.message).toContain('agents.executor');
+		}
+	});
+
+	it('fails for unknown field due to strict mode', async () => {
+		const path = join(tempDir, 'config.json');
+		writeFileSync(
+			path,
+			JSON.stringify({
+				agents: {
+					executor: {
+						...defaultAgentProfiles.executor,
+						unexpected: true,
+					},
+				},
+			}),
+		);
+
+		const result = await loadConfigFromPath(path);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('CONFIG_INVALID');
+		}
+	});
+
+	it('fails for wrong type in numeric field', async () => {
+		const path = join(tempDir, 'config.json');
+		writeFileSync(
+			path,
+			JSON.stringify({
+				agents: {
+					executor: {
+						...defaultAgentProfiles.executor,
+						limits: {
+							...defaultAgentProfiles.executor.limits,
+							maxIterations: 'twelve',
+						},
+					},
+				},
+			}),
+		);
+
+		const result = await loadConfigFromPath(path);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('CONFIG_INVALID');
+			expect(result.error.message).toContain('maxIterations');
+		}
+	});
+
+	it('fails for invalid enum values', async () => {
+		const path = join(tempDir, 'config.json');
+		writeFileSync(
+			path,
+			JSON.stringify({
+				agents: {
+					executor: {
+						...defaultAgentProfiles.executor,
+						tools: {
+							...defaultAgentProfiles.executor.tools,
+							mode: 'invalid-mode',
+						},
+					},
+				},
+			}),
+		);
+
+		const result = await loadConfigFromPath(path);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('CONFIG_INVALID');
+			expect(result.error.message).toContain('mode');
+		}
 	});
 });

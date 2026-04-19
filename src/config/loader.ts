@@ -1,122 +1,144 @@
-/**
- * Config loader — discovers, parses, and validates configuration.
- *
- * Discovery order:
- * 1. ./elefant.config.ts (dynamic import)
- * 2. ./elefant.config.json (Bun.file().json())
- * 3. ~/.config/elefant/elefant.config.ts
- * 4. ~/.config/elefant/elefant.config.json
- *
- * If no config file is found the daemon starts with empty defaults
- * (no providers). Users add providers via the desktop Settings UI.
- *
- * Environment variable overrides (applied on top of file config):
- * - ELEFANT_PORT          → config.port
- * - ELEFANT_DEFAULT_PROVIDER → config.defaultProvider
- * - ELEFANT_MODEL         → first provider model
- * - ELEFANT_API_KEY       → first provider apiKey
- * - ELEFANT_BASE_URL      → first provider baseURL
- */
+import { mkdir } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { z } from 'zod';
 
-import { z } from "zod";
-import { configSchema, type ElefantConfig, type ProviderEntry } from "./schema.ts";
-import type { Result } from "../types/result.ts";
-import { ok, err } from "../types/result.ts";
-import type { ElefantError } from "../types/errors.ts";
-import { homedir } from "os";
-import { join, resolve } from "path";
+import {
+	agentProfileSchema,
+	configSchema,
+	defaultAgentProfiles,
+	type AgentBehaviorConfig,
+	type AgentProfile,
+	type AgentRuntimeLimits,
+	type ElefantConfig,
+	type ToolPolicyConfig,
+	type ProviderEntry,
+} from './schema.ts';
+import type { ElefantError } from '../types/errors.ts';
+import { err, ok, type Result } from '../types/result.ts';
+
+export interface ConfigError extends ElefantError {}
+
+export type ConfigSourceLayer = 'default' | 'global' | 'project' | 'override';
+
+export interface ResolvedAgentConfig extends AgentProfile {
+	_sources: Record<string, ConfigSourceLayer>;
+}
+
+export interface AgentProfileOverride extends Partial<AgentProfile> {
+	behavior?: Partial<AgentBehaviorConfig>;
+	limits?: Partial<AgentRuntimeLimits>;
+	tools?: Partial<ToolPolicyConfig>;
+}
 
 interface RawConfig {
 	port?: number;
 	providers?: ProviderEntry[];
 	defaultProvider?: string;
-	logLevel?: "debug" | "info" | "warn" | "error";
+	logLevel?: 'debug' | 'info' | 'warn' | 'error';
+	agents?: Record<string, AgentProfile>;
 }
 
-function getSearchPaths(): string[] {
-	const home = homedir();
-	return [
-		"./elefant.config.ts",
-		"./elefant.config.json",
-		join(home, ".config", "elefant", "elefant.config.ts"),
-		join(home, ".config", "elefant", "elefant.config.json"),
-	];
+interface ConfigManagerOptions {
+	globalConfigPath?: string;
+	projectPathResolver?: (
+		projectId: string,
+	) => Result<string, ConfigError> | Promise<Result<string, ConfigError>>;
+}
+
+const DEFAULT_GLOBAL_CONFIG_PATH = join(
+	homedir(),
+	'.config',
+	'elefant',
+	'elefant.config.json',
+);
+
+const DEFAULT_CONFIG_SEARCH_PATHS = [
+	'./elefant.config.ts',
+	'./elefant.config.json',
+	join(homedir(), '.config', 'elefant', 'elefant.config.ts'),
+	DEFAULT_GLOBAL_CONFIG_PATH,
+];
+
+function makeConfigError(code: ConfigError['code'], message: string, details?: unknown): ConfigError {
+	return { code, message, details };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 async function fileExists(path: string): Promise<boolean> {
 	try {
-		const file = Bun.file(path);
-		return await file.exists();
+		return await Bun.file(path).exists();
 	} catch {
 		return false;
 	}
 }
 
-async function loadTsConfig(path: string): Promise<Result<RawConfig, ElefantError>> {
+async function loadRawTsConfig(path: string): Promise<Result<RawConfig, ConfigError>> {
 	try {
-		const absolutePath = resolve(path);
-		const module = await import(absolutePath);
+		const module = await import(resolve(path));
 		const config = module.default ?? module.config;
-		if (!config || typeof config !== "object") {
-			return err({
-				code: "CONFIG_INVALID",
-				message: `Config file ${path} must export a config object`,
-			});
+		if (!isRecord(config)) {
+			return err(
+				makeConfigError(
+					'CONFIG_INVALID',
+					`Config file ${path} must export a config object`,
+				),
+			);
 		}
+
 		return ok(config as RawConfig);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		return err({
-			code: "CONFIG_INVALID",
-			message: `Failed to load TypeScript config from ${path}: ${message}`,
-		});
+		return err(
+			makeConfigError(
+				'CONFIG_INVALID',
+				`Failed to load TypeScript config from ${path}: ${message}`,
+			),
+		);
 	}
 }
 
-async function loadJsonConfig(path: string): Promise<Result<RawConfig, ElefantError>> {
+async function loadRawJsonConfig(path: string): Promise<Result<RawConfig, ConfigError>> {
 	try {
-		const file = Bun.file(path);
-		const config = await file.json();
-		if (!config || typeof config !== "object") {
-			return err({
-				code: "CONFIG_INVALID",
-				message: `Config file ${path} must contain a JSON object`,
-			});
+		const raw = await Bun.file(path).json();
+		if (!isRecord(raw)) {
+			return err(
+				makeConfigError(
+					'CONFIG_INVALID',
+					`Config file ${path} must contain a JSON object`,
+				),
+			);
 		}
-		return ok(config as RawConfig);
+
+		return ok(raw as RawConfig);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		return err({
-			code: "CONFIG_INVALID",
-			message: `Failed to load JSON config from ${path}: ${message}`,
-		});
+		return err(
+			makeConfigError(
+				'CONFIG_INVALID',
+				`Failed to load JSON config from ${path}: ${message}`,
+			),
+		);
 	}
 }
 
-/**
- * Discover and load the first available config file.
- * Returns empty defaults if no file is found — daemon starts regardless.
- */
-async function discoverConfig(): Promise<RawConfig> {
-	for (const path of getSearchPaths()) {
-		if (await fileExists(path)) {
-			const result = path.endsWith(".ts")
-				? await loadTsConfig(path)
-				: await loadJsonConfig(path);
-			if (result.ok) return result.data;
-			console.error(`[elefant] Config warning: ${result.error.message}`);
-		}
-	}
-	// No config found — start with empty defaults
-	return {};
+function formatZodErrors(error: z.ZodError): string {
+	return error.issues
+		.map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
+		.join(', ');
 }
 
 function applyEnvOverrides(config: RawConfig): RawConfig {
 	const result: RawConfig = { ...config };
 
 	if (process.env.ELEFANT_PORT) {
-		const port = parseInt(process.env.ELEFANT_PORT, 10);
-		if (!isNaN(port)) result.port = port;
+		const port = Number.parseInt(process.env.ELEFANT_PORT, 10);
+		if (!Number.isNaN(port)) {
+			result.port = port;
+		}
 	}
 
 	if (process.env.ELEFANT_DEFAULT_PROVIDER) {
@@ -124,30 +146,437 @@ function applyEnvOverrides(config: RawConfig): RawConfig {
 	}
 
 	if (result.providers && result.providers.length > 0) {
-		const first = { ...result.providers[0] };
-		if (process.env.ELEFANT_MODEL) first.model = process.env.ELEFANT_MODEL;
-		if (process.env.ELEFANT_API_KEY) first.apiKey = process.env.ELEFANT_API_KEY;
-		if (process.env.ELEFANT_BASE_URL) first.baseURL = process.env.ELEFANT_BASE_URL;
-		result.providers = [first, ...result.providers.slice(1)];
+		const firstProvider = { ...result.providers[0] };
+		if (process.env.ELEFANT_MODEL) {
+			firstProvider.model = process.env.ELEFANT_MODEL;
+		}
+		if (process.env.ELEFANT_API_KEY) {
+			firstProvider.apiKey = process.env.ELEFANT_API_KEY;
+		}
+		if (process.env.ELEFANT_BASE_URL) {
+			firstProvider.baseURL = process.env.ELEFANT_BASE_URL;
+		}
+
+		result.providers = [firstProvider, ...result.providers.slice(1)];
 	}
 
 	return result;
 }
 
-function formatZodErrors(error: z.ZodError): string {
-	return error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ");
+export async function loadConfigFromPath(path: string): Promise<Result<ElefantConfig, ConfigError>> {
+	const loaded = path.endsWith('.ts')
+		? await loadRawTsConfig(path)
+		: await loadRawJsonConfig(path);
+
+	if (!loaded.ok) {
+		return loaded;
+	}
+
+	const parsed = configSchema.safeParse(loaded.data);
+	if (!parsed.success) {
+		return err(
+			makeConfigError('CONFIG_INVALID', formatZodErrors(parsed.error), parsed.error.issues),
+		);
+	}
+
+	return ok(parsed.data);
 }
 
-export async function loadConfig(): Promise<Result<ElefantConfig, ElefantError>> {
-	const raw = await discoverConfig();
-	const merged = applyEnvOverrides(raw);
+async function loadOptionalConfigFromPath(path: string): Promise<Result<ElefantConfig | null, ConfigError>> {
+	if (!(await fileExists(path))) {
+		return ok(null);
+	}
+
+	const loaded = await loadConfigFromPath(path);
+	if (!loaded.ok) {
+		return loaded;
+	}
+
+	return ok(loaded.data);
+}
+
+async function discoverConfig(): Promise<RawConfig> {
+	for (const path of DEFAULT_CONFIG_SEARCH_PATHS) {
+		if (!(await fileExists(path))) {
+			continue;
+		}
+
+		const loaded = path.endsWith('.ts')
+			? await loadRawTsConfig(path)
+			: await loadRawJsonConfig(path);
+
+		if (loaded.ok) {
+			return loaded.data;
+		}
+
+		console.error(`[elefant] Config warning: ${loaded.error.message}`);
+	}
+
+	return {};
+}
+
+function cloneAgentProfile(profile: AgentProfile): AgentProfile {
+	return {
+		...profile,
+		behavior: { ...profile.behavior },
+		limits: { ...profile.limits },
+		tools: {
+			...profile.tools,
+			allowedTools: profile.tools.allowedTools ? [...profile.tools.allowedTools] : undefined,
+			deniedTools: profile.tools.deniedTools ? [...profile.tools.deniedTools] : undefined,
+			perToolApproval: profile.tools.perToolApproval
+				? { ...profile.tools.perToolApproval }
+				: undefined,
+		},
+	};
+}
+
+function cloneAgentProfileOverride(profile: AgentProfileOverride): AgentProfileOverride {
+	return {
+		...profile,
+		behavior: profile.behavior ? { ...profile.behavior } : undefined,
+		limits: profile.limits ? { ...profile.limits } : undefined,
+		tools: profile.tools
+			? {
+					...profile.tools,
+					allowedTools: profile.tools.allowedTools ? [...profile.tools.allowedTools] : undefined,
+					deniedTools: profile.tools.deniedTools ? [...profile.tools.deniedTools] : undefined,
+					perToolApproval: profile.tools.perToolApproval
+						? { ...profile.tools.perToolApproval }
+						: undefined,
+			  }
+			: undefined,
+	};
+}
+
+function collectSourceLeafPaths(
+	value: unknown,
+	source: ConfigSourceLayer,
+	target: Record<string, ConfigSourceLayer>,
+	basePath = '',
+): void {
+	if (value === undefined) {
+		return;
+	}
+
+	if (Array.isArray(value) || !isRecord(value)) {
+		target[basePath] = source;
+		return;
+	}
+
+	for (const [key, nested] of Object.entries(value)) {
+		const path = basePath ? `${basePath}.${key}` : key;
+		collectSourceLeafPaths(nested, source, target, path);
+	}
+}
+
+function applyLayer(
+	target: Record<string, unknown>,
+	layer: Record<string, unknown>,
+	source: ConfigSourceLayer,
+	sourceMap: Record<string, ConfigSourceLayer>,
+	basePath = '',
+): void {
+	for (const [key, value] of Object.entries(layer)) {
+		if (value === undefined) {
+			continue;
+		}
+
+		const path = basePath ? `${basePath}.${key}` : key;
+		const existing = target[key];
+
+		if (isRecord(value) && isRecord(existing)) {
+			applyLayer(existing, value, source, sourceMap, path);
+			continue;
+		}
+
+		target[key] = value;
+		collectSourceLeafPaths(value, source, sourceMap, path);
+	}
+}
+
+function buildDefaultProfile(agentId: string): AgentProfile {
+	const preset = defaultAgentProfiles[agentId as keyof typeof defaultAgentProfiles]
+		?? defaultAgentProfiles.default;
+	const base = cloneAgentProfile(preset);
+
+	if (!defaultAgentProfiles[agentId as keyof typeof defaultAgentProfiles]) {
+		base.id = agentId;
+		base.label = agentId;
+		base.kind = 'custom';
+		base.description = `Default fallback profile for ${agentId}`;
+	}
+
+	return base;
+}
+
+async function writeConfigFile(path: string, config: ElefantConfig): Promise<Result<void, ConfigError>> {
+	try {
+		await mkdir(dirname(path), { recursive: true });
+		await Bun.write(path, `${JSON.stringify(config, null, 2)}\n`);
+		return ok(undefined);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		return err(makeConfigError('TOOL_EXECUTION_FAILED', `Failed to write config: ${message}`));
+	}
+}
+
+export class ConfigManager {
+	private readonly globalConfigPath: string;
+	private readonly projectPathResolver?: ConfigManagerOptions['projectPathResolver'];
+
+	constructor(options: ConfigManagerOptions = {}) {
+		this.globalConfigPath = options.globalConfigPath ?? DEFAULT_GLOBAL_CONFIG_PATH;
+		this.projectPathResolver = options.projectPathResolver;
+	}
+
+	private async resolveProjectConfigPath(projectId: string): Promise<Result<string, ConfigError>> {
+		if (!projectId.trim()) {
+			return err(makeConfigError('FILE_NOT_FOUND', 'Project id is required'));
+		}
+
+		if (!this.projectPathResolver) {
+			return err(
+				makeConfigError(
+					'FILE_NOT_FOUND',
+					'Project path resolver is not configured for ConfigManager',
+				),
+			);
+		}
+
+		const projectPathResult = await this.projectPathResolver(projectId);
+		if (!projectPathResult.ok) {
+			return projectPathResult;
+		}
+
+		return ok(join(projectPathResult.data, '.elefant', 'config.json'));
+	}
+
+	private async getGlobalConfig(): Promise<Result<ElefantConfig | null, ConfigError>> {
+		return loadOptionalConfigFromPath(this.globalConfigPath);
+	}
+
+	private async getProjectConfig(projectId: string): Promise<Result<ElefantConfig | null, ConfigError>> {
+		const pathResult = await this.resolveProjectConfigPath(projectId);
+		if (!pathResult.ok) {
+			if (pathResult.error.code === 'FILE_NOT_FOUND') {
+				return ok(null);
+			}
+			return pathResult;
+		}
+
+		return loadOptionalConfigFromPath(pathResult.data);
+	}
+
+	private resolveFromLayers(
+		agentId: string,
+		globalConfig: ElefantConfig | null,
+		projectConfig: ElefantConfig | null,
+		override?: AgentProfileOverride,
+	): Result<ResolvedAgentConfig, ConfigError> {
+		const effective = buildDefaultProfile(agentId);
+		const sourceMap: Record<string, ConfigSourceLayer> = {};
+
+		collectSourceLeafPaths(effective, 'default', sourceMap);
+
+		if (globalConfig?.agents?.default) {
+			applyLayer(
+				effective as unknown as Record<string, unknown>,
+				cloneAgentProfileOverride(globalConfig.agents.default) as unknown as Record<string, unknown>,
+				'global',
+				sourceMap,
+			);
+		}
+
+		if (globalConfig?.agents?.[agentId]) {
+			applyLayer(
+				effective as unknown as Record<string, unknown>,
+				cloneAgentProfileOverride(globalConfig.agents[agentId]) as unknown as Record<string, unknown>,
+				'global',
+				sourceMap,
+			);
+		}
+
+		if (projectConfig?.agents?.default) {
+			applyLayer(
+				effective as unknown as Record<string, unknown>,
+				cloneAgentProfileOverride(projectConfig.agents.default) as unknown as Record<string, unknown>,
+				'project',
+				sourceMap,
+			);
+		}
+
+		if (projectConfig?.agents?.[agentId]) {
+			applyLayer(
+				effective as unknown as Record<string, unknown>,
+				cloneAgentProfileOverride(projectConfig.agents[agentId]) as unknown as Record<string, unknown>,
+				'project',
+				sourceMap,
+			);
+		}
+
+		if (override) {
+			applyLayer(
+				effective as unknown as Record<string, unknown>,
+				cloneAgentProfileOverride(override) as unknown as Record<string, unknown>,
+				'override',
+				sourceMap,
+			);
+		}
+
+		const parsed = agentProfileSchema.safeParse(effective);
+		if (!parsed.success) {
+			return err(
+				makeConfigError('CONFIG_INVALID', formatZodErrors(parsed.error), parsed.error.issues),
+			);
+		}
+
+		return ok({
+			...parsed.data,
+			_sources: sourceMap,
+		});
+	}
+
+	public async resolve(
+		agentId: string,
+		projectId: string,
+		override?: AgentProfileOverride,
+	): Promise<Result<ResolvedAgentConfig, ConfigError>> {
+		const [globalResult, projectResult] = await Promise.all([
+			this.getGlobalConfig(),
+			this.getProjectConfig(projectId),
+		]);
+
+		if (!globalResult.ok) {
+			return globalResult;
+		}
+
+		if (!projectResult.ok) {
+			return projectResult;
+		}
+
+		return this.resolveFromLayers(agentId, globalResult.data, projectResult.data, override);
+	}
+
+	public async listResolvedProfiles(
+		projectId: string,
+	): Promise<Result<Record<string, ResolvedAgentConfig>, ConfigError>> {
+		const [globalResult, projectResult] = await Promise.all([
+			this.getGlobalConfig(),
+			this.getProjectConfig(projectId),
+		]);
+
+		if (!globalResult.ok) {
+			return globalResult;
+		}
+
+		if (!projectResult.ok) {
+			return projectResult;
+		}
+
+		const ids = new Set<string>(Object.keys(defaultAgentProfiles));
+
+		for (const id of Object.keys(globalResult.data?.agents ?? {})) {
+			ids.add(id);
+		}
+
+		for (const id of Object.keys(projectResult.data?.agents ?? {})) {
+			ids.add(id);
+		}
+
+		const resolved: Record<string, ResolvedAgentConfig> = {};
+		for (const id of ids) {
+			const profileResult = this.resolveFromLayers(id, globalResult.data, projectResult.data);
+			if (!profileResult.ok) {
+				return profileResult;
+			}
+			resolved[id] = profileResult.data;
+		}
+
+		return ok(resolved);
+	}
+
+	public async listProjectProfiles(
+		projectId: string,
+	): Promise<Result<Record<string, AgentProfile>, ConfigError>> {
+		const configResult = await this.getProjectConfig(projectId);
+		if (!configResult.ok) {
+			return configResult;
+		}
+
+		return ok(configResult.data?.agents ?? {});
+	}
+
+	public async upsertProjectProfile(
+		projectId: string,
+		profile: AgentProfile,
+	): Promise<Result<void, ConfigError>> {
+		const pathResult = await this.resolveProjectConfigPath(projectId);
+		if (!pathResult.ok) {
+			return pathResult;
+		}
+
+		const configResult = await loadOptionalConfigFromPath(pathResult.data);
+		if (!configResult.ok) {
+			return configResult;
+		}
+
+		const baseConfig = configResult.data ?? configSchema.parse({});
+		const nextConfig: ElefantConfig = {
+			...baseConfig,
+			agents: {
+				...(baseConfig.agents ?? {}),
+				[profile.id]: profile,
+			},
+		};
+
+		return writeConfigFile(pathResult.data, nextConfig);
+	}
+
+	public async deleteProjectProfile(
+		projectId: string,
+		agentId: string,
+	): Promise<Result<void, ConfigError>> {
+		const pathResult = await this.resolveProjectConfigPath(projectId);
+		if (!pathResult.ok) {
+			return pathResult;
+		}
+
+		const configResult = await loadOptionalConfigFromPath(pathResult.data);
+		if (!configResult.ok) {
+			return configResult;
+		}
+
+		const existingConfig = configResult.data;
+		if (!existingConfig?.agents?.[agentId]) {
+			return err(makeConfigError('FILE_NOT_FOUND', `Profile ${agentId} not found in project config`));
+		}
+
+		const nextAgents = { ...existingConfig.agents };
+		delete nextAgents[agentId];
+
+		const nextConfig: ElefantConfig = {
+			...existingConfig,
+			agents: Object.keys(nextAgents).length > 0 ? nextAgents : undefined,
+		};
+
+		return writeConfigFile(pathResult.data, nextConfig);
+	}
+}
+
+/**
+ * Discover and load config for daemon startup.
+ * Falls back to empty defaults when no config file exists.
+ */
+export async function loadConfig(): Promise<Result<ElefantConfig, ConfigError>> {
+	const discovered = await discoverConfig();
+	const merged = applyEnvOverrides(discovered);
 
 	const parsed = configSchema.safeParse(merged);
 	if (!parsed.success) {
-		return err({
-			code: "CONFIG_INVALID",
-			message: formatZodErrors(parsed.error),
-		});
+		return err(
+			makeConfigError('CONFIG_INVALID', formatZodErrors(parsed.error), parsed.error.issues),
+		);
 	}
 
 	return ok(parsed.data);
