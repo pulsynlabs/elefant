@@ -9,6 +9,7 @@ import { classify, DEFAULT_CLASSIFIER_RULES } from './classifier.ts';
 import type {
 	ClassifierRule,
 	Decision,
+	PermissionDecisionStatus,
 	Risk,
 } from './types.ts';
 
@@ -37,6 +38,25 @@ export interface PermissionCheckContext {
 	agent?: string;
 }
 
+interface PermissionAskedEvent {
+	requestId: string;
+	tool: string;
+	classification: Risk;
+	projectId?: string;
+	sessionId?: string;
+	agent?: string;
+	ts: number;
+}
+
+interface PermissionResolvedEvent {
+	requestId: string;
+	status: PermissionDecisionStatus;
+	source: 'hook' | 'user' | 'default';
+	reason?: string;
+	durationMs: number;
+	ts: number;
+}
+
 export class PermissionGate {
 	private readonly timeoutMs: number;
 	private readonly rules: ClassifierRule[];
@@ -58,7 +78,19 @@ export class PermissionGate {
 		context: PermissionCheckContext = {},
 	): Promise<Result<Decision, ElefantError>> {
 		try {
+			const startedAt = Date.now();
+			const requestId = crypto.randomUUID();
 			let risk = classify(tool, args, this.rules);
+
+			this.publishPermissionAskedEvent(context, {
+				requestId,
+				tool,
+				classification: risk,
+				projectId: context.projectId,
+				sessionId: context.sessionId,
+				agent: context.agent,
+				ts: startedAt,
+			});
 
 			const hookCtx = await this.emitPermissionAskHooks({
 				tool,
@@ -106,8 +138,24 @@ export class PermissionGate {
 					source: 'default',
 				};
 			} else {
-				decision = await this.resolveHighRiskDecision(tool, args, conversationId);
+				decision = await this.resolveHighRiskDecision(
+					tool,
+					args,
+					conversationId,
+					requestId,
+				);
 			}
+
+			const resolvedStatus =
+				hookStatus ?? (decision.approved ? 'allow' : 'deny');
+			this.publishPermissionResolvedEvent(context, {
+				requestId,
+				status: resolvedStatus,
+				source: decision.source,
+				reason: decision.reason,
+				durationMs: Date.now() - startedAt,
+				ts: Date.now(),
+			});
 
 			this.persistDecision(tool, args, conversationId, decision);
 
@@ -135,6 +183,7 @@ export class PermissionGate {
 		tool: string,
 		args: Record<string, unknown>,
 		conversationId: string,
+		requestId: string,
 	): Promise<Decision> {
 		if (!this.ws) {
 			return {
@@ -146,7 +195,7 @@ export class PermissionGate {
 		}
 
 		const payload: ApprovalRequest = {
-			requestId: crypto.randomUUID(),
+			requestId,
 			tool,
 			args,
 			risk: 'high',
@@ -212,6 +261,53 @@ export class PermissionGate {
 		}
 
 		return context;
+	}
+
+	private publishPermissionAskedEvent(
+		context: PermissionCheckContext,
+		event: PermissionAskedEvent,
+	): void {
+		this.publishPermissionEvent(
+			context,
+			'permission.asked',
+			event,
+		);
+	}
+
+	private publishPermissionResolvedEvent(
+		context: PermissionCheckContext,
+		event: PermissionResolvedEvent,
+	): void {
+		this.publishPermissionEvent(
+			context,
+			'permission.resolved',
+			event,
+		);
+	}
+
+	private publishPermissionEvent(
+		context: PermissionCheckContext,
+		eventType: 'permission.asked' | 'permission.resolved',
+		data: PermissionAskedEvent | PermissionResolvedEvent,
+	): void {
+		if (!context.projectId || !context.sessionId) {
+			return;
+		}
+
+		const sse = this.ctx.sse as unknown as {
+			publish?: (
+				projectId: string,
+				sessionId: string,
+				eventType: string,
+				data: unknown,
+			) => void;
+		};
+
+		if (typeof sse.publish !== 'function') {
+			return;
+		}
+
+		sse.publish(context.projectId, context.sessionId, eventType, data);
 	}
 
 	private persistDecision(
