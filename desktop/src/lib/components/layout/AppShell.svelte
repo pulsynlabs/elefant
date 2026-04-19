@@ -86,12 +86,13 @@
 		grid-column: 1 / 2;
 		display: flex;
 		flex-direction: column;
-		overflow: hidden;
+		/* `clip` (vs hidden) preserves mix-blend-mode rendering for the
+		   .glass-md ::after specular sheen layer. */
+		overflow: clip;
 		height: 100vh;
 		position: relative;
 		z-index: var(--z-sticky);
 		transition: width var(--transition-spring);
-		border-right: 1px solid var(--glass-border);
 	}
 
 	.main-area {
@@ -114,13 +115,25 @@
 		position: sticky;
 		top: 0;
 		z-index: var(--z-sticky);
+		/* Reset the border shorthand from .glass-sm so the topbar reads as a
+		   floating glass shelf with only a hairline at its bottom edge. */
+		border-top: none;
+		border-left: none;
+		border-right: none;
+		border-radius: 0;
 	}
 
 	.content {
 		grid-row: 2 / 3;
 		overflow-y: auto;
 		overflow-x: hidden;
-		background-color: var(--color-bg);
+		/* Subtle indigo vignette in the upper-left of the content area —
+		   lets the aurora bleed through visually without painting it. */
+		background: radial-gradient(
+			ellipse at 30% 20%,
+			rgba(64, 73, 225, 0.04) 0%,
+			var(--color-bg) 60%
+		);
 		position: relative;
 	}
 
