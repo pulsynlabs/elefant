@@ -130,8 +130,14 @@ export function mountProjectsCreateRoute(app: Elysia, db: Database): Elysia {
 }
 
 export function mountProjectEventsRoute(app: Elysia, sse: SseManager): Elysia {
-	return app.get('/api/projects/:id/events', ({ params, request }) => {
-		const lastEventId = request.headers.get('Last-Event-ID') ?? undefined;
+	return app.get('/api/projects/:id/events', ({ params, request, query }) => {
+		// Prefer the standard header; fall back to the ?lastEventId query
+		// parameter so browser EventSource clients (which cannot set custom
+		// headers) can still resume from a known cursor.
+		const queryLastEventId =
+			typeof query?.lastEventId === 'string' ? query.lastEventId : undefined;
+		const lastEventId =
+			request.headers.get('Last-Event-ID') ?? queryLastEventId ?? undefined;
 		return sse.subscribe(params.id, lastEventId);
 	});
 }
