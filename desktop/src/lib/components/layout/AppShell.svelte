@@ -95,6 +95,29 @@
 		transition: width var(--transition-spring);
 	}
 
+	/* Sidebar solid-surface override — cancels glass-md blur on the sidebar
+	   panel so the navigation rail reads as a confident, slightly elevated
+	   solid surface rather than a transparent blur rectangle. The glass-md
+	   ::before/::after layers live in global glass.css, so we reach them
+	   with :global(). */
+	:global(.sidebar.glass-md::before) {
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+		background: var(--color-surface);
+		opacity: 1;
+		border: none;
+	}
+
+	:global(.sidebar.glass-md) {
+		box-shadow: none;
+		border: none;
+		border-right: 1px solid var(--color-border);
+	}
+
+	:global(.sidebar.glass-md::after) {
+		display: none;
+	}
+
 	.main-area {
 		grid-row: 1 / 2;
 		grid-column: 2 / 3;
