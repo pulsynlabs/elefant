@@ -327,6 +327,65 @@ export function createConfigRoutes<TApp extends Elysia>(
 		return { ok: true, data: resolved.data };
 	});
 
+	// POST with explicit agentId in URL — creates/upserts with URL param taking precedence
+	app.post('/api/config/agents/:agentId', async ({ params, body, query, set }) => {
+		const queryParse = ProjectQuerySchema.safeParse(query);
+		const projectId = queryParse.success ? queryParse.data.projectId : undefined;
+
+		// URL param takes precedence over body agentId
+		const bodyWithAgentId = {
+			...(body as Record<string, unknown>),
+			id: params.agentId,
+		};
+
+		const profileParse = agentProfileSchema.safeParse(bodyWithAgentId);
+		if (!profileParse.success) {
+			set.status = 400;
+			return {
+				ok: false,
+				error: {
+					code: 'VALIDATION_ERROR',
+					message: profileParse.error.message,
+				},
+			};
+		}
+
+		const projectProfiles = await configManager.listProjectProfiles(projectId);
+		if (!projectProfiles.ok) {
+			set.status = projectProfiles.error.code === 'FILE_NOT_FOUND' ? 404 : 400;
+			return toErrorPayload(projectProfiles.error);
+		}
+
+		if (projectProfiles.data[profileParse.data.id]) {
+			set.status = 409;
+			return {
+				ok: false,
+				error: {
+					code: 'VALIDATION_ERROR',
+					message: `Profile ${profileParse.data.id} already exists in project layer`,
+				},
+			};
+		}
+
+		const writeResult = await configManager.upsertProjectProfile(
+			projectId,
+			profileParse.data,
+		);
+		if (!writeResult.ok) {
+			set.status = writeResult.error.code === 'FILE_NOT_FOUND' ? 404 : 400;
+			return toErrorPayload(writeResult.error);
+		}
+
+		const resolved = await configManager.resolve(profileParse.data.id, projectId);
+		if (!resolved.ok) {
+			set.status = resolved.error.code === 'FILE_NOT_FOUND' ? 404 : 400;
+			return toErrorPayload(resolved.error);
+		}
+
+		set.status = 201;
+		return { ok: true, data: resolved.data };
+	});
+
 	app.put('/api/config/agents/:agentId', async ({ params, body, query, set }) => {
 		const queryParse = ProjectQuerySchema.safeParse(query);
 		const projectId = queryParse.success ? queryParse.data.projectId : undefined;
