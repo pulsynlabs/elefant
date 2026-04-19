@@ -10,6 +10,7 @@ import type { ToolRegistry } from '../tools/registry.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { formatSSEEvent, formatSSEKeepalive } from './sse.ts'
 import type { QuestionSsePayload } from '../tools/question/emitter.ts'
+import type { RunContext } from '../runs/types.ts'
 
 const toolCallSchema = z.object({
 	id: z.string().min(1),
@@ -115,9 +116,10 @@ function createSSEStream(
 	toolRegistry: ToolRegistry,
 	hookRegistry: HookRegistry,
 	request: z.infer<typeof chatRequestSchema>,
-	conversationId: string,
+	runContext: RunContext,
+	abortController: AbortController,
 ): ReadableStream<Uint8Array> {
-	const abortController = new AbortController()
+	const signal = abortController.signal
 	let keepaliveTimer: ReturnType<typeof setInterval> | null = null
 	let cleanedUp = false
 
@@ -160,7 +162,7 @@ function createSSEStream(
 					await emit(hookRegistry, 'stream:start', {
 						provider: request.provider ?? 'default',
 						model: 'unknown',
-						conversationId,
+						conversationId: runContext.runId,
 					})
 
 					const agentLoop = runAgentLoop(providerRouter, toolRegistry, {
@@ -172,14 +174,16 @@ function createSSEStream(
 						temperature: request.temperature,
 						topP: request.topP,
 						timeoutMs: request.timeoutMs,
-						signal: abortController.signal,
 						hookRegistry,
-						conversationId,
+						runContext: {
+							...runContext,
+							signal,
+						},
 						questionEmitter,
 					})
 
 					for await (const streamEvent of agentLoop) {
-						if (abortController.signal.aborted) {
+						if (signal.aborted) {
 							break
 						}
 
@@ -193,7 +197,7 @@ function createSSEStream(
 						}
 					}
 				} catch (error) {
-					if (!abortController.signal.aborted) {
+					if (!signal.aborted) {
 						const message = error instanceof Error ? error.message : 'Unexpected provider stream error'
 						encodeSSEChunk(
 							controller,
@@ -207,7 +211,7 @@ function createSSEStream(
 					await emit(hookRegistry, 'stream:end', {
 						provider: request.provider ?? 'default',
 						model: 'unknown',
-						conversationId,
+						conversationId: runContext.runId,
 					})
 					cleanup(false)
 					closeController()
@@ -252,12 +256,21 @@ export function createConversationRoute<TApp extends Elysia>(
 
 		const sessionId = crypto.randomUUID()
 		const runId = `chat:${sessionId}:${crypto.randomUUID()}`
+		const abortController = new AbortController()
 		const stream = createSSEStream(
 			providerRouter,
 			toolRegistry,
 			hookRegistry,
 			parsed.data,
-			runId,
+			{
+				runId,
+				agentType: 'primary',
+				title: 'chat',
+				sessionId,
+				projectId: 'chat',
+				signal: abortController.signal,
+			},
+			abortController,
 		)
 		return new Response(stream, {
 			headers: SSE_HEADERS,

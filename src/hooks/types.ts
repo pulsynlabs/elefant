@@ -23,6 +23,9 @@ export interface MessageBeforeContext {
 	readonly messages: readonly Message[];
 	readonly provider: string;
 	readonly model: string;
+	readonly runId?: string;
+	readonly sessionId?: string;
+	readonly projectId?: string;
 }
 
 export interface MessageAfterContext {
@@ -30,6 +33,9 @@ export interface MessageAfterContext {
 	readonly provider: string;
 	readonly model: string;
 	readonly durationMs: number;
+	readonly runId?: string;
+	readonly sessionId?: string;
+	readonly projectId?: string;
 }
 
 export interface StreamStartContext {
@@ -90,6 +96,8 @@ export interface HookContextMap {
 		readonly messages: Message[];
 		readonly sessionId: string;
 		readonly conversationId: string;
+		readonly runId?: string;
+		readonly projectId?: string;
 		readonly state: unknown;
 		readonly budgets: {
 			readonly tokens: number;

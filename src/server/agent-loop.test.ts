@@ -32,6 +32,19 @@ async function collectEvents(generator: AsyncGenerator<StreamEvent>): Promise<St
 	return events
 }
 
+function createRunContext(runId: string) {
+	const [scope, suffix] = runId.split(':')
+	return {
+		runId,
+		parentRunId: undefined,
+		agentType: scope ?? 'test',
+		title: suffix ?? 'test-run',
+		sessionId: `session-${runId}`,
+		projectId: 'project-test',
+		signal: new AbortController().signal,
+	}
+}
+
 describe('runAgentLoop', () => {
 	it('terminates on text-only response', async () => {
 		const adapter: ProviderAdapter = {
@@ -50,7 +63,7 @@ describe('runAgentLoop', () => {
 				messages: [{ role: 'user', content: 'hi' }],
 				tools: EMPTY_TOOLS,
 				hookRegistry: new HookRegistry(),
-				conversationId: 'conv-text-only',
+				runContext: createRunContext('conv-text-only'),
 			}),
 		)
 
@@ -97,7 +110,7 @@ describe('runAgentLoop', () => {
 				messages: [{ role: 'user', content: 'run tool' }],
 				tools: EMPTY_TOOLS,
 				hookRegistry: hooks,
-				conversationId: 'conv-tool-result',
+				runContext: createRunContext('conv-tool-result'),
 			}),
 		)
 
@@ -152,7 +165,7 @@ describe('runAgentLoop', () => {
 				tools: EMPTY_TOOLS,
 				maxIterations: 2,
 				hookRegistry: new HookRegistry(),
-				conversationId: 'conv-max-iterations',
+				runContext: createRunContext('conv-max-iterations'),
 			}),
 		)
 
@@ -235,7 +248,7 @@ describe('runAgentLoop', () => {
 				messages: [{ role: 'user', content: 'hooks' }],
 				tools: EMPTY_TOOLS,
 				hookRegistry: hooks,
-				conversationId: 'conv-hooks',
+				runContext: createRunContext('conv-hooks'),
 			}),
 		)
 
@@ -298,7 +311,7 @@ describe('runAgentLoop', () => {
 					tools: EMPTY_TOOLS,
 					hookRegistry: hooks,
 					maxIterations: 1,
-					conversationId: 'conv-a',
+					runContext: createRunContext('conv-a'),
 				}),
 			),
 			collectEvents(
@@ -307,7 +320,7 @@ describe('runAgentLoop', () => {
 					tools: EMPTY_TOOLS,
 					hookRegistry: hooks,
 					maxIterations: 1,
-					conversationId: 'conv-b',
+					runContext: createRunContext('conv-b'),
 				}),
 			),
 		])
@@ -371,7 +384,7 @@ describe('runAgentLoop', () => {
 					tools: EMPTY_TOOLS,
 					hookRegistry: new HookRegistry(),
 					maxIterations: 1,
-					conversationId: 'conv-question-a',
+					runContext: createRunContext('conv-question-a'),
 					questionEmitter: (payload) => {
 						emittedA.push(payload.conversationId ?? 'missing')
 					},
@@ -383,7 +396,7 @@ describe('runAgentLoop', () => {
 					tools: EMPTY_TOOLS,
 					hookRegistry: new HookRegistry(),
 					maxIterations: 1,
-					conversationId: 'conv-question-b',
+					runContext: createRunContext('conv-question-b'),
 					questionEmitter: (payload) => {
 						emittedB.push(payload.conversationId ?? 'missing')
 					},
@@ -444,7 +457,7 @@ describe('runAgentLoop', () => {
 				messages: initialMessages,
 				tools: EMPTY_TOOLS,
 				hookRegistry: hooks,
-				conversationId: 'conv-transform-ephemeral',
+				runContext: createRunContext('conv-transform-ephemeral'),
 			}),
 		)
 
@@ -488,7 +501,7 @@ describe('runAgentLoop', () => {
 				messages: [{ role: 'user', content: 'hello' }],
 				tools: EMPTY_TOOLS,
 				hookRegistry: hooks,
-				conversationId: 'conv-transform-pipeline',
+				runContext: createRunContext('conv-transform-pipeline'),
 			}),
 		)
 
@@ -568,7 +581,7 @@ describe('runAgentLoop', () => {
 				messages: inputMessages,
 				tools: EMPTY_TOOLS,
 				hookRegistry: hooks,
-				conversationId: 'conv-transform-integration',
+				runContext: createRunContext('conv-transform-integration'),
 			}),
 		)
 

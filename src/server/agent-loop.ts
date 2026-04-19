@@ -3,6 +3,7 @@ import type { CompactionManager } from '../compaction/manager.ts'
 import type { PermissionGate } from '../permissions/gate.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { StreamEvent } from '../providers/types.ts'
+import type { RunContext } from '../runs/types.ts'
 import { createQuestionEmitter, type QuestionEmitter } from '../tools/question/emitter.ts'
 import type { ElefantError } from '../types/errors.ts'
 import { type Message } from '../types/providers.ts'
@@ -16,7 +17,6 @@ export interface ToolExecutor {
 export interface AgentLoopOptions {
 	messages: Message[]
 	tools: ToolDefinition[]
-	sessionId?: string
 	state?: unknown
 	provider?: string
 	maxIterations?: number
@@ -25,11 +25,10 @@ export interface AgentLoopOptions {
 	temperature?: number
 	topP?: number
 	timeoutMs?: number
-	signal?: AbortSignal
 	hookRegistry: HookRegistry
 	permissions?: PermissionGate
 	compaction?: CompactionManager
-	conversationId: string
+	runContext: RunContext
 	questionEmitter?: QuestionEmitter
 }
 
@@ -55,7 +54,7 @@ function cloneMessages(messages: Message[]): Message[] {
 
 function toToolArguments(
 	args: unknown,
-	conversationId: string,
+	runId: string,
 	questionEmitter: QuestionEmitter,
 ): Record<string, unknown> {
 	const baseArgs =
@@ -65,7 +64,7 @@ function toToolArguments(
 
 	return {
 		...baseArgs,
-		conversationId,
+		conversationId: runId,
 		_questionEmitter: questionEmitter,
 	}
 }
@@ -79,10 +78,10 @@ export async function* runAgentLoop(
 	let iterations = 0
 	let tokenCount = estimateTokenCount(messages)
 	const contextWindow = options.contextWindowTokens ?? 200_000
-	const sessionId = options.sessionId ?? options.conversationId
+	const sessionId = options.runContext.sessionId
 	const maxIterations = options.maxIterations ?? 50
 	const runQuestionEmitter = createQuestionEmitter(
-		options.conversationId,
+		options.runContext.runId,
 		options.questionEmitter ?? (() => undefined),
 	)
 
@@ -99,7 +98,7 @@ export async function* runAgentLoop(
 				tokenCount,
 				contextWindow,
 				sessionId,
-				conversationId: options.conversationId,
+				conversationId: options.runContext.runId,
 			})
 			messages = compacted.messages
 			tokenCount = compacted.tokenCountAfter
@@ -109,6 +108,9 @@ export async function* runAgentLoop(
 			messages,
 			provider: options.provider ?? 'default',
 			model: 'unknown',
+			runId: options.runContext.runId,
+			sessionId: options.runContext.sessionId,
+			projectId: options.runContext.projectId,
 		})
 
 		const adapterResult = router.getAdapter(options.provider)
@@ -126,7 +128,9 @@ export async function* runAgentLoop(
 		const transformedContext = await emit(options.hookRegistry, 'system:transform', {
 			messages: outgoingMessagesBase,
 			sessionId,
-			conversationId: options.conversationId,
+			conversationId: options.runContext.runId,
+			runId: options.runContext.runId,
+			projectId: options.runContext.projectId,
 			state: options.state ?? null,
 			budgets: {
 				tokens: Math.max(0, contextWindow - tokenCount),
@@ -138,7 +142,7 @@ export async function* runAgentLoop(
 				: outgoingMessagesBase
 
 		for await (const event of adapterResult.data.sendMessage(outgoingMessages, options.tools, {
-			signal: options.signal,
+			signal: options.runContext.signal,
 			provider: options.provider,
 			maxTokens: options.maxTokens,
 			temperature: options.temperature,
@@ -177,6 +181,9 @@ export async function* runAgentLoop(
 			provider: options.provider ?? 'default',
 			model: 'unknown',
 			durationMs: Date.now() - messageStart,
+			runId: options.runContext.runId,
+			sessionId: options.runContext.sessionId,
+			projectId: options.runContext.projectId,
 		})
 
 		if (pendingToolCalls.length === 0 || finishReason !== 'tool_calls') {
@@ -198,7 +205,12 @@ export async function* runAgentLoop(
 				const permResult = await options.permissions.check(
 					toolCall.name,
 					toolCall.arguments as Record<string, unknown>,
-					options.conversationId,
+					options.runContext.runId,
+					{
+						sessionId: options.runContext.sessionId,
+						projectId: options.runContext.projectId,
+						agent: options.runContext.agentType,
+					},
 				)
 
 				if (!permResult.ok || !permResult.data.approved) {
@@ -227,7 +239,7 @@ export async function* runAgentLoop(
 
 			const executeResult = await registry.execute(
 				toolCall.name,
-				toToolArguments(toolCall.arguments, options.conversationId, runQuestionEmitter),
+				toToolArguments(toolCall.arguments, options.runContext.runId, runQuestionEmitter),
 			)
 			const toolResult = createToolResult(
 				toolCall.id,
