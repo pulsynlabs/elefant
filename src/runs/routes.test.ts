@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 
 import { Database } from '../db/database.ts'
 import { HookRegistry } from '../hooks/index.ts'
+import type { ConfigManager } from '../config/loader.js'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { ProviderAdapter, SendMessageOptions, StreamEvent } from '../providers/types.ts'
 import { ToolRegistry } from '../tools/registry.ts'
@@ -74,6 +75,71 @@ function createJsonRequest(url: string, method: string, body?: unknown): Request
 	})
 }
 
+function createConfigManager(): ConfigManager {
+	return {
+		resolve: async () =>
+			({
+				ok: true,
+				data: {
+					name: 'executor',
+					provider: 'mock-provider',
+					model: 'mock-model',
+					timeout: null,
+					maxTokens: null,
+					temperature: null,
+					maxTaskDepth: null,
+					maxChildren: null,
+					permission: null,
+					modes: null,
+					context: null,
+				},
+			}) as never,
+	} as unknown as ConfigManager
+}
+
+function insertRun(
+	database: Database,
+	input: {
+		runId: string
+		sessionId: string
+		projectId: string
+		parentRunId?: string | null
+		title: string
+		createdAt: string
+	},
+): void {
+	database.db.run(
+		`INSERT INTO agent_runs (
+			run_id,
+			session_id,
+			project_id,
+			parent_run_id,
+			agent_type,
+			title,
+			status,
+			created_at,
+			started_at,
+			ended_at,
+			context_mode,
+			error_message
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		[
+			input.runId,
+			input.sessionId,
+			input.projectId,
+			input.parentRunId ?? null,
+			'executor',
+			input.title,
+			'done',
+			input.createdAt,
+			input.createdAt,
+			input.createdAt,
+			'none',
+			null,
+		],
+	)
+}
+
 describe('mountAgentRunRoutes', () => {
 	it('supports spawn, list, and detail endpoints', async () => {
 		const database = new Database(createTempDbPath())
@@ -97,6 +163,7 @@ describe('mountAgentRunRoutes', () => {
 			hookRegistry: new HookRegistry(),
 			runRegistry: new RunRegistry(),
 			sseManager: new SseManager(database),
+			configManager: createConfigManager(),
 		})
 
 		const spawnResponse = await app.handle(
@@ -170,6 +237,7 @@ describe('mountAgentRunRoutes', () => {
 			hookRegistry: new HookRegistry(),
 			runRegistry,
 			sseManager: new SseManager(database),
+			configManager: createConfigManager(),
 		})
 
 		const spawnResponse = await app.handle(
@@ -218,6 +286,223 @@ describe('mountAgentRunRoutes', () => {
 		}
 		expect(detailPayload.ok).toBe(true)
 		expect(detailPayload.data.run.status).toBe('cancelled')
+
+		database.close()
+	})
+
+	it('returns direct children with pagination and session isolation', async () => {
+		const database = new Database(createTempDbPath())
+		const projectId = crypto.randomUUID()
+		const sessionId = crypto.randomUUID()
+		const otherSessionId = crypto.randomUUID()
+
+		database.db.run(
+			'INSERT INTO projects (id, name, path, description) VALUES (?, ?, ?, ?)',
+			[projectId, 'Children project', '/tmp/children-project', null],
+		)
+		database.db.run(
+			'INSERT INTO sessions (id, project_id, workflow_id, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+			[sessionId, projectId, null, 'execute', 'running', new Date().toISOString(), null],
+		)
+		database.db.run(
+			'INSERT INTO sessions (id, project_id, workflow_id, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+			[otherSessionId, projectId, null, 'execute', 'running', new Date().toISOString(), null],
+		)
+
+		const parentRunId = crypto.randomUUID()
+		const childOne = crypto.randomUUID()
+		const childTwo = crypto.randomUUID()
+		const grandChild = crypto.randomUUID()
+		const crossSessionChild = crypto.randomUUID()
+
+		insertRun(database, {
+			runId: parentRunId,
+			sessionId,
+			projectId,
+			title: 'Parent',
+			createdAt: '2026-04-19T10:00:00.000Z',
+		})
+		insertRun(database, {
+			runId: childOne,
+			sessionId,
+			projectId,
+			parentRunId,
+			title: 'Child one',
+			createdAt: '2026-04-19T10:01:00.000Z',
+		})
+		insertRun(database, {
+			runId: childTwo,
+			sessionId,
+			projectId,
+			parentRunId,
+			title: 'Child two',
+			createdAt: '2026-04-19T10:02:00.000Z',
+		})
+		insertRun(database, {
+			runId: grandChild,
+			sessionId,
+			projectId,
+			parentRunId: childOne,
+			title: 'Grand child',
+			createdAt: '2026-04-19T10:03:00.000Z',
+		})
+		insertRun(database, {
+			runId: crossSessionChild,
+			sessionId: otherSessionId,
+			projectId,
+			parentRunId,
+			title: 'Cross session child',
+			createdAt: '2026-04-19T10:04:00.000Z',
+		})
+
+		const app = new Elysia()
+		mountAgentRunRoutes(app, {
+			db: database,
+			providerRouter: createRouter(),
+			toolRegistry: new ToolRegistry(new HookRegistry()),
+			hookRegistry: new HookRegistry(),
+			runRegistry: new RunRegistry(),
+			sseManager: new SseManager(database),
+			configManager: createConfigManager(),
+		})
+
+		const response = await app.handle(
+			new Request(
+				`http://localhost/api/projects/${projectId}/sessions/${sessionId}/runs/${parentRunId}/children`,
+			),
+		)
+		expect(response.status).toBe(200)
+		const payload = (await response.json()) as {
+			ok: boolean
+			data: Array<{ run_id: string }>
+		}
+		expect(payload.ok).toBe(true)
+		expect(payload.data.map((run) => run.run_id)).toEqual([childOne, childTwo])
+
+		const paginatedResponse = await app.handle(
+			new Request(
+				`http://localhost/api/projects/${projectId}/sessions/${sessionId}/runs/${parentRunId}/children?limit=1&offset=1`,
+			),
+		)
+		expect(paginatedResponse.status).toBe(200)
+		const paginatedPayload = (await paginatedResponse.json()) as {
+			ok: boolean
+			data: Array<{ run_id: string }>
+		}
+		expect(paginatedPayload.ok).toBe(true)
+		expect(paginatedPayload.data.map((run) => run.run_id)).toEqual([childTwo])
+
+		database.close()
+	})
+
+	it('returns 404 when session is not found for project', async () => {
+		const database = new Database(createTempDbPath())
+		const projectId = crypto.randomUUID()
+		const otherProjectId = crypto.randomUUID()
+		const sessionId = crypto.randomUUID()
+		const runId = crypto.randomUUID()
+
+		database.db.run(
+			'INSERT INTO projects (id, name, path, description) VALUES (?, ?, ?, ?)',
+			[projectId, 'Main project', '/tmp/main-project', null],
+		)
+		database.db.run(
+			'INSERT INTO projects (id, name, path, description) VALUES (?, ?, ?, ?)',
+			[otherProjectId, 'Other project', '/tmp/other-project', null],
+		)
+		database.db.run(
+			'INSERT INTO sessions (id, project_id, workflow_id, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+			[sessionId, projectId, null, 'execute', 'running', new Date().toISOString(), null],
+		)
+
+		insertRun(database, {
+			runId,
+			sessionId,
+			projectId,
+			title: 'Parent',
+			createdAt: '2026-04-19T10:00:00.000Z',
+		})
+
+		const app = new Elysia()
+		mountAgentRunRoutes(app, {
+			db: database,
+			providerRouter: createRouter(),
+			toolRegistry: new ToolRegistry(new HookRegistry()),
+			hookRegistry: new HookRegistry(),
+			runRegistry: new RunRegistry(),
+			sseManager: new SseManager(database),
+			configManager: createConfigManager(),
+		})
+
+		const response = await app.handle(
+			new Request(
+				`http://localhost/api/projects/${otherProjectId}/sessions/${sessionId}/runs/${runId}/children`,
+			),
+		)
+
+		expect(response.status).toBe(404)
+		const payload = (await response.json()) as {
+			ok: boolean
+			error: { code: string; message: string }
+		}
+		expect(payload.ok).toBe(false)
+		expect(payload.error.code).toBe('FILE_NOT_FOUND')
+
+		database.close()
+	})
+
+	it('returns 404 when run is not found in session', async () => {
+		const database = new Database(createTempDbPath())
+		const projectId = crypto.randomUUID()
+		const sessionId = crypto.randomUUID()
+		const otherSessionId = crypto.randomUUID()
+		const runId = crypto.randomUUID()
+
+		database.db.run(
+			'INSERT INTO projects (id, name, path, description) VALUES (?, ?, ?, ?)',
+			[projectId, 'Runs project', '/tmp/runs-project', null],
+		)
+		database.db.run(
+			'INSERT INTO sessions (id, project_id, workflow_id, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+			[sessionId, projectId, null, 'execute', 'running', new Date().toISOString(), null],
+		)
+		database.db.run(
+			'INSERT INTO sessions (id, project_id, workflow_id, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+			[otherSessionId, projectId, null, 'execute', 'running', new Date().toISOString(), null],
+		)
+
+		insertRun(database, {
+			runId,
+			sessionId: otherSessionId,
+			projectId,
+			title: 'Other session run',
+			createdAt: '2026-04-19T10:00:00.000Z',
+		})
+
+		const app = new Elysia()
+		mountAgentRunRoutes(app, {
+			db: database,
+			providerRouter: createRouter(),
+			toolRegistry: new ToolRegistry(new HookRegistry()),
+			hookRegistry: new HookRegistry(),
+			runRegistry: new RunRegistry(),
+			sseManager: new SseManager(database),
+			configManager: createConfigManager(),
+		})
+
+		const response = await app.handle(
+			new Request(
+				`http://localhost/api/projects/${projectId}/sessions/${sessionId}/runs/${runId}/children`,
+			),
+		)
+
+		expect(response.status).toBe(404)
+		const payload = (await response.json()) as {
+			ok: boolean
+			error: { code: string; message: string }
+		}
+		expect(payload.ok).toBe(false)
+		expect(payload.error.code).toBe('FILE_NOT_FOUND')
 
 		database.close()
 	})
