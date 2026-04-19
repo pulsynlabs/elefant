@@ -2,27 +2,29 @@
 	// ChildRunView — full-pane view for a child agent run.
 	//
 	// Layout (grid, three rows):
-	//   • header: breadcrumb back to parent
+	//   • header: breadcrumb back to parent + sibling prev/next controls
 	//   • body:   the child's transcript (via existing AgentRunTranscript)
 	//   • footer: a disabled composer that visually matches the real one
 	//             but cannot accept input — users must return to the parent
 	//             session to continue the conversation.
 	//
-	// This wave (6.1) uses an `onBack` callback stub. Wave 6.2 will replace
-	// the stub with a direct `navigationStore.backToParent()` call once the
-	// nav store ships.
+	// Navigation is wired directly to navigationStore (openChildRun /
+	// backToParent). Esc closes the child run and returns to the parent.
 
 	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
+	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import type { AgentRun } from '$lib/types/agent-run.js';
 	import AgentRunTranscript from './AgentRunTranscript.svelte';
-	import { computeChildRunViewState } from './child-run-view-state.js';
+	import {
+		computeChildRunViewState,
+		computeSiblingNavState,
+	} from './child-run-view-state.js';
 
 	type Props = {
 		runId: string;
-		onBack?: () => void;
 	};
 
-	let { runId, onBack }: Props = $props();
+	let { runId }: Props = $props();
 
 	const child = $derived<AgentRun | null>(
 		agentRunsStore.runs[runId] ?? null,
@@ -34,9 +36,52 @@
 
 	const viewState = $derived(computeChildRunViewState(child, parent));
 
+	const siblings = $derived<AgentRun[]>(
+		child?.parentRunId
+			? agentRunsStore.childRunsForRun(child.parentRunId)
+			: [],
+	);
+
+	const siblingNav = $derived(computeSiblingNavState(child, siblings));
+
 	function handleBack(): void {
-		onBack?.();
+		navigationStore.backToParent();
 	}
+
+	function handlePrev(): void {
+		if (siblingNav.prev) {
+			// Replace the top of the child-run stack: backToParent then
+			// openChildRun keeps the stack shallow instead of growing it
+			// with every sibling switch.
+			navigationStore.backToParent();
+			navigationStore.openChildRun(siblingNav.prev.runId);
+		}
+	}
+
+	function handleNext(): void {
+		if (siblingNav.next) {
+			navigationStore.backToParent();
+			navigationStore.openChildRun(siblingNav.next.runId);
+		}
+	}
+
+	// Esc navigates back to the parent when the child-run view is active.
+	$effect(() => {
+		if (navigationStore.current !== 'child-run') return;
+
+		function onKeydown(event: KeyboardEvent): void {
+			if (event.key !== 'Escape') return;
+			// Ignore when the user is mid-IME composition or inside a
+			// modal/input with its own Escape handling (the disabled
+			// textarea will not receive focus, but guard anyway).
+			if (event.defaultPrevented) return;
+			event.preventDefault();
+			navigationStore.backToParent();
+		}
+
+		window.addEventListener('keydown', onKeydown);
+		return () => window.removeEventListener('keydown', onKeydown);
+	});
 </script>
 
 {#if viewState.status === 'loading'}
@@ -68,6 +113,40 @@
 			<span class="breadcrumb-current" aria-current="page">
 				{viewState.childTitle}
 			</span>
+
+			{#if siblingNav.total > 1}
+				<div
+					class="sibling-nav"
+					role="group"
+					aria-label="Sibling run navigation"
+				>
+					<button
+						type="button"
+						class="sibling-button"
+						onclick={handlePrev}
+						disabled={!siblingNav.hasPrev}
+						aria-disabled={!siblingNav.hasPrev}
+						aria-label="Previous sibling run"
+						title="Previous sibling run"
+					>
+						<span aria-hidden="true">‹</span>
+					</button>
+					<span class="sibling-counter" aria-live="polite">
+						{siblingNav.index + 1} / {siblingNav.total}
+					</span>
+					<button
+						type="button"
+						class="sibling-button"
+						onclick={handleNext}
+						disabled={!siblingNav.hasNext}
+						aria-disabled={!siblingNav.hasNext}
+						aria-label="Next sibling run"
+						title="Next sibling run"
+					>
+						<span aria-hidden="true">›</span>
+					</button>
+				</div>
+			{/if}
 		</header>
 
 		<div class="transcript-scroll">
@@ -191,6 +270,61 @@
 		min-width: 0;
 	}
 
+	.sibling-nav {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		margin-left: auto;
+		flex-shrink: 0;
+	}
+
+	.sibling-button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 24px;
+		height: 24px;
+		background: none;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--font-size-md);
+		line-height: 1;
+		padding: 0;
+		transition:
+			color var(--transition-fast),
+			border-color var(--transition-fast),
+			background-color var(--transition-fast);
+	}
+
+	.sibling-button:hover:not(:disabled) {
+		color: var(--color-text-primary);
+		background-color: var(--color-surface-hover);
+		border-color: var(--color-border-strong, var(--color-border));
+	}
+
+	.sibling-button:focus-visible {
+		outline: none;
+		border-color: var(--color-primary);
+		box-shadow: var(--glow-focus);
+	}
+
+	.sibling-button:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.sibling-counter {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-xs);
+		font-variant-numeric: tabular-nums;
+		padding: 0 var(--space-1);
+		min-width: 3ch;
+		text-align: center;
+	}
+
 	.transcript-scroll {
 		overflow-y: auto;
 		min-height: 0;
@@ -284,6 +418,10 @@
 
 		.breadcrumb-back {
 			max-width: 50%;
+		}
+
+		.sibling-counter {
+			display: none;
 		}
 	}
 </style>

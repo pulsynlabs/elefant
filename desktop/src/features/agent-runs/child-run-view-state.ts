@@ -28,8 +28,28 @@ export interface ChildRunViewState {
 	composerPlaceholder: string;
 }
 
+/**
+ * Sibling navigation state. Derived from the list of siblings under the
+ * same parent run (`childRunsForRun(parentRunId)` in the store) plus the
+ * current child run's id.
+ */
+export interface SiblingNavState {
+	/** Previous sibling (older createdAt) or null when at the start. */
+	prev: AgentRun | null;
+	/** Next sibling (newer createdAt) or null when at the end. */
+	next: AgentRun | null;
+	/** Zero-based index of the current run within the sibling list. */
+	index: number;
+	/** Total siblings (including the current run). */
+	total: number;
+	/** `true` when prev is available. Convenience for aria-disabled plumbing. */
+	hasPrev: boolean;
+	/** `true` when next is available. Convenience for aria-disabled plumbing. */
+	hasNext: boolean;
+}
+
 const FALLBACK_TITLE = 'Untitled run';
-const COMPOSER_PLACEHOLDER = 'Back to parent to continue';
+const COMPOSER_PLACEHOLDER = 'Back to parent to continue the conversation';
 
 /**
  * Derive the full view state from the (optional) child run row and the
@@ -72,5 +92,66 @@ export function computeChildRunViewState(
 			? `Back to parent run: ${parentTitle}`
 			: 'Back to parent',
 		composerPlaceholder: COMPOSER_PLACEHOLDER,
+	};
+}
+
+/**
+ * Compute the previous/next sibling navigation state for the child run.
+ *
+ * `siblings` should be the list returned by
+ * `agentRunsStore.childRunsForRun(child.parentRunId)` — already sorted
+ * chronologically by `createdAt ASC`. The helper defensively re-sorts
+ * so callers can pass a raw list without worrying about ordering.
+ *
+ * Returns a neutral "no siblings, no navigation" state when:
+ *   • the child is null/undefined (not yet hydrated),
+ *   • the siblings list is empty,
+ *   • the current run is not present in the siblings list
+ *     (which can happen briefly during hydration).
+ */
+export function computeSiblingNavState(
+	child: AgentRun | null | undefined,
+	siblings: AgentRun[],
+): SiblingNavState {
+	if (!child || siblings.length === 0) {
+		return {
+			prev: null,
+			next: null,
+			index: -1,
+			total: siblings.length,
+			hasPrev: false,
+			hasNext: false,
+		};
+	}
+
+	// Defensive chronological sort — mirrors the store selector contract.
+	// `createdAt` is an ISO-8601 string so lexical comparison is
+	// equivalent to chronological ordering.
+	const sorted = [...siblings].sort((a, b) =>
+		a.createdAt.localeCompare(b.createdAt),
+	);
+	const index = sorted.findIndex((run) => run.runId === child.runId);
+
+	if (index === -1) {
+		return {
+			prev: null,
+			next: null,
+			index: -1,
+			total: sorted.length,
+			hasPrev: false,
+			hasNext: false,
+		};
+	}
+
+	const prev = index > 0 ? sorted[index - 1] : null;
+	const next = index < sorted.length - 1 ? sorted[index + 1] : null;
+
+	return {
+		prev,
+		next,
+		index,
+		total: sorted.length,
+		hasPrev: prev !== null,
+		hasNext: next !== null,
 	};
 }

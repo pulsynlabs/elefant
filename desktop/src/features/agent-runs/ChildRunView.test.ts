@@ -23,6 +23,7 @@ import { describe, expect, it } from 'bun:test';
 import type { AgentRun } from '$lib/types/agent-run.js';
 import {
 	computeChildRunViewState,
+	computeSiblingNavState,
 	type ChildRunViewState,
 } from './child-run-view-state.js';
 
@@ -43,17 +44,6 @@ const makeRun = (overrides: Partial<AgentRun> = {}): AgentRun => ({
 	errorMessage: null,
 	...overrides,
 });
-
-/**
- * Mirrors the click guard inside ChildRunView.svelte's handleBack.
- * Keeps the test honest about what the component actually does when
- * the breadcrumb back button is clicked.
- */
-function simulateBackClick(onBack?: () => void): boolean {
-	if (!onBack) return false;
-	onBack();
-	return true;
-}
 
 // ─── Suite ───────────────────────────────────────────────────────────────────
 
@@ -175,35 +165,134 @@ describe('ChildRunView — title guards', () => {
 	});
 });
 
-describe('ChildRunView — onBack stub wiring', () => {
-	it('fires the onBack callback when provided', () => {
-		let fired = 0;
-		const clicked = simulateBackClick(() => {
-			fired += 1;
+describe('ChildRunView — breadcrumb parent title', () => {
+	// The breadcrumb always renders the child's *direct* parent title.
+	// Deeper nesting is surfaced by the sidebar's active-child-path
+	// (MH3, Wave 7); ChildRunView itself only needs the immediate parent
+	// since `backToParent()` pops one level at a time — a chain of
+	// backs walks the user up through each breadcrumb in turn.
+	it('surfaces the direct parent title regardless of chain depth', () => {
+		const grandparent = makeRun({
+			runId: 'run-grand',
+			parentRunId: null,
+			title: 'Root session',
 		});
-		expect(clicked).toBe(true);
-		expect(fired).toBe(1);
+		const parent = makeRun({
+			runId: 'run-parent',
+			parentRunId: grandparent.runId,
+			title: 'Mid-level delegator',
+		});
+		const child = makeRun({
+			runId: 'run-child',
+			parentRunId: parent.runId,
+			title: 'Leaf task',
+		});
+		const state = computeChildRunViewState(child, parent);
+		expect(state.parentTitle).toBe('Mid-level delegator');
+		expect(state.childTitle).toBe('Leaf task');
 	});
 
-	it('is a safe no-op when onBack is undefined', () => {
-		const clicked = simulateBackClick(undefined);
-		expect(clicked).toBe(false);
+	it('composer placeholder guides user back to the parent session', () => {
+		const state = computeChildRunViewState(
+			makeRun(),
+			makeRun({ runId: 'run-parent', title: 'Main' }),
+		);
+		expect(state.composerPlaceholder).toBe(
+			'Back to parent to continue the conversation',
+		);
+	});
+});
+
+describe('ChildRunView — sibling navigation', () => {
+	// Siblings are the list of runs that share a parentRunId with the
+	// current child. They are sorted chronologically by createdAt so the
+	// prev/next buttons walk the user through the delegation timeline in
+	// the order the parent agent spawned them.
+
+	const mkSibling = (id: string, createdAt: string): AgentRun =>
+		makeRun({ runId: id, createdAt, parentRunId: 'run-parent' });
+
+	it('returns neutral state when the child is not yet hydrated', () => {
+		const nav = computeSiblingNavState(null, []);
+		expect(nav.prev).toBeNull();
+		expect(nav.next).toBeNull();
+		expect(nav.index).toBe(-1);
+		expect(nav.total).toBe(0);
+		expect(nav.hasPrev).toBe(false);
+		expect(nav.hasNext).toBe(false);
 	});
 
-	it('fires regardless of child run status', () => {
-		// Users can step back from any state — running, done, or errored.
-		const calls: number[] = [];
-		const onBack = () => calls.push(1);
-		for (const status of ['running', 'done', 'error', 'cancelled'] as const) {
-			// Verify the state is ready (so the breadcrumb renders), then click.
-			const state = computeChildRunViewState(
-				makeRun({ status }),
-				makeRun({ runId: 'run-parent', title: 'Main' }),
-			);
-			expect(state.status).toBe('ready');
-			simulateBackClick(onBack);
-		}
-		expect(calls.length).toBe(4);
+	it('returns neutral state when there are no siblings', () => {
+		const child = mkSibling('run-child', '2026-04-19T00:00:00.000Z');
+		const nav = computeSiblingNavState(child, []);
+		expect(nav.hasPrev).toBe(false);
+		expect(nav.hasNext).toBe(false);
+		expect(nav.total).toBe(0);
+	});
+
+	it('handles the only-child case — single sibling, no prev/next', () => {
+		const child = mkSibling('run-child', '2026-04-19T00:00:00.000Z');
+		const nav = computeSiblingNavState(child, [child]);
+		expect(nav.index).toBe(0);
+		expect(nav.total).toBe(1);
+		expect(nav.hasPrev).toBe(false);
+		expect(nav.hasNext).toBe(false);
+	});
+
+	it('prev is disabled when child is the first sibling', () => {
+		const a = mkSibling('run-a', '2026-04-19T00:00:00.000Z');
+		const b = mkSibling('run-b', '2026-04-19T00:00:01.000Z');
+		const c = mkSibling('run-c', '2026-04-19T00:00:02.000Z');
+		const nav = computeSiblingNavState(a, [a, b, c]);
+		expect(nav.index).toBe(0);
+		expect(nav.hasPrev).toBe(false);
+		expect(nav.hasNext).toBe(true);
+		expect(nav.next?.runId).toBe('run-b');
+	});
+
+	it('next is disabled when child is the last sibling', () => {
+		const a = mkSibling('run-a', '2026-04-19T00:00:00.000Z');
+		const b = mkSibling('run-b', '2026-04-19T00:00:01.000Z');
+		const c = mkSibling('run-c', '2026-04-19T00:00:02.000Z');
+		const nav = computeSiblingNavState(c, [a, b, c]);
+		expect(nav.index).toBe(2);
+		expect(nav.hasPrev).toBe(true);
+		expect(nav.hasNext).toBe(false);
+		expect(nav.prev?.runId).toBe('run-b');
+	});
+
+	it('both prev and next are enabled for middle siblings', () => {
+		const a = mkSibling('run-a', '2026-04-19T00:00:00.000Z');
+		const b = mkSibling('run-b', '2026-04-19T00:00:01.000Z');
+		const c = mkSibling('run-c', '2026-04-19T00:00:02.000Z');
+		const nav = computeSiblingNavState(b, [a, b, c]);
+		expect(nav.index).toBe(1);
+		expect(nav.hasPrev).toBe(true);
+		expect(nav.hasNext).toBe(true);
+		expect(nav.prev?.runId).toBe('run-a');
+		expect(nav.next?.runId).toBe('run-c');
+	});
+
+	it('siblings are walked in chronological order, not input order', () => {
+		// Pass siblings deliberately out of order; helper must re-sort
+		// so callers don't need to care about upstream ordering.
+		const early = mkSibling('run-early', '2026-04-19T00:00:00.000Z');
+		const mid = mkSibling('run-mid', '2026-04-19T00:00:01.000Z');
+		const late = mkSibling('run-late', '2026-04-19T00:00:02.000Z');
+		const nav = computeSiblingNavState(mid, [late, early, mid]);
+		expect(nav.prev?.runId).toBe('run-early');
+		expect(nav.next?.runId).toBe('run-late');
+	});
+
+	it('returns neutral state when the child is missing from its sibling list', () => {
+		// Brief race during hydration: the parent's children list has
+		// been fetched but the current child row hasn't landed yet.
+		const a = mkSibling('run-a', '2026-04-19T00:00:00.000Z');
+		const missing = mkSibling('run-missing', '2026-04-19T00:00:01.000Z');
+		const nav = computeSiblingNavState(missing, [a]);
+		expect(nav.index).toBe(-1);
+		expect(nav.hasPrev).toBe(false);
+		expect(nav.hasNext).toBe(false);
 	});
 });
 

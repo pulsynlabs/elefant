@@ -221,7 +221,7 @@
 	{:else if currentView === "worktrees"}
 		<WorktreeListPanel />
 	{:else if currentView === "child-run" && navigationStore.currentChildRunId !== null}
-		<ChildRunView runId={navigationStore.currentChildRunId} onBack={navigationStore.backToParent} />
+		<ChildRunView runId={navigationStore.currentChildRunId} />
 	{:else}
 		<div class="unknown-view">
 			Unknown view: {currentView}
