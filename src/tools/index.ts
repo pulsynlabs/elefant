@@ -34,6 +34,6 @@ export { skillTool, type SkillParams } from './skill/index.js';
 export { lspTool, type LspParams, type LspOperation } from './lsp/index.js';
 export { createToolListTool, type ToolListParams } from './tool_list/index.js';
 
-// Task and wait_on_run tools (per-run registry only)
+// Task and agent_session_search tools (per-run registry only)
 export { createTaskTool, type TaskParams, type TaskToolDeps, DEFAULT_MAX_CHILDREN } from './task/index.js';
-export { createWaitOnRunTool, type WaitOnRunParams, type WaitOnRunDeps, type WaitOnRunResult } from './wait_on_run/index.js';
+export { createAgentSessionSearchTool, type AgentSessionSearchParams, type AgentSessionSearchDeps } from './agent_session_search/index.js';

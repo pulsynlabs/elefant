@@ -9,6 +9,7 @@ import { err, ok, type Result } from '../types/result.ts';
 import type { ToolDefinition, ToolResult } from '../types/tools.ts';
 import type { SseManager } from '../transport/sse-manager.js';
 import { applyPatchTool } from './apply_patch/index.js';
+import { createAgentSessionSearchTool, type AgentSessionSearchDeps } from './agent_session_search/index.js';
 import { editTool } from './edit.js';
 import { globTool } from './glob.js';
 import { grepTool } from './grep.js';
@@ -20,7 +21,6 @@ import { skillTool } from './skill/index.js';
 import { createTaskTool, type TaskToolDeps } from './task/index.js';
 import { todoreadTool, todowriteTool } from './todo/index.js';
 import { createToolListTool } from './tool_list/index.js';
-import { createWaitOnRunTool, type WaitOnRunDeps } from './wait_on_run/index.js';
 import { webfetchTool } from './webfetch.js';
 import { websearchTool } from './websearch.js';
 import { writeTool } from './write.js';
@@ -230,12 +230,12 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	}
 	registry.register(createTaskTool(taskToolDeps))
 
-	// Register wait_on_run tool
-	const waitDeps: WaitOnRunDeps = {
+	// Register agent_session_search tool (needs per-run deps)
+	const agentSessionSearchDeps: AgentSessionSearchDeps = {
 		database: deps.database,
 		currentRun: deps.currentRun,
 	}
-	registry.register(createWaitOnRunTool(waitDeps))
+	registry.register(createAgentSessionSearchTool(agentSessionSearchDeps))
 
 	// tool_list MUST be last (reflects full set)
 	registry.register(createToolListTool(registry))

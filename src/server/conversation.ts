@@ -285,7 +285,7 @@ export function createConversationRoute<TApp extends Elysia>(
 			signal: abortController.signal,
 		}
 
-		// Use the per-run registry (includes task + wait_on_run) when the
+		// Use the per-run registry (includes task + agent_session_search) when the
 		// desktop supplies a real projectId. Fall back to the static registry
 		// for CLI/API callers that don't have a project context.
 		const activeRegistry =

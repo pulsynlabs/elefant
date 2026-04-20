@@ -141,7 +141,7 @@ export function mountAgentRunRoutes(
 			{ role: 'user' as const, content: parsedBody.data.prompt },
 		]
 
-		// Create per-run tool registry with task and wait_on_run tools
+		// Create per-run tool registry with task and agent_session_search tools
 		const runToolRegistry = createToolRegistryForRun({
 			hookRegistry: deps.hookRegistry,
 			database: deps.db,
