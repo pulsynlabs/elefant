@@ -84,23 +84,10 @@ function toSSEChunk(event: StreamEvent): string | null {
 		return formatSSEEvent('token', { text: event.text })
 	}
 
-	// Emit an early `tool_call` as soon as the provider announces the tool
-	// name and id (before arguments have been streamed). This lets the chat
-	// UI render the tool card immediately — the tool name is enough to pick
-	// the right card component (e.g. TaskToolCard) and show a spinner.
-	// A `tool_call_update` event follows when arguments are complete.
-	if (event.type === 'tool_call_start') {
-		return formatSSEEvent('tool_call', {
-			id: event.toolCall.id,
-			name: event.toolCall.name,
-			arguments: {},
-		})
-	}
-
-	// Update the already-rendered tool card with the fully-parsed arguments
-	// once streaming is complete.
+	// tool_call_complete emits the full tool_call with complete arguments.
+	// The metadata (runId, title, agentType) arrives earlier via tool_call_metadata.
 	if (event.type === 'tool_call_complete') {
-		return formatSSEEvent('tool_call_update', toToolCallPayload(event.toolCall))
+		return formatSSEEvent('tool_call', toToolCallPayload(event.toolCall))
 	}
 
 	if (event.type === 'tool_result') {
