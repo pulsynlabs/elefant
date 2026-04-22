@@ -190,16 +190,24 @@ describe('createConversationRoute', () => {
 		expect(receivedOptions?.timeoutMs).toBe(30000)
 	})
 
-	it('emits tool_call event with full arguments (not empty)', async () => {
-		// This test verifies the SSE mapping: tool_call_complete -> tool_call
-		// The agent loop yields tool_call_complete after executing tools, and
-		// conversation.ts maps it to a tool_call SSE event with full arguments.
-		// Note: Full integration testing of the metadataEmitter path is covered
-		// in src/tools/task/task.test.ts ('calls metadataEmitter callback').
+	it('emits tool_call on tool_call_start (empty args) and tool_call_update on tool_call_complete (full args)', async () => {
+		// This test verifies the two-phase SSE mapping:
+		// 1. tool_call_start -> tool_call (empty args for early card render)
+		// 2. tool_call_complete -> tool_call_update (full args to patch the card)
+		// This mirrors OpenCode's toolStart() and Claude Code's content_block_start pattern.
 		const adapter: ProviderAdapter = {
 			name: 'mock-provider',
 			async *sendMessage(): AsyncGenerator<StreamEvent> {
-				// Simulate the agent loop yielding tool_call_complete after tool execution
+				// Phase 1: Provider announces tool call start (arguments still streaming)
+				yield {
+					type: 'tool_call_start',
+					toolCall: {
+						id: 'call-123',
+						name: 'task',
+						arguments: {}, // Empty at start
+					},
+				}
+				// Phase 2: Tool execution completes, full arguments available
 				yield {
 					type: 'tool_call_complete',
 					toolCall: {
@@ -225,11 +233,12 @@ describe('createConversationRoute', () => {
 		expect(response.status).toBe(200)
 
 		const responseText = await response.text()
-		// The tool_call event should contain full arguments, not empty {}
-		// This verifies the fix that removed the broken tool_call_start workaround
+		// Early tool_call event has empty arguments for immediate card render
 		expect(responseText).toContain('event: tool_call')
 		expect(responseText).toContain('"id":"call-123"')
 		expect(responseText).toContain('"name":"task"')
+		// tool_call_update event has full arguments to patch the card
+		expect(responseText).toContain('event: tool_call_update')
 		expect(responseText).toContain('"description":"test task"')
 		expect(responseText).toContain('"agent_type":"researcher"')
 	})

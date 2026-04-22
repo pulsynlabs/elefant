@@ -84,10 +84,25 @@ function toSSEChunk(event: StreamEvent): string | null {
 		return formatSSEEvent('token', { text: event.text })
 	}
 
-	// tool_call_complete emits the full tool_call with complete arguments.
-	// The metadata (runId, title, agentType) arrives earlier via tool_call_metadata.
+	// Emit an early `tool_call` event with the tool id+name as soon as
+	// the provider announces the call, before arguments have streamed.
+	// This mirrors OpenCode's toolStart() (packages/opencode/src/acp/agent.ts:1115-1134)
+	// and Claude Code's content_block_start pattern (src/services/api/claude.ts:1997-2001)
+	// — both emit the tool card UI event BEFORE the tool executes so the
+	// card can render immediately. A subsequent `tool_call_update` event
+	// fills in the complete arguments once streaming finishes.
+	if (event.type === 'tool_call_start') {
+		return formatSSEEvent('tool_call', {
+			id: event.toolCall.id,
+			name: event.toolCall.name,
+			arguments: {},
+		})
+	}
+
+	// tool_call_complete now emits a `tool_call_update` so the already-
+	// rendered card can patch in the complete arguments.
 	if (event.type === 'tool_call_complete') {
-		return formatSSEEvent('tool_call', toToolCallPayload(event.toolCall))
+		return formatSSEEvent('tool_call_update', toToolCallPayload(event.toolCall))
 	}
 
 	if (event.type === 'tool_result') {
