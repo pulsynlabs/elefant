@@ -1,7 +1,17 @@
 import { loadConfig } from '../config/index.ts'
 import { createDaemon } from './create.ts'
-import { removePid, writePid } from './pid.ts'
+import { acquireDaemonLock } from './pid.ts'
 import { gracefulShutdown } from './shutdown.ts'
+
+const lockResult = acquireDaemonLock()
+if (!lockResult.ok) {
+	console.error(`[elefant] ${lockResult.error.message}`)
+	process.exit(1)
+}
+
+const lock = lockResult.data
+
+process.on('exit', () => { lock.release() })
 
 const configResult = await loadConfig()
 if (!configResult.ok) {
@@ -15,14 +25,13 @@ if (!daemonResult.ok) {
 	process.exit(1)
 }
 
-const pidResult = await writePid(process.pid)
-if (!pidResult.ok) {
-	console.error('[elefant] PID error:', pidResult.error.message)
-	process.exit(1)
-}
-
-process.on('exit', () => { void removePid() })
-process.on('SIGTERM', () => { void gracefulShutdown('SIGTERM', daemonResult.data) })
-process.on('SIGINT', () => { void gracefulShutdown('SIGINT', daemonResult.data) })
+process.on('SIGTERM', () => {
+	lock.release()
+	void gracefulShutdown('SIGTERM', daemonResult.data)
+})
+process.on('SIGINT', () => {
+	lock.release()
+	void gracefulShutdown('SIGINT', daemonResult.data)
+})
 
 await daemonResult.data.start()

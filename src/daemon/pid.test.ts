@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { isRunning, readPid, removePid, writePid } from './pid.ts';
+import { acquireDaemonLock, isRunning, readPid, removePid, writePid } from './pid.ts';
 
 const PID_FILE_OVERRIDE_ENV = 'ELEFANT_DAEMON_PID_FILE';
 
@@ -68,5 +69,58 @@ describe('pid', () => {
 
 		const cleanupResult = await removePid();
 		expect(cleanupResult.ok).toBe(true);
+	});
+
+	it('acquireDaemonLock prevents second acquisition while held', () => {
+		const first = acquireDaemonLock();
+		expect(first.ok).toBe(true);
+		if (!first.ok) {
+			throw new Error('Expected first daemon lock acquisition to succeed');
+		}
+
+		const second = acquireDaemonLock();
+		expect(second.ok).toBe(false);
+		if (second.ok) {
+			throw new Error('Expected second daemon lock acquisition to fail');
+		}
+
+		expect(second.error.code).toBe('VALIDATION_ERROR');
+		expect(second.error.details).toEqual(
+			expect.objectContaining({
+				pid: process.pid,
+			}),
+		);
+
+		first.data.release();
+	});
+
+	it('acquireDaemonLock reclaims stale lock from dead PID', () => {
+		writeFileSync(pidFilePath, '99999999\n', 'utf8');
+
+		const lockResult = acquireDaemonLock();
+		expect(lockResult.ok).toBe(true);
+		if (!lockResult.ok) {
+			throw new Error('Expected stale daemon lock to be reclaimed');
+		}
+
+		lockResult.data.release();
+	});
+
+	it('acquireDaemonLock release removes lock file', async () => {
+		const lockResult = acquireDaemonLock();
+		expect(lockResult.ok).toBe(true);
+		if (!lockResult.ok) {
+			throw new Error('Expected daemon lock acquisition to succeed');
+		}
+
+		lockResult.data.release();
+
+		const readResult = await readPid();
+		expect(readResult.ok).toBe(false);
+		if (readResult.ok) {
+			throw new Error('Expected lockfile to be removed by release');
+		}
+
+		expect(readResult.error.code).toBe('FILE_NOT_FOUND');
 	});
 });
