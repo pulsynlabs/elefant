@@ -149,6 +149,12 @@ export class ToolRegistry {
 			return ok(content);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
+			const stack = error instanceof Error ? error.stack : undefined;
+			// Log the full error so operators can diagnose tool crashes. The
+			// registry rewrites the thrown error into a flat `{ ok: false, error }`
+			// Result below (so the agent loop can continue), which hides the stack
+			// from the SSE client. The stderr log is the only place to see it.
+			console.error(`[registry] Tool "${name}" threw:`, error);
 			await emit(this.hookRegistry, 'tool:after', {
 				toolName: name,
 				args: hookArgs,
@@ -157,7 +163,7 @@ export class ToolRegistry {
 				conversationId,
 			});
 
-			return err(createToolError(`Tool "${name}" threw an exception`, { message }));
+			return err(createToolError(`Tool "${name}" threw an exception: ${message}`, { message, stack }));
 		}
 	}
 
