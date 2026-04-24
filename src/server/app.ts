@@ -33,6 +33,9 @@ export function createApp(
 	const app = new Elysia({
 		serve: {
 			maxRequestBodySize: 10 * 1024 * 1024,
+			// Disable SO_REUSEPORT so duplicate daemon binds fail fast with EADDRINUSE
+			// instead of silently sharing port 1337 across processes.
+			reusePort: false,
 		},
 	})
 		.onRequest(({ request, set }) => {

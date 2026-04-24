@@ -6,17 +6,24 @@
 	// path keep working). Tool calls reuse ToolCallCard. Terminal events
 	// (done/error/cancelled) render a status banner at the tail.
 
+	import { DAEMON_URL } from '$lib/daemon/client.js';
 	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
 	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import type {
 		AgentRun,
 		AgentRunStatus,
 		AgentRunTranscriptEntry,
+		DaemonResult,
 	} from '$lib/types/agent-run.js';
 	import StreamingMessage from '../chat/StreamingMessage.svelte';
 	import ToolCallCard from '../chat/ToolCallCard.svelte';
 	import AgentTaskCard from './AgentTaskCard.svelte';
 	import { computeRenderBlocks } from './agent-run-transcript-blocks.js';
+	import {
+		mapApiMessagesToEntries,
+		mergeHistoricalAndLive,
+		type AgentRunMessagesResponse,
+	} from './agent-run-transcript-history.js';
 
 	type Props = {
 		runId?: string;
@@ -30,8 +37,104 @@
 		effectiveRunId ? agentRunsStore.runs[effectiveRunId] ?? null : null,
 	);
 
-	const entries = $derived<AgentRunTranscriptEntry[]>(
+	// projectId is required to hit the per-project messages endpoint.
+	// We pull it off the run row in the store rather than threading
+	// another prop down from ChildRunView (the brief explicitly forbids
+	// modifying ChildRunView). Until the run row hydrates, projectId
+	// is null and the historical fetch effect is skipped.
+	const projectId = $derived<string | null>(run?.projectId ?? null);
+
+	// Live SSE entries — same source as before; the merge logic below
+	// keeps the contract that this component reads from the store and
+	// never writes back into it.
+	const liveEntries = $derived<AgentRunTranscriptEntry[]>(
 		effectiveRunId ? agentRunsStore.transcripts[effectiveRunId] ?? [] : [],
+	);
+
+	// Historical messages loaded from the REST endpoint on mount.
+	// Resets whenever `effectiveRunId` changes so navigating between
+	// child runs in ChildRunView re-fetches cleanly.
+	let historical = $state<AgentRunTranscriptEntry[]>([]);
+	let historicalLoaded = $state(false);
+	// Snapshot of `liveEntries.length` at the instant the fetch
+	// resolved. Anything past this index in `liveEntries` is treated as
+	// genuinely new (arrived after the daemon persisted what historical
+	// covered) and is appended to the historical list. See
+	// mergeHistoricalAndLive for the rationale on why we use an index
+	// snapshot rather than a cross-source seq comparison.
+	let liveBaselineLength = $state(0);
+
+	$effect(() => {
+		// Re-run on runId or projectId change. Reset state inline so a
+		// switch from one child run to another doesn't flash stale
+		// historical content.
+		const currentRunId = effectiveRunId;
+		const currentProjectId = projectId;
+		historical = [];
+		historicalLoaded = false;
+		liveBaselineLength = 0;
+
+		if (!currentRunId || !currentProjectId) return;
+
+		// Capture the runId we fetched FOR so a fast switch to a
+		// different run doesn't apply stale history once the original
+		// fetch resolves (Svelte $effect cleanup would also work, but
+		// AbortController + identity check keeps it transport-agnostic).
+		const ac = new AbortController();
+		const fetchedRunId = currentRunId;
+		const fetchedProjectId = currentProjectId;
+
+		void fetch(
+			`${DAEMON_URL}/api/projects/${encodeURIComponent(fetchedProjectId)}/runs/${encodeURIComponent(fetchedRunId)}/messages`,
+			{
+				signal: ac.signal,
+				headers: { Accept: 'application/json' },
+			},
+		)
+			.then(async (response) => {
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}`);
+				}
+				return (await response.json()) as DaemonResult<AgentRunMessagesResponse>;
+			})
+			.then((parsed) => {
+				// Stale fetch — the user already navigated away.
+				if (effectiveRunId !== fetchedRunId) return;
+				if (!parsed.ok) {
+					// Daemon replied with ok=false — record that the load
+					// finished so the renderer stops waiting, but leave
+					// historical empty so the live stream is the only source.
+					historicalLoaded = true;
+					liveBaselineLength = liveEntries.length;
+					return;
+				}
+				historical = mapApiMessagesToEntries(parsed.data.messages);
+				liveBaselineLength = liveEntries.length;
+				historicalLoaded = true;
+			})
+			.catch((err: unknown) => {
+				if (err instanceof DOMException && err.name === 'AbortError') return;
+				// Fail open: keep the live SSE flow responsive even when
+				// the historical endpoint is unreachable. The transcript
+				// degrades to "live-only" — same behavior the component
+				// shipped with before MH5.
+				if (effectiveRunId !== fetchedRunId) return;
+				historicalLoaded = true;
+				liveBaselineLength = liveEntries.length;
+			});
+
+		return () => {
+			ac.abort();
+		};
+	});
+
+	const entries = $derived<AgentRunTranscriptEntry[]>(
+		mergeHistoricalAndLive({
+			historical,
+			live: liveEntries,
+			liveBaselineLength,
+			historicalLoaded,
+		}),
 	);
 
 	// Direct children of the active run. Used as the fallback source for

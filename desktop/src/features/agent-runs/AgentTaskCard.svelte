@@ -43,6 +43,7 @@
 	const ariaLabel = $derived(buildAgentTaskCardAriaLabel(title, cardState));
 
 	function handleClick(): void {
+		console.debug('[AgentTaskCard] click', { disabled: cardState.disabled, resolvedRunId, status: cardState.status });
 		if (cardState.disabled || !resolvedRunId) return;
 		onOpenChildRun?.(resolvedRunId);
 	}

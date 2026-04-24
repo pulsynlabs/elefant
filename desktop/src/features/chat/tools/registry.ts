@@ -13,6 +13,7 @@ import SkillToolCard from './SkillToolCard.svelte';
 import ApplyPatchToolCard from './ApplyPatchToolCard.svelte';
 import LspToolCard from './LspToolCard.svelte';
 import QuestionToolCard from './QuestionToolCard.svelte';
+import TaskToolCard from './TaskToolCard.svelte';
 
 /** Map of tool name to Svelte component */
 export const toolCardRegistry: Record<string, Component<ToolCardProps>> = {
@@ -30,6 +31,7 @@ export const toolCardRegistry: Record<string, Component<ToolCardProps>> = {
 	apply_patch: ApplyPatchToolCard as unknown as Component<ToolCardProps>,
 	lsp: LspToolCard as unknown as Component<ToolCardProps>,
 	question: QuestionToolCard as unknown as Component<ToolCardProps>,
+	task: TaskToolCard as unknown as Component<ToolCardProps>,
 };
 
 /** Resolve a component for the given tool name. Returns null if not registered. */

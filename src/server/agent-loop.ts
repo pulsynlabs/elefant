@@ -6,6 +6,7 @@ import type { StreamEvent } from '../providers/types.ts'
 import { clearRunEventSequence, publishRunEvent, publishStatusChange } from '../runs/events.ts'
 import type { RunContext } from '../runs/types.ts'
 import { createQuestionEmitter, type QuestionEmitter } from '../tools/question/emitter.ts'
+import type { MetadataEmitter } from '../tools/task/metadata-emitter.ts'
 import type { ElefantError } from '../types/errors.ts'
 import { type Message } from '../types/providers.ts'
 import type { Result } from '../types/result.ts'
@@ -32,6 +33,7 @@ export interface AgentLoopOptions {
 	compaction?: CompactionManager
 	runContext: RunContext
 	questionEmitter?: QuestionEmitter
+	metadataEmitter?: MetadataEmitter
 	sseManager?: SseManager
 }
 

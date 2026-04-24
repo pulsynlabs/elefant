@@ -83,6 +83,26 @@ function toStreamEvent(parsed: SSEParsedEvent): ChatStreamEvent | null {
 					: {},
 			};
 
+		case 'tool_call_update':
+			return {
+				type: 'tool_call_update',
+				id: typeof d.id === 'string' ? d.id : '',
+				name: typeof d.name === 'string' ? d.name : '',
+				arguments: typeof d.arguments === 'object' && d.arguments !== null
+					? d.arguments as Record<string, unknown>
+					: {},
+			};
+
+		case 'tool_call_metadata':
+			return {
+				type: 'tool_call_metadata',
+				toolCallId: typeof d.toolCallId === 'string' ? d.toolCallId : '',
+				runId: typeof d.runId === 'string' ? d.runId : '',
+				agentType: typeof d.agentType === 'string' ? d.agentType : '',
+				title: typeof d.title === 'string' ? d.title : '',
+				parentRunId: typeof d.parentRunId === 'string' ? d.parentRunId : undefined,
+			};
+
 		case 'tool_result':
 			return {
 				type: 'tool_result',

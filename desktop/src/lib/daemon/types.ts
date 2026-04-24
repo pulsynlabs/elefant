@@ -52,6 +52,37 @@ export interface ToolCallEvent {
 	arguments: Record<string, unknown>;
 }
 
+/**
+ * Fired once argument streaming is complete for an already-announced tool
+ * call. The chat store patches the existing tool call block with the full
+ * arguments so downstream cards (e.g. TaskToolCard) can show details.
+ */
+export interface ToolCallUpdateEvent {
+	type: 'tool_call_update';
+	id: string;
+	name: string;
+	arguments: Record<string, unknown>;
+}
+
+/**
+ * Fired by the `task` tool at spawn time, alongside the project-level
+ * `agent_run.spawned` event. Carries the child runId (and the agent
+ * type, title, and parent runId) so `TaskToolCard` can resolve its
+ * child run deterministically instead of title-matching against the
+ * agent-runs store. Delivered through the chat SSE stream because the
+ * tool-call → child-run pairing is a chat-local concern that must be
+ * available even when the project SSE subscription hasn't hydrated
+ * yet (and to survive stream replay).
+ */
+export interface ToolCallMetadataEvent {
+	type: 'tool_call_metadata';
+	toolCallId: string;
+	runId: string;
+	agentType: string;
+	title: string;
+	parentRunId?: string;
+}
+
 export interface ToolResultEvent {
 	type: 'tool_result';
 	toolCallId: string;
@@ -81,7 +112,15 @@ export interface QuestionEvent {
 	conversationId?: string;
 }
 
-export type ChatStreamEvent = TokenEvent | ToolCallEvent | ToolResultEvent | DoneEvent | ErrorEvent | QuestionEvent;
+export type ChatStreamEvent =
+	| TokenEvent
+	| ToolCallEvent
+	| ToolCallUpdateEvent
+	| ToolCallMetadataEvent
+	| ToolResultEvent
+	| DoneEvent
+	| ErrorEvent
+	| QuestionEvent;
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting';
 

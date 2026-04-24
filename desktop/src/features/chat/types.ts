@@ -7,6 +7,21 @@ export interface ToolCallDisplay {
 	name: string;
 	arguments: Record<string, unknown>;
 	result?: ToolResultDisplay;
+	/**
+	 * Optional metadata patched in by `chatStore.patchToolCallMetadata`
+	 * when a `tool_call_metadata` SSE event arrives for this tool call.
+	 *
+	 * Today this is only populated for the `task` tool: the daemon emits
+	 * one metadata event per spawn carrying the child runId, so the
+	 * chat-surface `TaskToolCard` can resolve its child run without
+	 * falling back to a title-match against the agent-runs store.
+	 */
+	metadata?: {
+		runId: string;
+		agentType: string;
+		title: string;
+		parentRunId?: string;
+	};
 }
 
 export interface ToolResultDisplay {

@@ -91,6 +91,73 @@ export function addToolCall(toolCall: ToolCallDisplay): void {
 	});
 }
 
+/**
+ * Patch the arguments on an already-rendered tool call block once streaming
+ * is complete. Called when a `tool_call_update` event arrives — the card was
+ * already rendered on `tool_call` (with empty args); this fills in the full
+ * arguments so cards like TaskToolCard can resolve their description/agent_type.
+ */
+export function updateToolCallArguments(toolCallId: string, args: Record<string, unknown>): void {
+	if (!streamingMessageId) return;
+
+	messages = messages.map((msg) => {
+		if (msg.id !== streamingMessageId) return msg;
+
+		const blocks: ContentBlock[] = (msg.blocks ?? []).map((block) => {
+			if (block.type === 'tool_call' && block.toolCall.id === toolCallId) {
+				return {
+					...block,
+					toolCall: {
+						...block.toolCall,
+						arguments: args,
+					},
+				};
+			}
+			return block;
+		});
+
+		return { ...msg, blocks };
+	});
+}
+
+/**
+ * Patch daemon-supplied metadata onto an already-rendered tool call block.
+ *
+ * Fired when a `tool_call_metadata` SSE event arrives. Today the `task`
+ * tool is the only producer — it emits metadata at spawn time so
+ * `TaskToolCard` can resolve its child run deterministically via
+ * `metadata.runId` instead of title-matching against the agent-runs
+ * store. Mirrors `updateToolCallArguments` exactly: find the tool call
+ * block by id inside the currently-streaming assistant message and
+ * replace its `metadata` field with a fresh object so Svelte's reactive
+ * derivations re-run.
+ */
+export function patchToolCallMetadata(
+	toolCallId: string,
+	metadata: { runId: string; agentType: string; title: string; parentRunId?: string },
+): void {
+	if (!streamingMessageId) return;
+
+	messages = messages.map((msg) => {
+		if (msg.id !== streamingMessageId) return msg;
+
+		const blocks: ContentBlock[] = (msg.blocks ?? []).map((block) => {
+			if (block.type === 'tool_call' && block.toolCall.id === toolCallId) {
+				return {
+					...block,
+					toolCall: {
+						...block.toolCall,
+						metadata,
+					},
+				};
+			}
+			return block;
+		});
+
+		return { ...msg, blocks };
+	});
+}
+
 export function addToolResult(toolCallId: string, content: string, resultIsError: boolean): void {
 	if (!streamingMessageId) return;
 
@@ -301,6 +368,8 @@ export const chatStore = {
 	startAssistantMessage,
 	appendToken,
 	addToolCall,
+	updateToolCallArguments,
+	patchToolCallMetadata,
 	addToolResult,
 	addQuestion,
 	finalizeMessage,

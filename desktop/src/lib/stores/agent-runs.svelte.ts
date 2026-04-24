@@ -275,13 +275,20 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 			break;
 		}
 		case 'agent_run.tool_call': {
+			// The daemon emits { toolCall: { id, name, arguments } } — unwrap
+			// the nested toolCall field before reading individual properties.
+			// Pre-existing bug: store was reading data.id/name/arguments (flat)
+			// but agent-loop.ts always emits { toolCall: event.toolCall }.
+			const tc = (typeof data.toolCall === 'object' && data.toolCall !== null)
+				? (data.toolCall as Record<string, unknown>)
+				: data;
 			appendToTranscript(runId, {
 				kind: 'tool_call',
-				id: typeof data.id === 'string' ? data.id : '',
-				name: typeof data.name === 'string' ? data.name : '',
+				id: typeof tc.id === 'string' ? tc.id : '',
+				name: typeof tc.name === 'string' ? tc.name : '',
 				arguments:
-					typeof data.arguments === 'object' && data.arguments !== null
-						? (data.arguments as Record<string, unknown>)
+					typeof tc.arguments === 'object' && tc.arguments !== null
+						? (tc.arguments as Record<string, unknown>)
 						: {},
 				seq,
 			});
@@ -298,11 +305,16 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 			break;
 		}
 		case 'agent_run.tool_result': {
+			// The daemon emits { toolResult: { toolCallId, content, isError } } — unwrap.
+			// Same nested-vs-flat mismatch as agent_run.tool_call above.
+			const tr = (typeof data.toolResult === 'object' && data.toolResult !== null)
+				? (data.toolResult as Record<string, unknown>)
+				: data;
 			appendToTranscript(runId, {
 				kind: 'tool_result',
-				toolCallId: typeof data.toolCallId === 'string' ? data.toolCallId : '',
-				content: typeof data.content === 'string' ? data.content : '',
-				isError: typeof data.isError === 'boolean' ? data.isError : false,
+				toolCallId: typeof tr.toolCallId === 'string' ? tr.toolCallId : '',
+				content: typeof tr.content === 'string' ? tr.content : '',
+				isError: typeof tr.isError === 'boolean' ? tr.isError : false,
 				seq,
 			});
 			// Mark as unseen if this run is not currently active (MH3 blue dot)
