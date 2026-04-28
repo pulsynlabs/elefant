@@ -4,6 +4,7 @@
 	import { daemonLifecycle } from '$lib/services/daemon-lifecycle.js';
 	import Spinner from '$lib/components/ui/spinner/Spinner.svelte';
 	import { onMount } from 'svelte';
+	import { HugeiconsIcon, ViewIcon, ViewOffIcon } from '$lib/icons/index.js';
 
 	type Step = 'welcome' | 'provider' | 'starting';
 
@@ -167,7 +168,13 @@
 							type="button"
 							onclick={() => (showKey = !showKey)}
 							aria-label={showKey ? 'Hide key' : 'Show key'}
-						>{showKey ? '🙈' : '👁'}</button>
+						>
+							<HugeiconsIcon
+								icon={showKey ? ViewOffIcon : ViewIcon}
+								size={16}
+								strokeWidth={1.5}
+							/>
+						</button>
 					</div>
 					{#if format === 'anthropic'}
 						<span class="hint">
@@ -415,6 +422,9 @@
 	}
 
 	.btn-ghost {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		background: none;
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
@@ -424,6 +434,8 @@
 		font-size: 14px;
 		transition: color var(--transition-fast), border-color var(--transition-fast);
 		flex-shrink: 0;
+		min-width: 40px;
+		min-height: 40px;
 	}
 
 	.btn-ghost:hover {

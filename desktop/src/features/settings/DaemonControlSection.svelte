@@ -8,6 +8,7 @@
 	import { connectionStore } from '$lib/stores/connection.svelte.js';
 	import { configService } from '$lib/services/config-service.js';
 	import { navigationStore } from '$lib/stores/navigation.svelte.js';
+	import { HugeiconsIcon, WarningIcon } from '$lib/icons/index.js';
 
 	let daemonStatus = $state<DaemonLifecycleStatus>('unknown');
 	let isStarting = $state(false);
@@ -145,7 +146,9 @@
 
 		{#if actionError}
 			<div class="error-message" role="alert">
-				<span aria-hidden="true">⚠</span>
+				<span class="error-icon" aria-hidden="true">
+					<HugeiconsIcon icon={WarningIcon} size={14} strokeWidth={1.5} />
+				</span>
 				{actionError}
 			</div>
 		{/if}
@@ -311,6 +314,16 @@
 		border: 1px solid color-mix(in oklch, var(--color-error) 25%, transparent);
 		border-radius: var(--radius-md);
 		line-height: var(--line-height-base);
+	}
+
+	.error-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 14px;
+		height: 14px;
+		flex-shrink: 0;
+		margin-top: 2px;
 	}
 
 	.auto-start-row {

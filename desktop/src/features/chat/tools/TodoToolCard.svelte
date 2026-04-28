@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ToolCardProps } from './types.js';
 	import ToolCardShell from './ToolCardShell.svelte';
+	import { HugeiconsIcon, CheckIcon, CrossIcon, type IconSvgElement } from '$lib/icons/index.js';
 
 	let { toolCall }: ToolCardProps = $props();
 
@@ -57,11 +58,16 @@
 
 	const taskCount = $derived(todos.length);
 
-	const statusIcon: Record<ParsedTodo['status'], string> = {
+	// Glyph for non-terminal states (pending/in_progress) — text symbols.
+	// Terminal states (completed/cancelled) render via Hugeicons below.
+	const statusGlyph: Record<'pending' | 'in_progress', string> = {
 		pending: '○',
 		in_progress: '◐',
-		completed: '✓',
-		cancelled: '✗'
+	};
+
+	const terminalStatusIcon: Record<'completed' | 'cancelled', IconSvgElement> = {
+		completed: CheckIcon,
+		cancelled: CrossIcon,
 	};
 </script>
 
@@ -91,7 +97,15 @@
 									class:completed={todo.status === 'completed'}
 									class:cancelled={todo.status === 'cancelled'}
 								>
-									{statusIcon[todo.status]}
+									{#if todo.status === 'completed' || todo.status === 'cancelled'}
+										<HugeiconsIcon
+											icon={terminalStatusIcon[todo.status]}
+											size={14}
+											strokeWidth={1.5}
+										/>
+									{:else}
+										{statusGlyph[todo.status]}
+									{/if}
 								</span>
 								<span class="todo-content">{todo.content}</span>
 								{#if todo.priority === 'high'}
@@ -142,7 +156,11 @@
 
 	.todo-status-icon {
 		flex-shrink: 0;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		width: 16px;
+		height: 16px;
 		text-align: center;
 		font-family: var(--font-mono);
 		font-size: var(--font-size-sm);

@@ -14,11 +14,22 @@ export type AgentTaskCardStatus =
 	| 'error'
 	| 'cancelled';
 
+/**
+ * Logical status icon token. The Svelte component maps these tokens to
+ * concrete icon components so this module stays free of UI dependencies
+ * and remains trivially unit-testable.
+ */
+export type AgentTaskCardStatusIcon =
+	| 'spinner'
+	| 'check'
+	| 'cross'
+	| 'dash';
+
 export interface AgentTaskCardState {
 	/** High-level visual state the card should render. */
 	status: AgentTaskCardStatus;
-	/** Single-character status glyph shown next to the agent icon. */
-	statusIcon: string;
+	/** Logical status icon token; mapped to a concrete icon by the view. */
+	statusIcon: AgentTaskCardStatusIcon;
 	/** Short human-readable status label (also used as sr-only text). */
 	statusLabel: string;
 	/** Whether the card's button should be disabled (no click). */
@@ -45,7 +56,7 @@ export function computeAgentTaskCardState(
 	if (!resolvedRunId) {
 		return {
 			status: 'spawning',
-			statusIcon: '⋯',
+			statusIcon: 'spinner',
 			statusLabel: 'Spawning…',
 			disabled: true,
 			isPulsing: true,
@@ -58,7 +69,7 @@ export function computeAgentTaskCardState(
 		case 'done':
 			return {
 				status: 'done',
-				statusIcon: '✓',
+				statusIcon: 'check',
 				statusLabel: 'Complete',
 				disabled: false,
 				isPulsing: false,
@@ -66,7 +77,7 @@ export function computeAgentTaskCardState(
 		case 'error':
 			return {
 				status: 'error',
-				statusIcon: '✗',
+				statusIcon: 'cross',
 				statusLabel: 'Error',
 				disabled: false,
 				isPulsing: false,
@@ -74,7 +85,7 @@ export function computeAgentTaskCardState(
 		case 'cancelled':
 			return {
 				status: 'cancelled',
-				statusIcon: '—',
+				statusIcon: 'dash',
 				statusLabel: 'Cancelled',
 				disabled: false,
 				isPulsing: false,
@@ -83,7 +94,7 @@ export function computeAgentTaskCardState(
 		default:
 			return {
 				status: 'running',
-				statusIcon: '⋯',
+				statusIcon: 'spinner',
 				statusLabel: 'Running',
 				disabled: false,
 				isPulsing: true,

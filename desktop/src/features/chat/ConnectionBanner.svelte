@@ -2,6 +2,7 @@
 	import { connectionStore } from '$lib/stores/connection.svelte.js';
 	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import { HugeiconsIcon, WarningIcon } from '$lib/icons/index.js';
 
 	function goToSettings(): void {
 		navigationStore.navigate('settings');
@@ -19,7 +20,7 @@
 				{#if connectionStore.status === 'reconnecting'}
 					<span class="pulse-dot"></span>
 				{:else}
-					⚠
+					<HugeiconsIcon icon={WarningIcon} size={14} strokeWidth={1.5} />
 				{/if}
 			</span>
 			<span class="banner-text">

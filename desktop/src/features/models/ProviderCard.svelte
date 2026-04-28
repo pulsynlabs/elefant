@@ -3,6 +3,7 @@
 	import { getDaemonClient } from '$lib/daemon/client.js';
 	import Tag from '$lib/components/ui/tag/Tag.svelte';
 	import Spinner from '$lib/components/ui/spinner/Spinner.svelte';
+	import { HugeiconsIcon, CheckIcon, CrossIcon } from '$lib/icons/index.js';
 
 	type Props = {
 		provider: ProviderEntry;
@@ -78,7 +79,13 @@
 					role="status"
 					aria-live="polite"
 				>
-					<span aria-hidden="true">{testStatus === 'success' ? '✓' : '✗'}</span>
+					<span class="status-icon" aria-hidden="true">
+						<HugeiconsIcon
+							icon={testStatus === 'success' ? CheckIcon : CrossIcon}
+							size={14}
+							strokeWidth={1.5}
+						/>
+					</span>
 					{testMessage}
 				</div>
 			{/if}
@@ -198,6 +205,15 @@
 		gap: var(--space-2);
 		font-size: var(--font-size-sm);
 		white-space: nowrap;
+	}
+
+	.status-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 14px;
+		height: 14px;
+		flex-shrink: 0;
 	}
 
 	.test-result.success {

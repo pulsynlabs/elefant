@@ -11,9 +11,9 @@
 	//   │   └─ session 1…    │
 	//   │   └─ session 2…    │
 	//   ├────────────────────┤
-	//   │ ⚙ Settings         │  ← pinned bottom
-	//   │ ▦ Models           │
-	//   │ ⓘ About            │
+	//   │ [gear] Settings    │  <- pinned bottom
+	//   │ [grid] Models      │
+	//   │ [info] About       │
 	//   └────────────────────┘
 	//
 	// Collapsed mode: only the project avatars in the top section and icon-only

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Tag from '$lib/components/ui/tag/Tag.svelte';
+	import { HugeiconsIcon, GithubIcon } from '$lib/icons/index.js';
 
 	const version = '0.1.0';
 	const repoUrl = 'https://github.com/hffmnnj/elefant';
@@ -48,7 +49,9 @@
 				rel="noopener noreferrer"
 				aria-label="View source code on GitHub (opens in browser)"
 			>
-				<span aria-hidden="true">⌘</span>
+				<span class="link-icon" aria-hidden="true">
+					<HugeiconsIcon icon={GithubIcon} size={16} strokeWidth={1.5} />
+				</span>
 				Source Code — GitHub
 			</a>
 		</div>
@@ -182,6 +185,15 @@
 	.link-item:hover {
 		color: var(--color-primary-hover);
 		text-decoration: underline;
+	}
+
+	.link-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
+		flex-shrink: 0;
 	}
 
 	.stack-section {

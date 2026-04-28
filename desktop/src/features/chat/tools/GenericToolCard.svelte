@@ -2,6 +2,7 @@
 	import type { ToolCallDisplay } from '../types.js';
 	import CopyButton from '$lib/components/CopyButton.svelte';
 	import { isFileEditTool, parseUnifiedDiff, extractFilePath } from '$lib/daemon/diff-parser.js';
+	import { HugeiconsIcon, FlashIcon, CheckIcon, CrossIcon } from '$lib/icons/index.js';
 
 	type Props = {
 		toolCall: ToolCallDisplay;
@@ -34,7 +35,9 @@
 		onkeydown={(e) => e.key === 'Enter' && (expanded = !expanded)}
 		aria-expanded={expanded}
 	>
-		<span class="tool-icon" aria-hidden="true">⚡</span>
+		<span class="tool-icon" aria-hidden="true">
+			<HugeiconsIcon icon={FlashIcon} size={14} strokeWidth={1.5} />
+		</span>
 		<div class="tool-info">
 			<span class="tool-name">{toolCall.name}</span>
 			{#if filePath}
@@ -47,12 +50,20 @@
 				class:error={toolCall.result.isError}
 				aria-label={toolCall.result.isError ? 'Tool failed' : 'Tool succeeded'}
 			>
-				{toolCall.result.isError ? '✗' : '✓'}
+				<HugeiconsIcon
+					icon={toolCall.result.isError ? CrossIcon : CheckIcon}
+					size={14}
+					strokeWidth={1.5}
+				/>
 			</span>
 		{:else}
-			<span class="tool-running" aria-label="Tool running">⋯</span>
+			<span class="tool-running" aria-label="Tool running">
+				<span class="tool-running-dot"></span>
+				<span class="tool-running-dot"></span>
+				<span class="tool-running-dot"></span>
+			</span>
 		{/if}
-		<span class="expand-icon" aria-hidden="true">{expanded ? '▲' : '▼'}</span>
+		<span class="expand-icon" aria-hidden="true" class:expanded></span>
 	</div>
 
 	{#if expanded}
@@ -139,8 +150,13 @@
 	}
 
 	.tool-icon {
-		font-size: 13px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 14px;
+		height: 14px;
 		flex-shrink: 0;
+		color: var(--color-text-muted);
 	}
 
 	.tool-info {
@@ -167,7 +183,11 @@
 	}
 
 	.tool-status {
-		font-size: 13px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 14px;
+		height: 14px;
 		color: var(--color-success);
 		flex-shrink: 0;
 	}
@@ -177,10 +197,27 @@
 	}
 
 	.tool-running {
-		font-size: 16px;
-		color: var(--color-warning);
-		animation: pulse 1.5s ease-in-out infinite;
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
 		flex-shrink: 0;
+	}
+
+	.tool-running-dot {
+		display: block;
+		width: 3px;
+		height: 3px;
+		border-radius: var(--radius-full);
+		background-color: var(--color-warning);
+		animation: pulse 1.5s ease-in-out infinite;
+	}
+
+	.tool-running-dot:nth-child(2) {
+		animation-delay: 0.15s;
+	}
+
+	.tool-running-dot:nth-child(3) {
+		animation-delay: 0.3s;
 	}
 
 	@keyframes pulse {
@@ -189,9 +226,26 @@
 	}
 
 	.expand-icon {
-		font-size: 10px;
-		color: var(--color-text-muted);
 		flex-shrink: 0;
+		width: 8px;
+		height: 8px;
+		border-right: 1.5px solid var(--color-text-muted);
+		border-bottom: 1.5px solid var(--color-text-muted);
+		transform: rotate(45deg);
+		transition: transform var(--transition-fast);
+	}
+
+	.expand-icon.expanded {
+		transform: rotate(225deg);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tool-running-dot {
+			animation: none;
+		}
+		.expand-icon {
+			transition: none;
+		}
 	}
 
 	.tool-body {
