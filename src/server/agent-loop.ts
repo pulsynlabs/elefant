@@ -209,30 +209,34 @@ export async function* runAgentLoop(
 			}
 
 			if (event.type === 'done') {
-				emitRunEvent('agent_run.done', {
-					finishReason: event.finishReason,
-				})
-
-				// Emit status change: running -> done
-				if (options.sseManager) {
-					publishStatusChange(options.sseManager, {
-						runId: options.runContext.runId,
-						sessionId: options.runContext.sessionId,
-						projectId: options.runContext.projectId,
-						parentRunId: options.runContext.parentRunId,
-						agentType: options.runContext.agentType,
-						title: options.runContext.title,
-						previousStatus: 'running',
-						nextStatus: 'done',
-						reason: `finishReason: ${event.finishReason}`,
-					})
-				}
-
 				finishReason = event.finishReason
+
 				if (event.finishReason !== 'tool_calls') {
+					// Run is truly finishing — emit done event and status change now.
+					emitRunEvent('agent_run.done', {
+						finishReason: event.finishReason,
+					})
+
+					// Emit status change: running -> done
+					if (options.sseManager) {
+						publishStatusChange(options.sseManager, {
+							runId: options.runContext.runId,
+							sessionId: options.runContext.sessionId,
+							projectId: options.runContext.projectId,
+							parentRunId: options.runContext.parentRunId,
+							agentType: options.runContext.agentType,
+							title: options.runContext.title,
+							previousStatus: 'running',
+							nextStatus: 'done',
+							reason: `finishReason: ${event.finishReason}`,
+						})
+					}
+
 					clearRunEventSequence(options.runContext.runId)
 					yield event
 				}
+				// finishReason === 'tool_calls': intermediate turn, loop continues.
+				// Do NOT emit agent_run.done — the run is not finished yet.
 				continue
 			}
 
