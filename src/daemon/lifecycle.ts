@@ -86,11 +86,10 @@ export async function startDaemon(): Promise<Result<{ pid: number }, ElefantErro
 			return err(createLifecycleError('TOOL_EXECUTION_FAILED', 'Daemon process did not provide a valid PID'));
 		}
 
-		const writeResult = await writePid(subprocess.pid);
-		if (!writeResult.ok) {
-			void sendSignal(subprocess.pid, 'SIGTERM');
-			return writeResult;
-		}
+		// server-entry.ts owns the PID file via acquireDaemonLock().
+		// Do NOT write it here — writing it from the parent causes a conflict:
+		// the child's acquireDaemonLock() finds the file already exists, sees
+		// the PID as "running", and exits immediately.
 
 		return ok({ pid: subprocess.pid });
 	} catch (error) {
