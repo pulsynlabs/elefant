@@ -18,7 +18,7 @@
 	} from './agent-task-card-state.js';
 	import {
 		HugeiconsIcon,
-		BotIcon,
+		AiBrain01Icon,
 		CheckIcon,
 		CrossIcon,
 		ChevronRightIcon,
@@ -82,7 +82,7 @@
 	<span class="card-accent" aria-hidden="true"></span>
 
 	<span class="agent-icon" aria-hidden="true">
-		<HugeiconsIcon icon={BotIcon} size={20} strokeWidth={1.5} />
+		<HugeiconsIcon icon={AiBrain01Icon} size={20} strokeWidth={1.5} />
 	</span>
 
 	<span class="card-body">

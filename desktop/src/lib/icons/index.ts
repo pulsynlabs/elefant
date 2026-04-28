@@ -52,5 +52,6 @@ export { default as BotIcon } from '@hugeicons/core-free-icons/BotIcon';
 
 // New feature icons (MH3, MH4, MH5)
 export { default as AgentsIcon } from '@hugeicons/core-free-icons/UserGroupIcon';
+export { default as AiBrain01Icon } from '@hugeicons/core-free-icons/AiBrain01Icon';
 export { default as RunsIcon } from '@hugeicons/core-free-icons/PlayIcon';
 export { default as WorktreesIcon } from '@hugeicons/core-free-icons/FolderTreeIcon';
