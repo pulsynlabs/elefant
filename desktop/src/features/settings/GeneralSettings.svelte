@@ -5,7 +5,6 @@
 	import { onMount } from 'svelte';
 
 	let daemonUrl = $state(settingsStore.daemonUrl);
-	let daemonProjectPath = $state(settingsStore.daemonProjectPath);
 	let port = $state(1337);
 	let logLevel = $state<LogLevel>('info');
 	let defaultProvider = $state('');
@@ -27,7 +26,6 @@
 		saveStatus = 'saving';
 		try {
 			await settingsStore.setDaemonUrl(daemonUrl);
-			await settingsStore.setDaemonProjectPath(daemonProjectPath);
 			await configService.updateConfig({
 				port,
 				logLevel,
@@ -61,21 +59,6 @@
 		<span id="daemonUrl-hint" class="field-hint"
 			>The URL where the Elefant daemon is running</span
 		>
-	</div>
-
-	<div class="form-group">
-		<label class="field-label" for="daemonProjectPath">Project Path</label>
-		<input
-			id="daemonProjectPath"
-			type="text"
-			class="field-input"
-			bind:value={daemonProjectPath}
-			placeholder="/home/user/elefant"
-			aria-describedby="daemonProjectPath-hint"
-		/>
-		<span id="daemonProjectPath-hint" class="field-hint">
-			Absolute path to the Elefant project root. Required for Start / Restart from the daemon panel.
-		</span>
 	</div>
 
 	<div class="form-group">

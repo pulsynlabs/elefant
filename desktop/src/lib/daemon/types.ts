@@ -5,6 +5,8 @@ export interface HealthResponse {
 	status: 'running';
 	uptime: number;
 	timestamp: string;
+	/** Absolute path to the daemon entry point. Used by the desktop app to restart. */
+	entryPath?: string;
 }
 
 export interface ErrorResponse {

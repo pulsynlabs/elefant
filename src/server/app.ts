@@ -79,6 +79,9 @@ export function createApp(
 			status: 'running',
 			uptime: process.uptime(),
 			timestamp: new Date().toISOString(),
+			// Absolute path to the entry point so the desktop app can restart
+			// the daemon without any manual path configuration.
+			entryPath: import.meta.filename,
 		}))
 
 	// Graceful shutdown endpoint — called by the desktop app's daemon
