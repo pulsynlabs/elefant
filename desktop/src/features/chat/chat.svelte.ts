@@ -1,6 +1,8 @@
 import type { ChatMessage, ContentBlock, ToolCallDisplay } from './types.js';
 import type { QuestionEvent } from '$lib/daemon/types.js';
 import type { AgentRunOverride } from '$lib/types/agent-config.js';
+import { getDaemonClient } from '$lib/daemon/client.js';
+import type { MessageRow } from '$lib/daemon/client.js';
 
 function generateId(): string {
 	return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -236,6 +238,47 @@ export function clearConversation(): void {
 	isStreaming = false;
 }
 
+/**
+ * Map daemon MessageRow records to ChatMessage objects for the UI.
+ * Filters out system messages and converts assistant messages with text blocks.
+ */
+export function mapMessageRowsToChat(rows: MessageRow[]): ChatMessage[] {
+	return rows
+		.filter((row) => row.role !== 'system')
+		.map((row) => {
+			const base = {
+				id: String(row.id),
+				content: row.content,
+				timestamp: new Date(row.created_at),
+			};
+			if (row.role === 'user') {
+				return { ...base, role: 'user' as const };
+			}
+			// assistant
+			return {
+				...base,
+				role: 'assistant' as const,
+				blocks: [{ type: 'text' as const, text: row.content }],
+			};
+		});
+}
+
+/**
+ * Load session history from the daemon and populate the messages array.
+ * On error, messages remain empty (empty state will show).
+ */
+export async function loadSessionHistory(projectId: string, sessionId: string): Promise<void> {
+	const client = getDaemonClient();
+	try {
+		const rows = await client.fetchSessionMessages(projectId, sessionId);
+		const mapped = mapMessageRowsToChat(rows);
+		messages = mapped;
+	} catch (err) {
+		console.error('[chatStore] loadSessionHistory failed:', err);
+		// Leave messages empty — empty state will show
+	}
+}
+
 // Build the API message array from conversation history
 export function getApiMessages(): Array<{ role: string; content: string }> {
 	return messages.map((msg) => ({
@@ -364,6 +407,7 @@ export const chatStore = {
 	clearAgentOverride,
 	getAgentOverride,
 	buildChatRequestFields,
+	loadSessionHistory,
 	addUserMessage,
 	startAssistantMessage,
 	appendToken,
