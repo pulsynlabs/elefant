@@ -3,10 +3,10 @@
 	//
 	// - Body click / Enter / Space emits `onSelect`
 	// - Hover (or keyboard focus) reveals rename + delete icon buttons
-	// - Rename: click ✏️ → converts name to an input → Enter/blur commits,
+	// - Rename: click the edit icon -> converts name to an input -> Enter/blur commits,
 	//   Esc cancels. The input auto-focuses and selects its text when it
 	//   appears so the user can immediately retype.
-	// - Delete: click 🗑️ → opens DeleteProjectDialog → confirm calls the
+	// - Delete: click the delete icon -> opens DeleteProjectDialog -> confirm calls the
 	//   store's deleteProject. Cancel closes the dialog without side effects.
 	//
 	// Rename and delete call the projects store directly because the input

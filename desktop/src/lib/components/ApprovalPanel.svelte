@@ -15,6 +15,12 @@
 
 	import { approvalsStore } from '$lib/stores/approvals.svelte.js';
 	import type { ApprovalRequest } from '$lib/daemon/approvals.js';
+	import {
+		HugeiconsIcon,
+		WarningIcon,
+		CheckIcon,
+		CrossIcon,
+	} from '$lib/icons/index.js';
 
 	const RISK_BADGE: Record<ApprovalRequest['risk'], string> = {
 		low: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
@@ -67,7 +73,9 @@
 	>
 		<header class="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
 			<h2 class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-				<span aria-hidden="true">⚠️</span>
+				<span class="inline-flex items-center justify-center" aria-hidden="true">
+					<HugeiconsIcon icon={WarningIcon} size={14} strokeWidth={1.5} />
+				</span>
 				Approval Required
 			</h2>
 			<span
@@ -116,17 +124,23 @@
 					<div class="flex gap-2">
 						<button
 							type="button"
-							class="flex-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+							class="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
 							onclick={() => handleApprove(req.requestId)}
 						>
-							<span aria-hidden="true">✓</span> Approve
+							<span class="inline-flex items-center" aria-hidden="true">
+								<HugeiconsIcon icon={CheckIcon} size={14} strokeWidth={1.5} />
+							</span>
+							Approve
 						</button>
 						<button
 							type="button"
-							class="flex-1 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+							class="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
 							onclick={() => handleDeny(req.requestId)}
 						>
-							<span aria-hidden="true">✗</span> Deny
+							<span class="inline-flex items-center" aria-hidden="true">
+								<HugeiconsIcon icon={CrossIcon} size={14} strokeWidth={1.5} />
+							</span>
+							Deny
 						</button>
 					</div>
 				</li>

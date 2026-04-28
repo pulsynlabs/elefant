@@ -41,14 +41,41 @@
 	let _lastSessionId = $state<string | null>(projectsStore.activeSessionId);
 	$effect(() => {
 		const current = projectsStore.activeSessionId;
+		const currentProjectId = projectsStore.activeProjectId;
+
 		if (current !== _lastSessionId) {
 			_lastSessionId = current;
+
+			// Track the active session so finalizeMessage knows where to persist.
+			chatStore.setActiveSession(current);
+
 			// Stop any in-flight stream before clearing
 			if (abortController) {
 				abortController.abort();
 				abortController = null;
 			}
 			chatStore.clearConversation();
+
+			// Load session history if we have a valid session+project.
+			// `$effect` cannot be async in Svelte 5 (effects must be
+			// synchronous), so we fire-and-forget the fetch with `void`
+			// and use `.then()` to apply a stale-result guard: if the
+			// user switches sessions while the fetch is in flight, the
+			// resolved messages are discarded so the UI stays consistent
+			// with `projectsStore.activeSessionId`.
+			if (current !== null && currentProjectId !== null) {
+				const requestedSessionId = current;
+				const requestedProjectId = currentProjectId;
+
+				void chatStore
+					.loadSessionHistory(requestedProjectId, requestedSessionId)
+					.then(() => {
+						// Race-safety: discard result if user switched sessions mid-fetch
+						if (projectsStore.activeSessionId !== requestedSessionId) {
+							chatStore.clearConversation();
+						}
+					});
+			}
 		}
 	});
 

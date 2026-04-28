@@ -65,6 +65,25 @@
 		}
 	}
 
+	let transcriptScrollEl = $state<HTMLDivElement | null>(null);
+
+	function scrollToBottom(): void {
+		if (transcriptScrollEl) {
+			transcriptScrollEl.scrollTop = transcriptScrollEl.scrollHeight;
+		}
+	}
+
+	// Scroll to bottom whenever the runId changes (new subagent opened).
+	$effect(() => {
+		// Depend on runId so this re-runs on every navigation.
+		const _id = runId;
+		if (!transcriptScrollEl) return;
+		// First pass: after current paint.
+		requestAnimationFrame(scrollToBottom);
+		// Second pass: after historical messages have loaded and re-painted.
+		setTimeout(scrollToBottom, 300);
+	});
+
 	// Esc navigates back to the parent when the child-run view is active.
 	$effect(() => {
 		if (navigationStore.current !== 'child-run') return;
@@ -149,7 +168,7 @@
 			{/if}
 		</header>
 
-		<div class="transcript-scroll">
+		<div class="transcript-scroll" bind:this={transcriptScrollEl}>
 			<AgentRunTranscript {runId} />
 		</div>
 

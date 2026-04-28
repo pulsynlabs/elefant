@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { HugeiconsIcon, CheckIcon, CopyIcon } from '$lib/icons/index.js';
+
 	type Props = {
 		content: string;
 		small?: boolean;
@@ -32,11 +34,13 @@
 	aria-label={copied ? 'Copied!' : 'Copy to clipboard'}
 	title={copied ? 'Copied!' : 'Copy to clipboard'}
 >
-	{#if copied}
-		<span aria-hidden="true">✓</span>
-	{:else}
-		<span aria-hidden="true">⧉</span>
-	{/if}
+	<span class="copy-icon" aria-hidden="true">
+		{#if copied}
+			<HugeiconsIcon icon={CheckIcon} size={small ? 12 : 14} strokeWidth={1.5} />
+		{:else}
+			<HugeiconsIcon icon={CopyIcon} size={small ? 12 : 14} strokeWidth={1.5} />
+		{/if}
+	</span>
 </button>
 
 <style>
@@ -74,5 +78,11 @@
 		color: var(--color-success);
 		border-color: var(--color-success);
 		background-color: color-mix(in oklch, var(--color-success) 10%, transparent);
+	}
+
+	.copy-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 	}
 </style>

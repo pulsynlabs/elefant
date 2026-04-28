@@ -238,15 +238,17 @@
 									the chat composer for v1.
 								</p>
 							</div>
-						{:else if block.kind === 'terminal'}
-							<div
-								class="terminal terminal-{block.status}"
-								role="status"
-								aria-live="polite"
-							>
-								<strong>{terminalHeading(block.status)}.</strong>
+					{:else if block.kind === 'terminal'}
+						<div
+							class="terminal terminal-{block.status}"
+							role="status"
+							aria-live="polite"
+						>
+							<strong>{terminalHeading(block.status)}.</strong>
+							{#if block.status !== 'done' && block.message}
 								<span>{block.message}</span>
-							</div>
+							{/if}
+						</div>
 						{/if}
 					</li>
 				{/each}

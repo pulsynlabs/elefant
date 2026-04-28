@@ -3,6 +3,7 @@
 	import ToolCardShell from './ToolCardShell.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { getDaemonClient } from '$lib/daemon/client.js';
+	import { HugeiconsIcon, CheckSquareIcon, UncheckSquareIcon } from '$lib/icons/index.js';
 
 	let { toolCall }: ToolCardProps = $props();
 
@@ -131,7 +132,13 @@
 							aria-pressed={isSelected}
 							type="button"
 						>
-							<span class="checkbox-indicator" aria-hidden="true">{isSelected ? '☑' : '☐'}</span>
+							<span class="checkbox-indicator" aria-hidden="true">
+								<HugeiconsIcon
+									icon={isSelected ? CheckSquareIcon : UncheckSquareIcon}
+									size={16}
+									strokeWidth={1.5}
+								/>
+							</span>
 							<span class="option-inner">
 								<span class="option-label">{option.label}</span>
 								{#if option.description}
@@ -267,10 +274,13 @@
 	}
 
 	.checkbox-indicator {
-		font-size: var(--font-size-sm);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
 		color: var(--color-primary);
 		flex-shrink: 0;
-		line-height: 1.4;
 	}
 
 	.option-inner {

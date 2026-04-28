@@ -1,6 +1,11 @@
 import type { ChatMessage, ContentBlock, ToolCallDisplay } from './types.js';
 import type { QuestionEvent } from '$lib/daemon/types.js';
 import type { AgentRunOverride } from '$lib/types/agent-config.js';
+import { getDaemonClient } from '$lib/daemon/client.js';
+import {
+	saveSessionHistory,
+	loadSessionHistory as loadFromStore,
+} from '$lib/services/chat-history.js';
 
 function generateId(): string {
 	return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -11,6 +16,8 @@ let messages = $state<ChatMessage[]>([]);
 let isStreaming = $state(false);
 let streamingMessageId = $state<string | null>(null);
 let selectedProvider = $state<string | null>(null);
+// Tracked so finalizeMessage can auto-persist without needing an extra param.
+let activeSessionId = $state<string | null>(null);
 let maxIterations = $state(50);
 let maxTokens = $state(4096);
 let temperature = $state(1.0);
@@ -216,6 +223,12 @@ export function finalizeMessage(_finishReason: string): void {
 
 	streamingMessageId = null;
 	isStreaming = false;
+
+	// Persist after every completed turn so session restore always has
+	// up-to-date history. Fire-and-forget — never block the UI.
+	if (activeSessionId) {
+		void saveSessionHistory(activeSessionId, messages);
+	}
 }
 
 export function setStreamingError(error: string): void {
@@ -234,6 +247,64 @@ export function clearConversation(): void {
 	messages = [];
 	streamingMessageId = null;
 	isStreaming = false;
+}
+
+/**
+ * Map daemon MessageRow records into ChatMessage display objects.
+ * Only user and assistant roles are rendered; tool_call/tool_result/system are dropped.
+ */
+function mapDaemonMessages(rows: Array<{
+	id: number; role: string; content: string; created_at: string;
+}>): ChatMessage[] {
+	return rows
+		.filter((r) => r.role === 'user' || r.role === 'assistant')
+		.map((r) => ({
+			id: String(r.id),
+			role: r.role as 'user' | 'assistant',
+			content: r.content,
+			timestamp: new Date(r.created_at),
+			...(r.role === 'assistant'
+				? { blocks: [{ type: 'text' as const, text: r.content }] }
+				: {}),
+		}));
+}
+
+/**
+ * Load session history and populate the messages array.
+ *
+ * Strategy (in order):
+ * 1. Tauri Store — for sessions that have been active since persistence
+ *    was added. Fast, works offline.
+ * 2. Daemon DB — for older sessions. Fetches root-level agent run
+ *    messages (user + assistant only) from the daemon API.
+ */
+export async function loadSessionHistory(projectId: string, sessionId: string): Promise<void> {
+	activeSessionId = sessionId;
+
+	// Strategy 1: local Tauri Store
+	try {
+		const stored = await loadFromStore(sessionId);
+		if (stored.length > 0) {
+			messages = stored;
+			return;
+		}
+	} catch {
+		// Fall through to daemon
+	}
+
+	// Strategy 2: daemon DB (root runs only — no child agent runs)
+	try {
+		const client = getDaemonClient();
+		const rows = await client.fetchSessionMessages(projectId, sessionId);
+		const mapped = mapDaemonMessages(rows);
+		if (mapped.length > 0) {
+			messages = mapped;
+			// Backfill the Tauri Store so next load is instant
+			void saveSessionHistory(sessionId, mapped);
+		}
+	} catch (err) {
+		console.error('[chatStore] loadSessionHistory daemon fallback failed:', err);
+	}
 }
 
 // Build the API message array from conversation history
@@ -342,6 +413,9 @@ export const chatStore = {
 	get hasAgentOverride() {
 		return hasAgentOverride();
 	},
+	setActiveSession: (id: string | null) => {
+		activeSessionId = id;
+	},
 	setProvider: (p: string | null) => {
 		selectedProvider = p;
 	},
@@ -364,6 +438,7 @@ export const chatStore = {
 	clearAgentOverride,
 	getAgentOverride,
 	buildChatRequestFields,
+	loadSessionHistory,
 	addUserMessage,
 	startAssistantMessage,
 	appendToken,

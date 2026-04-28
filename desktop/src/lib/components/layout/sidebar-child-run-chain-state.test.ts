@@ -59,15 +59,17 @@ describe('computeSidebarChildRunChain — visibility rules', () => {
 		expect(rows).toEqual([]);
 	});
 
-	it('renders nothing when the current view is not chat or child-run', () => {
-		const rows = computeSidebarChildRunChain({
-			isActiveSession: true,
-			currentView: 'settings',
-			currentChildRunId: 'child',
-			sessionRuns: [rootRun, childRun],
-			activeChildPath: [rootRun, childRun],
-		});
-		expect(rows).toEqual([]);
+	it('renders nothing when the current view is not child-run', () => {
+		for (const view of ['settings', 'chat', 'agent-runs'] as const) {
+			const rows = computeSidebarChildRunChain({
+				isActiveSession: true,
+				currentView: view,
+				currentChildRunId: 'child',
+				sessionRuns: [rootRun, childRun],
+				activeChildPath: [rootRun, childRun],
+			});
+			expect(rows).toEqual([]);
+		}
 	});
 
 	it('renders nothing when there is no active child run id', () => {
@@ -110,7 +112,7 @@ describe('computeSidebarChildRunChain — happy path', () => {
 	it('returns a single indented row for a one-level child chain', () => {
 		const rows = computeSidebarChildRunChain({
 			isActiveSession: true,
-			currentView: 'chat',
+			currentView: 'child-run',
 			currentChildRunId: 'child',
 			sessionRuns: [rootRun, childRun],
 			activeChildPath: [rootRun, childRun],
@@ -138,7 +140,7 @@ describe('computeSidebarChildRunChain — happy path', () => {
 	it('preserves the order from the active child path', () => {
 		const rows = computeSidebarChildRunChain({
 			isActiveSession: true,
-			currentView: 'chat',
+			currentView: 'child-run',
 			currentChildRunId: 'grandchild',
 			sessionRuns: [rootRun, childRun, grandchildRun],
 			activeChildPath: [rootRun, childRun, grandchildRun],
@@ -150,7 +152,7 @@ describe('computeSidebarChildRunChain — happy path', () => {
 	it('excludes the root run from the rendered rows', () => {
 		const rows = computeSidebarChildRunChain({
 			isActiveSession: true,
-			currentView: 'chat',
+			currentView: 'child-run',
 			currentChildRunId: 'child',
 			sessionRuns: [rootRun, childRun],
 			activeChildPath: [rootRun, childRun],

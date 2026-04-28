@@ -2,6 +2,7 @@
 	import type { ChatMessage } from './types.js';
 	import ToolCallCard from './ToolCallCard.svelte';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
+	import { HugeiconsIcon, ErrorIcon } from '$lib/icons/index.js';
 
 	type Props = {
 		message: ChatMessage;
@@ -13,7 +14,9 @@
 <div class="streaming-message">
 	{#if message.isError}
 		<div class="error-content" role="alert">
-			<span class="error-icon" aria-hidden="true">⚠</span>
+			<span class="error-icon" aria-hidden="true">
+				<HugeiconsIcon icon={ErrorIcon} size={16} strokeWidth={1.5} />
+			</span>
 			<span class="error-text">{message.errorMessage ?? 'An error occurred'}</span>
 		</div>
 	{:else if message.blocks && message.blocks.length > 0}
@@ -50,7 +53,11 @@
 	}
 
 	.error-icon {
-		font-size: 16px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
 		flex-shrink: 0;
 	}
 

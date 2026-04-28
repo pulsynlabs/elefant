@@ -38,6 +38,6 @@ export function matchesShortcut(event: KeyboardEvent, shortcut: Shortcut): boole
 }
 
 export function getShortcutLabel(shortcut: Shortcut): string {
-	const modifier = isMac ? '⌘' : 'Ctrl+';
+	const modifier = isMac ? 'Cmd+' : 'Ctrl+';
 	return `${modifier}${shortcut.key.toUpperCase()}`;
 }

@@ -91,7 +91,7 @@ describe('AgentTaskCard — state derivation', () => {
 		expect(state.statusLabel).toBe('Running');
 	});
 
-	it('renders done state with a checkmark icon when the child run completes', () => {
+	it('renders done state with a check token when the child run completes', () => {
 		const state = computeAgentTaskCardState(
 			'run-child',
 			makeRun({ status: 'done' }),
@@ -99,11 +99,11 @@ describe('AgentTaskCard — state derivation', () => {
 		expect(state.status).toBe('done');
 		expect(state.disabled).toBe(false);
 		expect(state.isPulsing).toBe(false);
-		expect(state.statusIcon).toBe('✓');
+		expect(state.statusIcon).toBe('check');
 		expect(state.statusLabel).toBe('Complete');
 	});
 
-	it('renders error state with a cross icon when the child run errors', () => {
+	it('renders error state with a cross token when the child run errors', () => {
 		const state = computeAgentTaskCardState(
 			'run-child',
 			makeRun({ status: 'error', errorMessage: 'boom' }),
@@ -111,11 +111,11 @@ describe('AgentTaskCard — state derivation', () => {
 		expect(state.status).toBe('error');
 		expect(state.disabled).toBe(false);
 		expect(state.isPulsing).toBe(false);
-		expect(state.statusIcon).toBe('✗');
+		expect(state.statusIcon).toBe('cross');
 		expect(state.statusLabel).toBe('Error');
 	});
 
-	it('renders cancelled state with a dash icon when the child run is cancelled', () => {
+	it('renders cancelled state with a dash token when the child run is cancelled', () => {
 		const state = computeAgentTaskCardState(
 			'run-child',
 			makeRun({ status: 'cancelled' }),
@@ -123,7 +123,7 @@ describe('AgentTaskCard — state derivation', () => {
 		expect(state.status).toBe('cancelled');
 		expect(state.disabled).toBe(false);
 		expect(state.isPulsing).toBe(false);
-		expect(state.statusIcon).toBe('—');
+		expect(state.statusIcon).toBe('dash');
 		expect(state.statusLabel).toBe('Cancelled');
 	});
 });

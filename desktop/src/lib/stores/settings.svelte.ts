@@ -38,7 +38,6 @@ export async function initSettings(): Promise<void> {
 			autoStartDaemon = savedAutoStart;
 		}
 
-		// Update daemon client with persisted URL
 		getDaemonClient(daemonUrl);
 	} catch {
 		// Use defaults on error
@@ -47,7 +46,7 @@ export async function initSettings(): Promise<void> {
 
 export async function setDaemonUrl(url: string): Promise<void> {
 	daemonUrl = url;
-	getDaemonClient(url); // Update singleton
+	getDaemonClient(url);
 
 	try {
 		const s = await getStore();

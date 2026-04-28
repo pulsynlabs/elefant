@@ -98,8 +98,10 @@ export function computeSidebarChildRunChain(
 	// Rule 1: only the active session renders a chain.
 	if (!isActiveSession) return [];
 
-	// Rule 2: chain is only relevant inside the chat/child-run flow.
-	if (currentView !== 'chat' && currentView !== 'child-run') return [];
+	// Rule 2: chain only shows when the user is actively viewing a child run.
+	// In plain chat view the session row alone is sufficient — showing the
+	// chain there is visual noise the user didn't ask for.
+	if (currentView !== 'child-run') return [];
 
 	// Rule 3: no active child run → nothing to surface.
 	if (!currentChildRunId) return [];

@@ -14,7 +14,24 @@
 	import {
 		buildAgentTaskCardAriaLabel,
 		computeAgentTaskCardState,
+		type AgentTaskCardStatusIcon,
 	} from './agent-task-card-state.js';
+	import {
+		HugeiconsIcon,
+		AiBrain01Icon,
+		CheckIcon,
+		CrossIcon,
+		ChevronRightIcon,
+		type IconSvgElement,
+	} from '$lib/icons/index.js';
+
+	// Map logical status icon tokens to concrete icon components. The
+	// 'spinner' and 'dash' tokens render as their own non-icon elements
+	// (animated spinner / em-dash) below.
+	const STATUS_ICON_MAP: Partial<Record<AgentTaskCardStatusIcon, IconSvgElement>> = {
+		check: CheckIcon,
+		cross: CrossIcon,
+	};
 
 	type Props = {
 		title: string;
@@ -64,7 +81,9 @@
 >
 	<span class="card-accent" aria-hidden="true"></span>
 
-	<span class="agent-icon" aria-hidden="true">🤖</span>
+	<span class="agent-icon" aria-hidden="true">
+		<HugeiconsIcon icon={AiBrain01Icon} size={20} strokeWidth={1.5} />
+	</span>
 
 	<span class="card-body">
 		<span class="card-title-row">
@@ -84,8 +103,14 @@
 				>
 					{#if cardState.isPulsing}
 						<span class="pulse-dot"></span>
-					{:else}
-						{cardState.statusIcon}
+					{:else if cardState.statusIcon === 'dash'}
+						<span class="dash-glyph">—</span>
+					{:else if STATUS_ICON_MAP[cardState.statusIcon]}
+						<HugeiconsIcon
+							icon={STATUS_ICON_MAP[cardState.statusIcon]!}
+							size={12}
+							strokeWidth={1.5}
+						/>
 					{/if}
 				</span>
 				<span class="status-text">{cardState.statusLabel}</span>
@@ -94,7 +119,9 @@
 	</span>
 
 	{#if !cardState.disabled}
-		<span class="card-chevron" aria-hidden="true">›</span>
+		<span class="card-chevron" aria-hidden="true">
+			<HugeiconsIcon icon={ChevronRightIcon} size={16} strokeWidth={1.5} />
+		</span>
 	{/if}
 </button>
 
@@ -162,9 +189,19 @@
 	}
 
 	.agent-icon {
-		font-size: 20px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
 		line-height: 1;
 		flex-shrink: 0;
+		color: var(--color-info);
+	}
+
+	.dash-glyph {
+		font-size: 12px;
+		line-height: 1;
 	}
 
 	.card-body {
@@ -264,7 +301,11 @@
 	}
 
 	.card-chevron {
-		font-size: 18px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
 		color: var(--color-text-muted);
 		line-height: 1;
 		flex-shrink: 0;

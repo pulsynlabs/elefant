@@ -6,7 +6,12 @@
   "permissions": [
     "core:default",
     "dialog:allow-open",
-    "shell:allow-execute",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        { "name": "bun", "cmd": "bun", "args": true }
+      ]
+    },
     "shell:allow-open",
     "store:allow-get",
     "store:allow-set",

@@ -110,15 +110,27 @@
 		onSelectChildRun?.(runId);
 	}
 
-	// Truncate a session's display string. Falls back to id if no title field.
+	// Format a session into a human-readable label.
+	// Preference order:
+	//   1. workflowId — a meaningful slug (e.g. "feat-auth", "fix-bug-42")
+	//   2. startedAt formatted as a compact local date+time
+	//   3. Last-resort: truncated id
 	function sessionLabel(session: Session): string {
-		// The Session type doesn't guarantee a title, so use a sensible
-		// fallback chain.
-		const maybeTitle = (session as Session & { title?: string }).title;
-		const label = maybeTitle && maybeTitle.trim().length > 0
-			? maybeTitle
-			: `Session ${session.id.slice(0, 8)}`;
-		return label;
+		if (session.workflowId && session.workflowId.trim().length > 0) {
+			return session.workflowId;
+		}
+		if (session.startedAt) {
+			const d = new Date(session.startedAt);
+			if (!isNaN(d.getTime())) {
+				return d.toLocaleString(undefined, {
+					month: 'short',
+					day: 'numeric',
+					hour: 'numeric',
+					minute: '2-digit',
+				});
+			}
+		}
+		return session.id.slice(0, 8);
 	}
 
 	function handleRowClick(): void {
@@ -227,14 +239,14 @@
 								></span>
 							{/if}
 						</button>
-						{#if isActiveSession && childRunChainRows.length > 0}
-							<SidebarChildRunChain
-								rows={childRunChainRows}
-								{activeChildRunId}
-								getStatusVariant={resolveChildRunVariant}
-								onSelectRun={handleSelectChildRun}
-							/>
-						{/if}
+					{#if isActiveSession && activeChildRunId && childRunChainRows.length > 0}
+						<SidebarChildRunChain
+							rows={childRunChainRows}
+							{activeChildRunId}
+							getStatusVariant={resolveChildRunVariant}
+							onSelectRun={handleSelectChildRun}
+						/>
+					{/if}
 					</li>
 				{/each}
 			{/if}
