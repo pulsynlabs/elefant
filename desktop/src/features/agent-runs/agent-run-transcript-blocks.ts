@@ -185,16 +185,25 @@ export function computeRenderBlocks(
 				});
 				break;
 			}
-			case 'terminal': {
-				flushText();
-				out.push({
-					kind: 'terminal',
-					id: `terminal-${entry.seq}`,
-					status: entry.status,
-					message: entry.message,
-				});
-				break;
+		case 'terminal': {
+			flushText();
+			// Replace any prior terminal block — only the last terminal entry
+			// is meaningful. This prevents duplicate "Run complete." banners
+			// if the daemon emitted the event more than once (defensive guard).
+			const existingTerminalIdx = out.findIndex((b) => b.kind === 'terminal');
+			const terminalBlock: RenderBlock = {
+				kind: 'terminal',
+				id: `terminal-${entry.seq}`,
+				status: entry.status,
+				message: entry.message,
+			};
+			if (existingTerminalIdx !== -1) {
+				out[existingTerminalIdx] = terminalBlock;
+			} else {
+				out.push(terminalBlock);
 			}
+			break;
+		}
 		}
 	}
 
