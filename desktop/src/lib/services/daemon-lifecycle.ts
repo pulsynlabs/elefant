@@ -48,8 +48,20 @@ export async function getDaemonStatus(): Promise<DaemonLifecycleStatus> {
 	}
 }
 
+export async function restartDaemon(): Promise<void> {
+	// Best-effort stop — ignore errors if already stopped
+	try {
+		await stopDaemon();
+		await new Promise<void>((r) => setTimeout(r, 1000));
+	} catch {
+		// Already stopped — proceed to start
+	}
+	await startDaemon();
+}
+
 export const daemonLifecycle = {
 	startDaemon,
 	stopDaemon,
+	restartDaemon,
 	getDaemonStatus,
 };
