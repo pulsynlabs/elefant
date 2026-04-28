@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ChatMessage } from './types.js';
 	import MessageBubble from './MessageBubble.svelte';
+	import { HugeiconsIcon, ChatIcon } from '$lib/icons/index.js';
 	import { tick } from 'svelte';
 
 	type Props = {
@@ -31,7 +32,9 @@
 <div class="message-list" bind:this={listEl}>
 	{#if messages.length === 0}
 		<div class="empty-state">
-			<div class="empty-icon" aria-hidden="true">🐘</div>
+			<div class="empty-icon" aria-hidden="true">
+				<HugeiconsIcon icon={ChatIcon} size={40} strokeWidth={1.5} />
+			</div>
 			<h3 class="empty-title">Start a conversation</h3>
 			<p class="empty-desc">
 				Ask Elefant to help with your code, explain concepts, or execute tasks.
@@ -70,7 +73,9 @@
 	}
 
 	.empty-icon {
-		font-size: 40px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		opacity: 0.7;
 	}
 
