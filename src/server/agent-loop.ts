@@ -83,6 +83,7 @@ export async function* runAgentLoop(
 	const contextWindow = options.contextWindowTokens ?? 200_000
 	const sessionId = options.runContext.sessionId
 	const maxIterations = options.maxIterations ?? 50
+	const repairCounts = new Map<string, number>()
 	const emitRunEvent = (type: string, data: unknown): void => {
 		if (!options.sseManager) {
 			return
@@ -297,6 +298,7 @@ export async function* runAgentLoop(
 		type TaskOutput = {
 			events: StreamEvent[]
 			message: Message
+			isRepair?: boolean
 		}
 
 		const toolTasks = pendingToolCalls.map((toolCall) =>
@@ -343,6 +345,29 @@ export async function* runAgentLoop(
 					toolCall.name,
 					toToolArguments(toolCall.arguments, options.runContext.runId, toolCall.id, runQuestionEmitter),
 				)
+
+				if (!executeResult.ok && executeResult.error.code === 'VALIDATION_ERROR') {
+					const repairCount = repairCounts.get(toolCall.id) ?? 0
+					if (repairCount < 2) {
+						repairCounts.set(toolCall.id, repairCount + 1)
+						const toolResult = createToolResult(toolCall.id, executeResult.error.message, true)
+						emitRunEvent('agent_run.tool_result', {
+							toolResult,
+						})
+						taskEvents.push({ type: 'tool_result', toolResult })
+
+						return {
+							events: taskEvents,
+							message: {
+								role: 'tool',
+								content: toolResult.content,
+								toolCallId: toolResult.toolCallId,
+							},
+							isRepair: true,
+						}
+					}
+				}
+
 				const toolResult = createToolResult(
 					toolCall.id,
 					executeResult.ok ? executeResult.data : executeResult.error.message,
@@ -365,6 +390,7 @@ export async function* runAgentLoop(
 		)
 
 		const taskOutputs = await Promise.all(toolTasks)
+		const anyRepair = taskOutputs.some((output) => output.isRepair === true)
 
 		for (const output of taskOutputs) {
 			for (const event of output.events) {
@@ -383,6 +409,10 @@ export async function* runAgentLoop(
 			sessionId: options.runContext.sessionId,
 			projectId: options.runContext.projectId,
 		})
+
+		if (anyRepair) {
+			iterations -= 1
+		}
 	}
 
 	yield {
