@@ -6,7 +6,7 @@ import type { RunRegistry } from '../runs/registry.ts';
 import type { RunContext } from '../runs/types.ts';
 import type { ElefantError } from '../types/errors.ts';
 import { err, ok, type Result } from '../types/result.ts';
-import type { ToolDefinition, ToolResult } from '../types/tools.ts';
+import type { ParameterDefinition, ToolDefinition, ToolResult } from '../types/tools.ts';
 import type { SseManager } from '../transport/sse-manager.js';
 import { applyPatchTool } from './apply_patch/index.js';
 import { createAgentSessionSearchTool, type AgentSessionSearchDeps } from './agent_session_search/index.js';
@@ -25,6 +25,11 @@ import { createToolListTool } from './tool_list/index.js';
 import { webfetchTool } from './webfetch.js';
 import { websearchTool } from './websearch.js';
 import { writeTool } from './write.js';
+
+export const MAX_TOOL_OUTPUT_CHARS = 100_000;
+
+const TRUNCATION_NOTICE_TEMPLATE = (n: number): string =>
+	`\n\n[Output truncated: showing first ${n} chars. Use grep/glob/read to retrieve specific parts.]`;
 
 function createToolError(message: string, details?: unknown): ElefantError {
 	return {
@@ -59,12 +64,114 @@ function toToolContent(value: unknown): string {
 	}
 }
 
+export function truncateToolOutput(args: {
+	content: string;
+	maxChars?: number;
+	maxLines?: number;
+}): { content: string; wasTruncated: boolean } {
+	const maxChars = args.maxChars ?? MAX_TOOL_OUTPUT_CHARS;
+	let content = args.content;
+	let wasTruncated = false;
+
+	if (args.maxLines !== undefined) {
+		const lines = content.split('\n');
+		if (lines.length > args.maxLines) {
+			content = lines.slice(0, args.maxLines).join('\n');
+			wasTruncated = true;
+		}
+	}
+
+	if (content.length > maxChars) {
+		content = content.slice(0, maxChars);
+		wasTruncated = true;
+	}
+
+	if (!wasTruncated) {
+		return { content, wasTruncated: false };
+	}
+
+	return {
+		content: content + TRUNCATION_NOTICE_TEMPLATE(maxChars),
+		wasTruncated: true,
+	};
+}
+
 function toHookResult(content: string, isError: boolean): ToolResult {
 	return {
 		toolCallId: '',
 		content,
 		isError,
 	};
+}
+
+function actualType(value: unknown): string {
+	if (value === null) {
+		return 'null';
+	}
+
+	if (Array.isArray(value)) {
+		return 'array';
+	}
+
+	return typeof value;
+}
+
+function matchesParameterType(value: unknown, type: ParameterDefinition['type']): boolean {
+	switch (type) {
+		case 'string':
+			return typeof value === 'string';
+		case 'number':
+			return typeof value === 'number' && !Number.isNaN(value);
+		case 'boolean':
+			return typeof value === 'boolean';
+		case 'object':
+			return typeof value === 'object' && value !== null && !Array.isArray(value);
+		case 'array':
+			return Array.isArray(value);
+	}
+}
+
+function createValidationError(toolName: string, reason: string): ElefantError {
+	return {
+		code: 'VALIDATION_ERROR',
+		message: `The "${toolName}" tool was called with invalid arguments: ${reason}. Please rewrite the input so it satisfies the expected schema.`,
+	};
+}
+
+export function validateToolArgs(
+	tool: ToolDefinition<unknown, string>,
+	rawArgs: unknown,
+): Result<Record<string, unknown>, ElefantError> {
+	if (typeof rawArgs !== 'object' || rawArgs === null || Array.isArray(rawArgs)) {
+		return err(createValidationError(tool.name, `expected an object, got ${actualType(rawArgs)}`));
+	}
+
+	const validatedArgs: Record<string, unknown> = { ...(rawArgs as Record<string, unknown>) };
+
+	for (const [paramName, definition] of Object.entries(tool.parameters)) {
+		const valueIsPresent = paramName in validatedArgs;
+		if (!valueIsPresent) {
+			if (definition.default !== undefined) {
+				validatedArgs[paramName] = definition.default;
+				continue;
+			}
+
+			if (definition.required) {
+				return err(createValidationError(tool.name, `missing required field "${paramName}" (${definition.type})`));
+			}
+
+			continue;
+		}
+
+		if (!matchesParameterType(validatedArgs[paramName], definition.type)) {
+			return err(createValidationError(
+				tool.name,
+				`field "${paramName}" expected ${definition.type}, got ${actualType(validatedArgs[paramName])}`,
+			));
+		}
+	}
+
+	return ok(validatedArgs);
 }
 
 export class ToolRegistry {
@@ -123,33 +230,61 @@ export class ToolRegistry {
 			conversationId,
 		});
 
-		try {
-			const execution = await tool.execute(args);
-			if (!execution.ok) {
-				await emit(this.hookRegistry, 'tool:after', {
-					toolName: name,
-					args: hookArgs,
-					result: toHookResult(execution.error.message, true),
-					durationMs: Date.now() - startedAt,
-					conversationId,
-				});
+		const validatedArgs = validateToolArgs(tool, args);
+		if (!validatedArgs.ok) {
+			const truncated = truncateToolOutput({ content: validatedArgs.error.message });
+			const error = {
+				...validatedArgs.error,
+				message: truncated.content,
+			};
 
-				return execution;
-			}
-
-			const content = toToolContent(execution.data);
 			await emit(this.hookRegistry, 'tool:after', {
 				toolName: name,
 				args: hookArgs,
-				result: toHookResult(content, false),
+				result: toHookResult(truncated.content, true),
 				durationMs: Date.now() - startedAt,
 				conversationId,
 			});
 
-			return ok(content);
+			return err(error);
+		}
+
+		try {
+			const execution = await tool.execute(validatedArgs.data);
+			if (!execution.ok) {
+				const truncated = truncateToolOutput({ content: execution.error.message });
+				const error = {
+					...execution.error,
+					message: truncated.content,
+				};
+
+				await emit(this.hookRegistry, 'tool:after', {
+					toolName: name,
+					args: hookArgs,
+					result: toHookResult(truncated.content, true),
+					durationMs: Date.now() - startedAt,
+					conversationId,
+				});
+
+				return err(error);
+			}
+
+			const content = toToolContent(execution.data);
+			const truncated = truncateToolOutput({ content });
+			await emit(this.hookRegistry, 'tool:after', {
+				toolName: name,
+				args: hookArgs,
+				result: toHookResult(truncated.content, false),
+				durationMs: Date.now() - startedAt,
+				conversationId,
+			});
+
+			return ok(truncated.content);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			const stack = error instanceof Error ? error.stack : undefined;
+			const wrappedMessage = `Tool "${name}" threw an exception: ${message}`;
+			const truncated = truncateToolOutput({ content: wrappedMessage });
 			// Log the full error so operators can diagnose tool crashes. The
 			// registry rewrites the thrown error into a flat `{ ok: false, error }`
 			// Result below (so the agent loop can continue), which hides the stack
@@ -158,12 +293,12 @@ export class ToolRegistry {
 			await emit(this.hookRegistry, 'tool:after', {
 				toolName: name,
 				args: hookArgs,
-				result: toHookResult(message, true),
+				result: toHookResult(truncated.content, true),
 				durationMs: Date.now() - startedAt,
 				conversationId,
 			});
 
-			return err(createToolError(`Tool "${name}" threw an exception: ${message}`, { message, stack }));
+			return err(createToolError(truncated.content, { message, stack }));
 		}
 	}
 
