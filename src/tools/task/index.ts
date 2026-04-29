@@ -1,4 +1,6 @@
 import type { ConfigManager } from '../../config/loader.js'
+import { readFile } from 'node:fs/promises'
+import { isAbsolute, resolve, sep } from 'node:path'
 import type { Database } from '../../db/database.js'
 import type { HookRegistry } from '../../hooks/index.js'
 import type { ProviderRouter } from '../../providers/router.js'
@@ -33,7 +35,8 @@ export interface TaskToolDeps {
 export interface TaskParams {
 	description: string
 	prompt: string
-	agent_type: string
+	agent_type?: string
+	subagent_type?: string
 	context_mode?: 'none' | 'inherit_session' | 'snapshot'
 }
 
@@ -43,6 +46,45 @@ interface TaskExecutionParams extends TaskParams {
 
 export const DEFAULT_MAX_CHILDREN = 4
 export const DEFAULT_MAX_TASK_DEPTH = 4
+
+function promptPathIsAllowed(path: string): boolean {
+	const promptsRoot = resolve(process.cwd(), 'src', 'agents', 'prompts')
+	const candidate = isAbsolute(path) ? resolve(path) : resolve(process.cwd(), path)
+	return candidate === promptsRoot || candidate.startsWith(`${promptsRoot}${sep}`)
+}
+
+export async function resolveAgentPrompt(
+	subagentType: string,
+	configManager: ConfigManager,
+	projectId?: string,
+): Promise<string | null> {
+	const configResult = await configManager.resolve(subagentType, projectId)
+	if (!configResult.ok) {
+		return null
+	}
+
+	const profile = configResult.data
+	if (profile.promptOverride?.trim()) {
+		return profile.promptOverride
+	}
+
+	if (!profile.promptFile) {
+		return null
+	}
+
+	if (!promptPathIsAllowed(profile.promptFile)) {
+		return null
+	}
+
+	try {
+		const path = isAbsolute(profile.promptFile)
+			? profile.promptFile
+			: resolve(process.cwd(), profile.promptFile)
+		return await readFile(path, 'utf-8')
+	} catch {
+		return null
+	}
+}
 
 export function wireParentAbortToChild(parentSignal: AbortSignal, childController: AbortController): () => void {
 	const onParentAbort = (): void => childController.abort()
@@ -91,8 +133,13 @@ Use agent_session_search to query the child's full message history by runId.`,
 			},
 			agent_type: {
 				type: 'string',
-				required: true,
-				description: 'Agent type identifier (must match a profile in agent config)',
+				required: false,
+				description: 'Agent type identifier (legacy alias for subagent_type)',
+			},
+			subagent_type: {
+				type: 'string',
+				required: false,
+				description: 'Subagent profile identifier; resolves prompt and config at dispatch time',
 			},
 			context_mode: {
 				type: 'string',
@@ -115,7 +162,15 @@ Use agent_session_search to query the child's full message history by runId.`,
 				currentRun,
 			} = deps
 
-			const configResult = await configManager.resolve(params.agent_type, currentRun.projectId)
+			const agentType = params.subagent_type ?? params.agent_type
+			if (!agentType) {
+				return err({
+					code: 'VALIDATION_ERROR',
+					message: 'Task tool requires agent_type or subagent_type.',
+				})
+			}
+
+			const configResult = await configManager.resolve(agentType, currentRun.projectId)
 			const resolvedConfig = configResult.ok ? configResult.data : null
 			const resolvedConfigRecord =
 				resolvedConfig && typeof resolvedConfig === 'object'
@@ -127,7 +182,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 			if ((currentRun.depth ?? 0) >= maxDepth) {
 				return err({
 					code: 'VALIDATION_ERROR',
-					message: `Agent depth limit reached: current depth ${currentRun.depth ?? 0} >= maxTaskDepth ${maxDepth} for agent type "${params.agent_type}"`,
+					message: `Agent depth limit reached: current depth ${currentRun.depth ?? 0} >= maxTaskDepth ${maxDepth} for agent type "${agentType}"`,
 				})
 			}
 
@@ -156,7 +211,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 			const childCtx: RunContext = {
 				runId: childRunId,
 				parentRunId: currentRun.runId,
-				agentType: params.agent_type,
+				agentType: agentType,
 				title: params.description,
 				sessionId: currentRun.sessionId,
 				projectId: currentRun.projectId,
@@ -164,13 +219,14 @@ Use agent_session_search to query the child's full message history by runId.`,
 				depth: (currentRun.depth ?? 0) + 1,
 			}
 
-			const contextMode = params.context_mode ?? 'none'
+			const contextMode = params.context_mode ?? resolvedConfig?.contextMode ?? 'none'
+			const resolvedPrompt = await resolveAgentPrompt(agentType, configManager, currentRun.projectId)
 			const delegationSystemContent = [
 				'<delegation_context>',
 				`  parent_run_id: ${currentRun.runId}`,
 				`  root_session_id: ${currentRun.sessionId}`,
 				`  project_id: ${currentRun.projectId}`,
-				`  agent_type: ${params.agent_type}`,
+				`  agent_type: ${agentType}`,
 				`  description: ${params.description}`,
 				`  context_mode: ${contextMode}`,
 				`  depth: ${childCtx.depth}`,
@@ -184,6 +240,13 @@ Use agent_session_search to query the child's full message history by runId.`,
 				role: 'system' as const,
 				content: delegationSystemContent,
 			}
+
+			const agentPromptMsg = resolvedPrompt
+				? {
+					role: 'system' as const,
+					content: resolvedPrompt,
+				}
+				: null
 
 			let contextMessages: Message[] = []
 			if (contextMode === 'inherit_session' || contextMode === 'snapshot') {
@@ -206,7 +269,12 @@ Use agent_session_search to query the child's full message history by runId.`,
 				role: 'user' as const,
 				content: params.prompt,
 			}
-			const initialMessages: Message[] = [delegationSystemMsg, ...contextMessages, userPromptMsg]
+			const initialMessages: Message[] = [
+				...(agentPromptMsg ? [agentPromptMsg] : []),
+				delegationSystemMsg,
+				...contextMessages,
+				userPromptMsg,
+			]
 
 			// Only set parent_run_id when the parent is itself a persisted agent
 			// run (i.e. spawned via the agent-runs REST endpoint and present in
@@ -244,11 +312,12 @@ Use agent_session_search to query the child's full message history by runId.`,
 				session_id: currentRun.sessionId,
 				project_id: currentRun.projectId,
 				parent_run_id: persistedParentRunId,
-				agent_type: params.agent_type,
+				agent_type: agentType,
 				title: params.description,
 				status: 'running',
 				context_mode: contextMode,
 				started_at: new Date().toISOString(),
+				orchestrator_prompt: params.prompt,
 			})
 			if (!createResult.ok) {
 				// Log but don't abort — child can still run without a DB row
@@ -263,7 +332,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 				parentRunId: currentRun.runId,
 				startedAt: new Date(),
 				questionEmitter: createQuestionEmitter(childRunId, () => undefined),
-				agentType: params.agent_type,
+				agentType: agentType,
 				title: params.description,
 			})
 
@@ -272,6 +341,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 		publishRunEvent(childCtx, sseManager, 'agent_run.spawned', {
 			contextMode,
 			parentRunId: currentRun.runId,
+			orchestratorPrompt: params.prompt,
 		})
 
 		// Emit status change: null -> running (MH5 contract requirement)
@@ -287,7 +357,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 					toolCallId: params._toolCallId,
 					runId: childRunId,
 					parentRunId: currentRun.runId,
-					agentType: params.agent_type,
+					agentType: agentType,
 					title: params.description,
 					__sessionId: currentRun.sessionId,
 				} as unknown as Parameters<typeof publishToolCallMetadata>[2])
@@ -296,7 +366,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 					toolCallId: params._toolCallId,
 					runId: childRunId,
 					parentRunId: currentRun.runId,
-					agentType: params.agent_type,
+			agentType: agentType,
 					title: params.description,
 				})
 			}
@@ -348,6 +418,11 @@ Use agent_session_search to query the child's full message history by runId.`,
 					hookRegistry,
 					runContext: childCtx,
 					sseManager,
+					provider: resolvedConfig?.provider ?? resolvedConfig?.behavior?.provider,
+					maxTokens: resolvedConfig?.limits?.maxTokens,
+					temperature: resolvedConfig?.limits?.temperature,
+					topP: resolvedConfig?.limits?.topP,
+					timeoutMs: resolvedConfig?.limits?.timeoutMs,
 				})) {
 					if (event.type === 'text_delta') {
 						pendingAssistantText += event.text
@@ -390,7 +465,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 						sessionId: currentRun.sessionId,
 						projectId: currentRun.projectId,
 						parentRunId: currentRun.runId,
-						agentType: params.agent_type,
+						agentType: agentType,
 						title: params.description,
 						previousStatus: 'running',
 						nextStatus: 'done',
@@ -407,7 +482,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 						sessionId: currentRun.sessionId,
 						projectId: currentRun.projectId,
 						parentRunId: currentRun.runId,
-						agentType: params.agent_type,
+						agentType: agentType,
 						title: params.description,
 						previousStatus: 'running',
 						nextStatus: 'error',
@@ -425,7 +500,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 					sessionId: currentRun.sessionId,
 					projectId: currentRun.projectId,
 					parentRunId: currentRun.runId,
-					agentType: params.agent_type,
+					agentType: agentType,
 					title: params.description,
 					previousStatus: 'running',
 					nextStatus: 'error',
@@ -465,7 +540,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 				JSON.stringify({
 					runId: childRunId,
 					status: endStatus,
-					agentType: params.agent_type,
+					agentType: agentType,
 					parentRunId: currentRun.runId,
 					durationMs,
 					result,

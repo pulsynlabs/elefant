@@ -13,6 +13,7 @@ import type { Result } from '../types/result.ts'
 import type { ToolCall, ToolDefinition, ToolResult } from '../types/tools.ts'
 import type { SseManager } from '../transport/sse-manager.ts'
 import { estimateMessageTokens } from '../utils/tokens.ts'
+import { parseSlashCommand } from './slash-commands.ts'
 
 export interface ToolExecutor {
 	execute(name: string, args: unknown): Promise<Result<string, ElefantError>>
@@ -36,6 +37,7 @@ export interface AgentLoopOptions {
 	questionEmitter?: QuestionEmitter
 	metadataEmitter?: MetadataEmitter
 	sseManager?: SseManager
+	commandsDir?: string
 }
 
 function createToolResult(toolCallId: string, content: string, isError: boolean): ToolResult {
@@ -107,6 +109,22 @@ export async function* runAgentLoop(
 		agentType: options.runContext.agentType,
 		title: options.runContext.title,
 	})
+
+	// Slash command detection: check the first user message for a /spec-* command.
+	// If matched, prepend the command's prompt content as a system message so the
+	// orchestrator receives it as context. Non-slash messages pass through unchanged.
+	if (options.commandsDir) {
+		const firstUserIdx = messages.findIndex((m) => m.role === 'user')
+		if (firstUserIdx >= 0) {
+			const match = await parseSlashCommand(messages[firstUserIdx].content, options.commandsDir)
+			if (match) {
+				messages.splice(firstUserIdx, 0, {
+					role: 'system',
+					content: match.promptContent,
+				})
+			}
+		}
+	}
 
 	while (iterations < maxIterations) {
 		if (options.runContext.signal.aborted) {

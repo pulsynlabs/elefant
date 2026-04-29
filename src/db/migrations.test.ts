@@ -41,7 +41,16 @@ describe('runMigrations', () => {
 
 		db.close();
 
-		expect(applied).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+		expect(applied).toEqual([
+			{ version: 1 },
+			{ version: 2 },
+			{ version: 3 },
+			{ version: 4 },
+			{ version: 5 },
+			{ version: 6 },
+			{ version: 7 },
+			{ version: 8 },
+		]);
 	});
 
 	it('is idempotent when re-run on an existing database', () => {
@@ -54,7 +63,7 @@ describe('runMigrations', () => {
 
 		db.close();
 
-		expect(count.count).toBe(3);
+		expect(count.count).toBe(8);
 	});
 
 	it('rolls back a failing migration and keeps existing schema intact', () => {

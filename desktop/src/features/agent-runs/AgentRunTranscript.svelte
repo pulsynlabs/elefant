@@ -194,6 +194,17 @@
 			</span>
 		</header>
 
+		{#if run.orchestratorPrompt}
+			<div class="orchestrator-prompt" role="region" aria-label="Orchestrator prompt">
+				<div class="orchestrator-prompt-header">
+					<span class="orchestrator-badge">Orchestrator</span>
+				</div>
+				<div class="orchestrator-prompt-body">
+					{run.orchestratorPrompt}
+				</div>
+			</div>
+		{/if}
+
 		{#if renderBlocks.length === 0}
 			<div class="empty" role="status">
 				{run.status === 'running'
@@ -449,6 +460,42 @@
 	.terminal-cancelled {
 		border-color: var(--color-border-strong);
 		color: var(--color-text-muted);
+	}
+
+	.orchestrator-prompt {
+		padding: var(--space-3) var(--space-4);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background-color: var(--color-surface);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.orchestrator-prompt-header {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.orchestrator-badge {
+		font-family: var(--font-mono);
+		font-size: var(--font-size-xs);
+		color: var(--color-text-muted);
+		background-color: var(--color-surface-elevated);
+		padding: 2px 8px;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--color-border);
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-wider);
+	}
+
+	.orchestrator-prompt-body {
+		font-size: var(--font-size-md);
+		color: var(--color-text-primary);
+		line-height: var(--line-height-relaxed);
+		white-space: pre-wrap;
+		word-break: break-word;
 	}
 
 	@media (max-width: 640px) {

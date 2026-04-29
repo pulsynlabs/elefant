@@ -5,7 +5,7 @@ import type { HookContextMap } from '../hooks/types.ts';
 import type { ElefantWsServer } from '../transport/ws-server.ts';
 import type { ElefantError } from '../types/errors.ts';
 import { err, ok, type Result } from '../types/result.ts';
-import { classify, DEFAULT_CLASSIFIER_RULES } from './classifier.ts';
+import { classifyPermission, DEFAULT_CLASSIFIER_RULES } from './classifier.ts';
 import { statusFromApproval } from './types.ts';
 import type {
 	ClassifierRule,
@@ -81,7 +81,10 @@ export class PermissionGate {
 		try {
 			const startedAt = Date.now();
 			const requestId = crypto.randomUUID();
-			let risk = classify(tool, args, this.rules);
+			const classification = classifyPermission(tool, args, this.rules, {
+				agentType: context.agent,
+			});
+			let risk: Risk = classification.decision === 'risk' ? classification.risk : 'high';
 
 			this.publishPermissionAskedEvent(context, {
 				requestId,
@@ -92,6 +95,32 @@ export class PermissionGate {
 				agent: context.agent,
 				ts: startedAt,
 			});
+
+			if (classification.decision === 'deny') {
+				const decision: Decision = {
+					approved: false,
+					status: 'deny',
+					reason: classification.reason,
+					risk,
+					source: 'default',
+				};
+
+				this.publishPermissionResolvedEvent(context, {
+					requestId,
+					status: 'deny',
+					source: 'default',
+					reason: classification.reason,
+					durationMs: Date.now() - startedAt,
+					ts: Date.now(),
+				});
+				this.persistDecision(tool, args, conversationId, decision);
+				await emit(this.ctx.hooks, 'tool:block', {
+					tool,
+					reason: classification.reason,
+					conversationId,
+				});
+				return ok(decision);
+			}
 
 			const hookCtx = await this.emitPermissionAskHooks({
 				tool,

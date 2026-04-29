@@ -13,7 +13,9 @@ export type ErrorCode =
   | 'SHELL_TIMEOUT'
   | 'BINARY_NOT_FOUND'
   | 'STREAM_ERROR'
-  | 'VALIDATION_ERROR';
+  | 'VALIDATION_ERROR'
+  | 'INVALID_PHASE'
+  | 'TOOL_VETOED';
 
 export interface ElefantError {
   code: ErrorCode;

@@ -200,6 +200,50 @@ export function mountProjectsDeleteRoute(app: Elysia, db: Database) {
 	});
 }
 
+const ProjectSettingsBodySchema = z.object({
+	legacyStateMode: z.boolean().optional(),
+});
+
+export function mountProjectSettingsRoute(app: Elysia, db: Database) {
+	return app
+		.get('/api/projects/:id/settings', ({ params, set }) => {
+			const existing = getProjectById(db, params.id);
+			if (!existing.ok) {
+				set.status = 404;
+				return { ok: false, error: existing.error.message };
+			}
+			const row = db.db
+				.query('SELECT legacy_state_mode FROM projects WHERE id = ?')
+				.get(params.id) as { legacy_state_mode: number } | null;
+			return {
+				ok: true,
+				data: { legacyStateMode: Boolean(row?.legacy_state_mode) },
+			};
+		})
+		.patch('/api/projects/:id/settings', ({ params, body, set }) => {
+			const parsed = ProjectSettingsBodySchema.safeParse(body ?? {});
+			if (!parsed.success) {
+				set.status = 400;
+				return { ok: false, error: parsed.error.message };
+			}
+			const existing = getProjectById(db, params.id);
+			if (!existing.ok) {
+				set.status = 404;
+				return { ok: false, error: existing.error.message };
+			}
+			if (parsed.data.legacyStateMode !== undefined) {
+				db.db.run('UPDATE projects SET legacy_state_mode = ? WHERE id = ?', [
+					parsed.data.legacyStateMode ? 1 : 0,
+					params.id,
+				]);
+			}
+			const row = db.db
+				.query('SELECT legacy_state_mode FROM projects WHERE id = ?')
+				.get(params.id) as { legacy_state_mode: number };
+			return { ok: true, data: { legacyStateMode: Boolean(row.legacy_state_mode) } };
+		});
+}
+
 export function mountProjectsSessionsRoutes(app: Elysia, db: Database) {
 	return app
 		.get('/api/projects/:id/sessions', ({ params, set }) => {
@@ -255,6 +299,7 @@ export function mountProjectsRoutes(app: Elysia, db: Database) {
 	mountProjectsListRoute(app, db);
 	mountProjectsUpdateRoute(app, db);
 	mountProjectsDeleteRoute(app, db);
+	mountProjectSettingsRoute(app, db);
 	mountProjectsSessionsRoutes(app, db);
 	return app;
 }

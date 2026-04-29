@@ -113,6 +113,8 @@ export class SseManager {
 				connection.counter += 1
 				this.enqueue(connection.controller, payload)
 			}
+		}).catch((error) => {
+			console.error('[elefant] Failed to publish SSE event:', error)
 		})
 	}
 

@@ -28,6 +28,7 @@
 	import AgentRunTabs from "./features/agent-runs/AgentRunTabs.svelte";
 	import WorktreeListPanel from "./features/worktrees/WorktreeListPanel.svelte";
 	import ChildRunView from "./features/agent-runs/ChildRunView.svelte";
+	import { SpecModeView } from "./features/spec-mode/index.js";
 
 	type NavigationRuntime = typeof navigationStore & {
 		initNavigation: (opts: { getActiveProjectId: () => string | null }) => void;
@@ -223,6 +224,8 @@
 		<AgentRunTabs />
 	{:else if currentView === "worktrees"}
 		<WorktreeListPanel />
+	{:else if currentView === "spec-mode"}
+		<SpecModeView />
 	{:else if currentView === "child-run" && navigationStore.currentChildRunId !== null}
 		<ChildRunView runId={navigationStore.currentChildRunId} />
 	{:else}

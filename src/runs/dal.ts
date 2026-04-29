@@ -38,8 +38,9 @@ export function createRun(db: Database, input: InsertAgentRun): Result<AgentRunR
 				started_at,
 				ended_at,
 				context_mode,
-				error_message
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				error_message,
+				orchestrator_prompt
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			[
 				data.run_id,
 				data.session_id,
@@ -53,6 +54,7 @@ export function createRun(db: Database, input: InsertAgentRun): Result<AgentRunR
 				data.ended_at ?? null,
 				data.context_mode,
 				data.error_message ?? null,
+				data.orchestrator_prompt ?? null,
 			],
 		)
 

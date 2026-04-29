@@ -11,6 +11,7 @@ import {
 	type AgentProfile,
 	type ConfigError,
 	type ElefantConfig,
+	type ResolvedAgentConfig,
 } from '../config/index.ts';
 import type { ProviderRouter } from '../providers/router.ts';
 
@@ -25,9 +26,23 @@ const ProjectQuerySchema = z.object({
 const AgentProfilePatchSchema = z
 	.object({
 		label: z.string().min(1).optional(),
-		kind: z.enum(['planner', 'executor', 'researcher', 'default', 'custom']).optional(),
+		kind: z.enum(['orchestrator', 'planner', 'executor', 'researcher', 'explorer', 'verifier', 'debugger', 'tester', 'writer', 'librarian', 'default', 'custom']).optional(),
 		description: z.string().min(1).optional(),
 		enabled: z.boolean().optional(),
+		provider: z.string().min(1).optional(),
+		model: z.string().min(1).optional(),
+		toolsAllowlist: z.array(z.string().min(1)).nullable().optional(),
+		permissions: z
+			.object({
+				read: z.boolean().optional(),
+				write: z.boolean().optional(),
+				execute: z.boolean().optional(),
+			})
+			.strict()
+			.optional(),
+		contextMode: z.enum(['none', 'inherit_session', 'snapshot']).optional(),
+		promptFile: z.string().min(1).nullable().optional(),
+		promptOverride: z.string().min(1).nullable().optional(),
 		behavior: z
 			.object({
 				provider: z.string().min(1).optional(),
@@ -74,6 +89,12 @@ function toErrorPayload(error: ConfigError) {
 
 function isPlaceholderApiKey(apiKey: string): boolean {
 	return apiKey === 'YOUR_API_KEY_HERE' || apiKey === '';
+}
+
+function stripResolvedSources(profile: ResolvedAgentConfig): AgentProfile {
+	const clone: AgentProfile & { _sources?: unknown } = { ...profile };
+	delete clone._sources;
+	return clone;
 }
 
 async function readConfigFile(): Promise<ElefantConfig | null> {
@@ -414,11 +435,92 @@ export function createConfigRoutes<TApp extends Elysia>(
 			return toErrorPayload(baseProfileResult.error);
 		}
 
-		const baseProfile = existingProjectProfiles.data[params.agentId] ?? baseProfileResult.data;
+		const baseProfile = existingProjectProfiles.data[params.agentId] ?? stripResolvedSources(baseProfileResult.data);
 		const mergedProfile: AgentProfile = {
 			...baseProfile,
 			...patchParse.data,
 			id: params.agentId,
+			behavior: {
+				...baseProfile.behavior,
+				...(patchParse.data.behavior ?? {}),
+			},
+			limits: {
+				...baseProfile.limits,
+				...(patchParse.data.limits ?? {}),
+			},
+			tools: {
+				...baseProfile.tools,
+				...(patchParse.data.tools ?? {}),
+			},
+		};
+
+		const profileParse = agentProfileSchema.safeParse(mergedProfile);
+		if (!profileParse.success) {
+			set.status = 400;
+			return {
+				ok: false,
+				error: {
+					code: 'VALIDATION_ERROR',
+					message: profileParse.error.message,
+				},
+			};
+		}
+
+		const updateResult = await configManager.upsertProjectProfile(
+			projectId,
+			profileParse.data,
+		);
+		if (!updateResult.ok) {
+			set.status = updateResult.error.code === 'FILE_NOT_FOUND' ? 404 : 400;
+			return toErrorPayload(updateResult.error);
+		}
+
+		const resolved = await configManager.resolve(params.agentId, projectId);
+		if (!resolved.ok) {
+			set.status = resolved.error.code === 'FILE_NOT_FOUND' ? 404 : 400;
+			return toErrorPayload(resolved.error);
+		}
+
+		return { ok: true, data: resolved.data };
+	});
+
+	app.patch('/api/config/agents/:agentId', async ({ params, body, query, set }) => {
+		const queryParse = ProjectQuerySchema.safeParse(query);
+		const projectId = queryParse.success ? queryParse.data.projectId : undefined;
+
+		const patchParse = AgentProfilePatchSchema.safeParse(body);
+		if (!patchParse.success) {
+			set.status = 400;
+			return {
+				ok: false,
+				error: {
+					code: 'VALIDATION_ERROR',
+					message: patchParse.error.message,
+				},
+			};
+		}
+
+		const existingProjectProfiles = await configManager.listProjectProfiles(projectId);
+		if (!existingProjectProfiles.ok) {
+			set.status = existingProjectProfiles.error.code === 'FILE_NOT_FOUND' ? 404 : 400;
+			return toErrorPayload(existingProjectProfiles.error);
+		}
+
+		const baseProfileResult = await configManager.resolve(params.agentId, projectId);
+		if (!baseProfileResult.ok) {
+			set.status = baseProfileResult.error.code === 'FILE_NOT_FOUND' ? 404 : 400;
+			return toErrorPayload(baseProfileResult.error);
+		}
+
+		const baseProfile = existingProjectProfiles.data[params.agentId] ?? stripResolvedSources(baseProfileResult.data);
+		const mergedProfile: AgentProfile = {
+			...baseProfile,
+			...patchParse.data,
+			id: params.agentId,
+			permissions: {
+				...baseProfile.permissions,
+				...(patchParse.data.permissions ?? {}),
+			},
 			behavior: {
 				...baseProfile.behavior,
 				...(patchParse.data.behavior ?? {}),

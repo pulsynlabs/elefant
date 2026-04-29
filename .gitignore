@@ -8,6 +8,21 @@ AGENTS.md
 # GoopSpec planning artifacts
 .goopspec/
 
+# Elefant per-project runtime artifacts (DB, state.json, PID, etc.)
+.elefant/
+
+# Generated test screenshots + artifacts
+audit-*.png
+pr-*.png
+qa-*.png
+sidebar-*.png
+fraunces-check-*.png
+test-results/
+
+# Playwright MCP state
+.playwright-mcp/
+desktop/.playwright-mcp/
+
 # Node / Bun
 node_modules/
 jspm_packages/

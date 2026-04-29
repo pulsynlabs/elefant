@@ -255,6 +255,7 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 					startedAt: envelope.ts,
 					endedAt: null,
 					errorMessage: null,
+					orchestratorPrompt: typeof data.orchestratorPrompt === 'string' ? data.orchestratorPrompt : null,
 				});
 			}
 			break;
@@ -430,6 +431,7 @@ export function applyRunEvent(envelope: AgentRunEventEnvelope): void {
 					startedAt: previousStatus === 'running' ? envelope.ts : null,
 					endedAt: ['done', 'error', 'cancelled'].includes(nextStatus) ? envelope.ts : null,
 					errorMessage: null,
+					orchestratorPrompt: null,
 				});
 			} else {
 				// Update existing run status
@@ -629,6 +631,7 @@ async function spawn(
 			startedAt: now,
 			endedAt: null,
 			errorMessage: null,
+			orchestratorPrompt: opts.prompt,
 		});
 		openRun(parsed.data.runId);
 		setActiveRun(parsed.data.runId);

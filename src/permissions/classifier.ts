@@ -1,4 +1,25 @@
 import type { ClassifierRule, Risk } from './types.ts';
+import {
+	evaluateOrchestratorGate,
+	ORCHESTRATOR_NO_WRITE_MESSAGE,
+} from './orchestrator-gate.ts';
+
+export interface ClassificationContext {
+	agentType?: string;
+}
+
+export type PermissionClassification =
+	| { decision: 'risk'; risk: Risk }
+	| { decision: 'deny'; reason: 'ORCHESTRATOR_NO_WRITE'; message: string };
+
+function extractTargetPath(args: Record<string, unknown>): string | undefined {
+	const candidates = [args.targetPath, args.filePath, args.path];
+	for (const candidate of candidates) {
+		if (typeof candidate === 'string') return candidate;
+	}
+
+	return undefined;
+}
 
 export const DEFAULT_CLASSIFIER_RULES: ClassifierRule[] = [
 	{
@@ -54,6 +75,31 @@ export function classify(
 	args: Record<string, unknown>,
 	rules: ClassifierRule[] = DEFAULT_CLASSIFIER_RULES,
 ): Risk {
+	const structured = classifyPermission(tool, args, rules);
+	if (structured.decision === 'deny') return 'high';
+	return structured.risk;
+}
+
+export function classifyPermission(
+	tool: string,
+	args: Record<string, unknown>,
+	rules: ClassifierRule[] = DEFAULT_CLASSIFIER_RULES,
+	context: ClassificationContext = {},
+): PermissionClassification {
+	if (
+		evaluateOrchestratorGate({
+			agentType: context.agentType,
+			tool,
+			targetPath: extractTargetPath(args),
+		}) === 'deny'
+	) {
+		return {
+			decision: 'deny',
+			reason: 'ORCHESTRATOR_NO_WRITE',
+			message: ORCHESTRATOR_NO_WRITE_MESSAGE,
+		};
+	}
+
 	for (const rule of rules) {
 		const toolMatches =
 			typeof rule.tool === 'string' ? rule.tool === tool : rule.tool.test(tool);
@@ -66,8 +112,8 @@ export function classify(
 			continue;
 		}
 
-		return rule.risk;
+		return { decision: 'risk', risk: rule.risk };
 	}
 
-	return 'high';
+	return { decision: 'risk', risk: 'high' };
 }

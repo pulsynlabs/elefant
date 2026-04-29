@@ -35,6 +35,7 @@ const makeRun = (overrides: Partial<AgentRun> = {}): AgentRun => ({
 	startedAt: '2026-04-19T00:00:00.000Z',
 	endedAt: null,
 	errorMessage: null,
+	orchestratorPrompt: null,
 	...overrides,
 });
 

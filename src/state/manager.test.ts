@@ -9,10 +9,18 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Database } from '../db/database.ts';
 import { statePath } from '../project/paths.ts';
+import {
+  InvalidTransitionError,
+  SpecModeNotConfiguredError,
+  WorkflowExistsError,
+  WorkflowNotFoundError,
+} from './errors.ts';
 import { StateManager } from './manager.ts';
 
 const tempDirs: string[] = [];
+const databases: Database[] = [];
 
 function createTempProject(): string {
   const dir = mkdtempSync(join(tmpdir(), 'elefant-state-manager-'));
@@ -28,10 +36,301 @@ function createManager(projectPath: string): StateManager {
   });
 }
 
+function createSpecManager(): {
+  manager: StateManager;
+  database: Database;
+  projectId: string;
+  projectPath: string;
+} {
+  const projectPath = createTempProject();
+  const projectId = `project-${crypto.randomUUID()}`;
+  mkdirSync(join(projectPath, '.elefant'), { recursive: true });
+  const database = new Database(join(projectPath, '.elefant', 'db.sqlite'));
+  databases.push(database);
+  database.db
+    .query('INSERT INTO projects (id, name, path) VALUES (?, ?, ?)')
+    .run(projectId, 'elefant-test', projectPath);
+
+  const manager = new StateManager(projectPath, {
+    id: projectId,
+    name: 'elefant-test',
+    path: projectPath,
+    database,
+  });
+
+  return { manager, database, projectId, projectPath };
+}
+
 afterEach(() => {
+  for (const database of databases.splice(0)) {
+    database.close();
+  }
+
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+describe('StateManager spec-mode', () => {
+  it('createSpecWorkflow persists and returns a parsed workflow', async () => {
+    const { manager, projectId } = createSpecManager();
+
+    const workflow = await manager.createSpecWorkflow({
+      projectId,
+      workflowId: 'flow-a',
+      mode: 'quick',
+      depth: 'deep',
+      isActive: true,
+    });
+
+    expect(workflow.id.length).toBeGreaterThan(0);
+    expect(workflow.projectId).toBe(projectId);
+    expect(workflow.workflowId).toBe('flow-a');
+    expect(workflow.mode).toBe('quick');
+    expect(workflow.depth).toBe('deep');
+    expect(workflow.phase).toBe('idle');
+    expect(workflow.isActive).toBe(true);
+  });
+
+  it('createSpecWorkflow rejects duplicates with WorkflowExistsError', async () => {
+    const { manager, projectId } = createSpecManager();
+
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    await expect(
+      manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' }),
+    ).rejects.toBeInstanceOf(WorkflowExistsError);
+  });
+
+  it('getSpecWorkflow returns null for missing workflow', async () => {
+    const { manager, projectId } = createSpecManager();
+
+    await expect(manager.getSpecWorkflow(projectId, 'missing')).resolves.toBeNull();
+  });
+
+  it('listSpecWorkflows returns workflows ordered by last_activity descending', async () => {
+    const { manager, database, projectId } = createSpecManager();
+
+    await manager.createSpecWorkflow({ projectId, workflowId: 'old' });
+    await manager.createSpecWorkflow({ projectId, workflowId: 'new' });
+    database.db
+      .query(
+        `UPDATE spec_workflows
+         SET last_activity = ?
+         WHERE project_id = ? AND workflow_id = ?`,
+      )
+      .run('2026-01-01 00:00:00', projectId, 'old');
+    database.db
+      .query(
+        `UPDATE spec_workflows
+         SET last_activity = ?
+         WHERE project_id = ? AND workflow_id = ?`,
+      )
+      .run('2026-01-02 00:00:00', projectId, 'new');
+
+    const workflows = await manager.listSpecWorkflows(projectId);
+
+    expect(workflows.map((workflow) => workflow.workflowId)).toEqual(['new', 'old']);
+  });
+
+  it('setActiveSpecWorkflow sets exactly one active workflow', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a', isActive: true });
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-b' });
+
+    const active = await manager.setActiveSpecWorkflow(projectId, 'flow-b');
+    const workflows = await manager.listSpecWorkflows(projectId);
+
+    expect(active.workflowId).toBe('flow-b');
+    expect(workflows.filter((workflow) => workflow.isActive)).toHaveLength(1);
+    expect(workflows.find((workflow) => workflow.isActive)?.workflowId).toBe('flow-b');
+  });
+
+  it('setActiveSpecWorkflow rejects missing workflows', async () => {
+    const { manager, projectId } = createSpecManager();
+
+    await expect(
+      manager.setActiveSpecWorkflow(projectId, 'missing'),
+    ).rejects.toBeInstanceOf(WorkflowNotFoundError);
+  });
+
+  it('transitionSpecPhase persists a valid transition', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const workflow = await manager.transitionSpecPhase(projectId, 'flow-a', 'plan');
+
+    expect(workflow.phase).toBe('plan');
+  });
+
+  it('transitionSpecPhase rejects invalid non-forced transitions with allowed phases', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    try {
+      await manager.transitionSpecPhase(projectId, 'flow-a', 'execute');
+      throw new Error('Expected transition to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(InvalidTransitionError);
+      const transitionError = error as InvalidTransitionError;
+      expect(transitionError.from).toBe('idle');
+      expect(transitionError.to).toBe('execute');
+      expect(transitionError.allowed).toEqual(['discuss', 'plan']);
+    }
+
+    const workflow = await manager.getSpecWorkflow(projectId, 'flow-a');
+    expect(workflow?.phase).toBe('idle');
+  });
+
+  it('transitionSpecPhase allows invalid forced transitions and logs to ADL repo', async () => {
+    const { manager, projectId, database } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const workflow = await manager.transitionSpecPhase(projectId, 'flow-a', 'execute', {
+      force: true,
+      reason: 'operator override',
+    });
+
+    expect(workflow.phase).toBe('execute');
+
+    // Verify ADL entry was persisted to spec_adl_entries
+    const rows = database.db
+      .query(
+        `SELECT * FROM spec_adl_entries WHERE workflow_id = ? ORDER BY created_at DESC LIMIT 1`,
+      )
+      .all(workflow.id) as { type: string; title: string; body: string }[];
+    expect(rows.length).toBe(1);
+    expect(rows[0].type).toBe('deviation');
+    expect(rows[0].title).toBe('Forced phase transition');
+    const body = JSON.parse(rows[0].body) as { from: string; to: string; reason: string };
+    expect(body.from).toBe('idle');
+    expect(body.to).toBe('execute');
+    expect(body.reason).toBe('operator override');
+  });
+
+  it('lockSpec and unlockSpec toggle spec_locked', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const locked = await manager.lockSpec(projectId, 'flow-a');
+    const unlocked = await manager.unlockSpec(projectId, 'flow-a');
+
+    expect(locked.specLocked).toBe(true);
+    expect(unlocked.specLocked).toBe(false);
+  });
+
+  it('setMode and setDepth persist workflow settings', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const withMode = await manager.setMode(projectId, 'flow-a', 'comprehensive');
+    const withDepth = await manager.setDepth(projectId, 'flow-a', 'deep');
+
+    expect(withMode.mode).toBe('comprehensive');
+    expect(withDepth.depth).toBe('deep');
+  });
+
+  it('setAutopilot persists autopilot and lazy flags atomically', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const workflow = await manager.setAutopilot(projectId, 'flow-a', true, true);
+
+    expect(workflow.autopilot).toBe(true);
+    expect(workflow.lazyAutopilot).toBe(true);
+  });
+
+  it('setLazyAutopilot(true) implies autopilot', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const workflow = await manager.setLazyAutopilot(projectId, 'flow-a', true);
+
+    expect(workflow.autopilot).toBe(true);
+    expect(workflow.lazyAutopilot).toBe(true);
+  });
+
+  it('completeInterview sets the flag and completion timestamp', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const workflow = await manager.completeInterview(projectId, 'flow-a');
+
+    expect(workflow.interviewComplete).toBe(true);
+    expect(workflow.interviewCompletedAt).not.toBeNull();
+  });
+
+  it('updateWave persists current and total wave counters', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const workflow = await manager.updateWave(projectId, 'flow-a', 2, 5);
+
+    expect(workflow.currentWave).toBe(2);
+    expect(workflow.totalWaves).toBe(5);
+  });
+
+  it('confirmAcceptance and resetAcceptance toggle acceptance flag', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const confirmed = await manager.confirmAcceptance(projectId, 'flow-a');
+    const reset = await manager.resetAcceptance(projectId, 'flow-a');
+
+    expect(confirmed.acceptanceConfirmed).toBe(true);
+    expect(reset.acceptanceConfirmed).toBe(false);
+  });
+
+  it('amendSpec ends with spec_locked true', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a', specLocked: true });
+
+    const workflow = await manager.amendSpec(projectId, 'flow-a', {
+      rationale: 'Adjust locked contract',
+    });
+
+    expect(workflow.specLocked).toBe(true);
+  });
+
+  it('serializes concurrent transitions on the same workflow mutex', async () => {
+    const { manager, projectId } = createSpecManager();
+    await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
+
+    const results = await Promise.all([
+      manager.transitionSpecPhase(projectId, 'flow-a', 'discuss'),
+      manager.transitionSpecPhase(projectId, 'flow-a', 'plan'),
+      manager.transitionSpecPhase(projectId, 'flow-a', 'research'),
+      manager.transitionSpecPhase(projectId, 'flow-a', 'specify'),
+      manager.transitionSpecPhase(projectId, 'flow-a', 'execute'),
+    ]);
+
+    expect(results.map((workflow) => workflow.phase)).toEqual([
+      'discuss',
+      'plan',
+      'research',
+      'specify',
+      'execute',
+    ]);
+    expect((await manager.getSpecWorkflow(projectId, 'flow-a'))?.phase).toBe('execute');
+  });
+
+  it('continues supporting legacy state operations without a database', async () => {
+    const projectPath = createTempProject();
+    const manager = createManager(projectPath);
+
+    await manager.updateWorkflow({ mode: 'quick' });
+
+    expect(manager.getState().workflow.mode).toBe('quick');
+  });
+
+  it('throws SpecModeNotConfiguredError for spec-mode methods without a database', async () => {
+    const projectPath = createTempProject();
+    const manager = createManager(projectPath);
+
+    await expect(manager.listSpecWorkflows('project-a')).rejects.toBeInstanceOf(
+      SpecModeNotConfiguredError,
+    );
+  });
 });
 
 describe('StateManager', () => {

@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia'
+import { dirname, join } from 'node:path'
 
 import type { HookRegistry } from '../hooks/index.ts'
 import type { ProviderRouter } from '../providers/router.ts'
@@ -16,6 +17,8 @@ import { mountAgentRunRoutes } from '../runs/routes.ts'
 import { mountWorktreeRoutes } from '../worktree/routes.ts'
 import { createConfigRoutes } from './config-routes.ts'
 import { gracefulShutdown } from '../daemon/shutdown.ts'
+import type { StateManager } from '../state/manager.ts'
+import { mountSpecRoutes } from './routes-spec.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,
@@ -24,6 +27,7 @@ export function createApp(
 	db: Database,
 	ws?: ElefantWsServer,
 	sse?: SseManager,
+	stateManager?: StateManager,
 ) {
 	const CORS_HEADERS = {
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -79,9 +83,10 @@ export function createApp(
 			status: 'running',
 			uptime: process.uptime(),
 			timestamp: new Date().toISOString(),
-			// Absolute path to the entry point so the desktop app can restart
-			// the daemon without any manual path configuration.
-			entryPath: import.meta.filename,
+		// Absolute path to the entry point so the desktop app can restart
+		// the daemon without any manual path configuration.
+		// Resolved from this file's location: src/server/app.ts -> src/daemon/server-entry.ts
+		entryPath: join(dirname(dirname(import.meta.filename)), 'daemon', 'server-entry.ts'),
 		}))
 
 	// Graceful shutdown endpoint — called by the desktop app's daemon
@@ -139,6 +144,10 @@ export function createApp(
 
 	// Mount agent config routes (MH4)
 	createConfigRoutes(baseApp, providerRouter, configManager)
+
+	if (stateManager) {
+		mountSpecRoutes(baseApp, { db, stateManager, hookRegistry })
+	}
 
 	return baseApp
 }

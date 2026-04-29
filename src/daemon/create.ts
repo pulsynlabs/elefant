@@ -11,9 +11,13 @@ import { ProviderRouter } from '../providers/router.ts'
 import { createApp } from '../server/app.ts'
 import { StateManager } from '../state/manager.ts'
 import { createToolRegistry } from '../tools/registry.ts'
+import { createPhaseAllowListFromSpecTools, createSpecPhaseGateHandler } from '../hooks/spec-phase-gate.ts'
+import { createPkbContextTransformHandler } from '../hooks/pkb-context-transform.ts'
+import { instantiateSpecTools } from '../tools/spec/index.ts'
 import { sessionManager } from '../tools/shell/index.js'
 import { ElefantWsServer } from '../transport/ws-server.ts'
 import { SseManager } from '../transport/sse-manager.ts'
+import { registerSpecModeEventPublisher } from '../transport/spec-mode-events.ts'
 import type { ElefantError } from '../types/errors.ts'
 import { err, ok, type Result } from '../types/result.ts'
 import type { DaemonContext } from './context.ts'
@@ -62,7 +66,22 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 		id: projectInfo.projectId,
 		name: basename(projectInfo.projectPath),
 		path: projectInfo.projectPath,
+		database: db,
+		hookRegistry,
 	})
+	hookRegistry.on(
+		'tool:before',
+		createSpecPhaseGateHandler(
+			stateManager,
+			createPhaseAllowListFromSpecTools(instantiateSpecTools()),
+		),
+		{ priority: 10 },
+	)
+	hookRegistry.on(
+		'context:transform',
+		createPkbContextTransformHandler({ projectPath: projectInfo.projectPath }),
+		{ priority: 10 },
+	)
 
 	const contextBase = {
 		config,
@@ -85,6 +104,7 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 	const sse = new SseManager(db)
 	context.ws = ws
 	context.sse = sse
+	registerSpecModeEventPublisher(hookRegistry, sse, ws)
 
 	// Permission gate for tool-call approval
 	const permissions = new PermissionGate(context, ws)
@@ -94,7 +114,7 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 	const compaction = new CompactionManager(context)
 	context.compaction = compaction
 
-	const app = createApp(providerRouter, toolRegistry, hookRegistry, db, ws, sse)
+	const app = createApp(providerRouter, toolRegistry, hookRegistry, db, ws, sse, stateManager)
 
 	ws.startHeartbeat()
 

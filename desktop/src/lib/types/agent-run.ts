@@ -20,6 +20,7 @@ export interface AgentRun {
 	startedAt: string | null;
 	endedAt: string | null;
 	errorMessage: string | null;
+	orchestratorPrompt: string | null;
 }
 
 /**
@@ -103,6 +104,7 @@ export interface AgentRunRow {
 	started_at: string | null;
 	ended_at: string | null;
 	error_message: string | null;
+	orchestrator_prompt: string | null;
 }
 
 /** Data payload for `agent_run.status_changed` events. */
@@ -132,5 +134,6 @@ export function agentRunFromRow(row: AgentRunRow): AgentRun {
 		startedAt: row.started_at,
 		endedAt: row.ended_at,
 		errorMessage: row.error_message,
+		orchestratorPrompt: row.orchestrator_prompt,
 	};
 }

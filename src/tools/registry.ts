@@ -18,6 +18,7 @@ import { questionTool } from './question/index.js';
 import { readTool } from './read.js';
 import { bashTool } from './shell/index.js';
 import { skillTool } from './skill/index.js';
+import { createSpecToolContext, createSpecTools } from './spec/index.ts';
 import { createTaskTool, type TaskToolDeps } from './task/index.js';
 import type { MetadataEmitter } from './task/metadata-emitter.js';
 import { todoreadTool, todowriteTool } from './todo/index.js';
@@ -224,11 +225,35 @@ export class ToolRegistry {
 		const conversationId = toConversationId(hookArgs);
 		const startedAt = Date.now();
 
-		await emit(this.hookRegistry, 'tool:before', {
+		const beforeContext = await emit(this.hookRegistry, 'tool:before', {
 			toolName: name,
 			args: hookArgs,
 			conversationId,
 		});
+		if (beforeContext.veto === true) {
+			const errorPayload = beforeContext.error ?? {
+				code: 'TOOL_VETOED',
+				message: `Tool '${name}' was vetoed by a before hook`,
+			};
+			const message = errorPayload.message;
+			const code = errorPayload.code === 'INVALID_PHASE'
+				? 'INVALID_PHASE'
+				: errorPayload.code === 'TOOL_VETOED'
+					? 'TOOL_VETOED'
+					: 'TOOL_EXECUTION_FAILED';
+			await emit(this.hookRegistry, 'tool:after', {
+				toolName: name,
+				args: hookArgs,
+				result: toHookResult(message, true),
+				durationMs: Date.now() - startedAt,
+				conversationId,
+			});
+			return err({
+				code,
+				message,
+				details: errorPayload,
+			});
+		}
 
 		const validatedArgs = validateToolArgs(tool, args);
 		if (!validatedArgs.ok) {
@@ -380,6 +405,16 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 		currentRun: deps.currentRun,
 	}
 	registry.register(createAgentSessionSearchTool(agentSessionSearchDeps))
+
+	const specCtx = createSpecToolContext({
+		database: deps.database,
+		projectId: deps.currentRun.projectId,
+		runId: deps.currentRun.runId,
+		hookRegistry: deps.hookRegistry,
+	})
+	for (const tool of createSpecTools(specCtx)) {
+		registry.register(tool)
+	}
 
 	// tool_list MUST be last (reflects full set)
 	registry.register(createToolListTool(registry))
