@@ -41,6 +41,18 @@ describe('Database', () => {
 			'memory_entries',
 			'projects',
 			'sessions',
+			'spec_acceptance_criteria',
+			'spec_adl_entries',
+			'spec_amendments',
+			'spec_blueprints',
+			'spec_chronicle_entries',
+			'spec_documents',
+			'spec_must_haves',
+			'spec_out_of_scope',
+			'spec_tasks',
+			'spec_validation_contracts',
+			'spec_waves',
+			'spec_workflows',
 			'work_items',
 		]);
 	});
@@ -90,6 +102,12 @@ describe('Database', () => {
 		}[];
 		secondOpen.close();
 
-		expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+		expect(rows).toEqual([
+			{ version: 1 },
+			{ version: 2 },
+			{ version: 3 },
+			{ version: 4 },
+			{ version: 5 },
+		]);
 	});
 });
