@@ -39,8 +39,8 @@
 		AgentsIcon,
 		RunsIcon,
 		WorktreesIcon,
+		SpecModeIcon,
 	} from '$lib/icons/index.js';
-	import TaskList01Icon from '@hugeicons/core-free-icons/TaskList01Icon';
 	import { clearConversation } from '../../../features/chat/chat.svelte.js';
 	import { agentConfigStore } from '$lib/stores/agent-config.svelte.js';
 	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
@@ -155,7 +155,7 @@
 	const bottomNavItems: BottomNavItem[] = [
 		{ id: 'agent-config', label: 'Agent Config', icon: AgentsIcon },
 		{ id: 'agent-runs', label: 'Runs', icon: RunsIcon },
-		{ id: 'spec-mode', label: 'Spec', icon: TaskList01Icon },
+		{ id: 'spec-mode', label: 'Spec', icon: SpecModeIcon },
 		{ id: 'worktrees', label: 'Worktrees', icon: WorktreesIcon },
 		{ id: 'settings', label: 'Settings', icon: SettingsIcon },
 		{ id: 'models', label: 'Models', icon: ModelsIcon },
