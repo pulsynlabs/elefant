@@ -56,6 +56,8 @@ export { default as MaximizeIcon } from '@hugeicons/core-free-icons/SquareIcon';
 export { default as RestoreIcon } from '@hugeicons/core-free-icons/SquaresExcludeIcon';
 export { default as WindowCloseIcon } from '@hugeicons/core-free-icons/Cancel01Icon';
 
+// Feature icons
+export { default as AgentsIcon } from '@hugeicons/core-free-icons/UserGroupIcon';
 export { default as AiBrain01Icon } from '@hugeicons/core-free-icons/AiBrain01Icon';
 export { default as RunsIcon } from '@hugeicons/core-free-icons/PlayIcon';
 export { default as WorktreesIcon } from '@hugeicons/core-free-icons/FolderTreeIcon';
