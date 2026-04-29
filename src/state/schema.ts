@@ -104,7 +104,11 @@ export const ElefantStateSchema = z.object({
   workflow: WorkflowEntrySchema,
   workflows: z.record(z.string(), WorkflowEntrySchema).default({}),
   specModeWorkflows: z.record(z.string(), SpecWorkflowSchema).optional().default({}),
-  execution: ExecutionStateSchema.default({}),
+  execution: ExecutionStateSchema.default({
+    activeCheckpointId: null,
+    completedPhases: [],
+    pendingTasks: [],
+  }),
 });
 export type ElefantState = z.infer<typeof ElefantStateSchema>;
 
