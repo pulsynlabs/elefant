@@ -23,7 +23,7 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent): void {
-		if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+		if (event.key === 'Enter' && !event.shiftKey) {
 			event.preventDefault();
 			handleSend();
 		}
@@ -44,7 +44,7 @@
 		bind:this={textareaEl}
 		bind:value={inputValue}
 		class="message-input"
-		placeholder="Message Elefant... (Ctrl+Enter to send)"
+		placeholder="Message Elefant..."
 		disabled={streaming}
 		rows={1}
 		onkeydown={handleKeydown}
@@ -68,7 +68,7 @@
 				onclick={handleSend}
 				disabled={!canSend}
 				aria-label="Send message"
-				title="Send message (Ctrl+Enter)"
+				title="Send message (Enter)"
 			>
 				<span aria-hidden="true">↑</span>
 			</button>

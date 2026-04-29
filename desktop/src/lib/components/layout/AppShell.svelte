@@ -135,7 +135,7 @@
 		grid-row: 1 / 2;
 		display: flex;
 		align-items: center;
-		padding: 0 var(--space-4);
+		padding: 0 0 0 var(--space-4);
 		gap: var(--space-3);
 		height: var(--topbar-height);
 		position: sticky;
