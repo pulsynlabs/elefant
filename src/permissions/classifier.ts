@@ -42,6 +42,11 @@ export const DEFAULT_CLASSIFIER_RULES: ClassifierRule[] = [
 	{ tool: 'todoread', risk: 'low' },
 	{ tool: 'skill', risk: 'low' },
 	{ tool: 'lsp', risk: 'low' },
+	{ tool: 'task', risk: 'low' },
+	{ tool: 'todowrite', risk: 'low' },
+	{ tool: 'question', risk: 'low' },
+	{ tool: 'tool_list', risk: 'low' },
+	{ tool: 'agent_session_search', risk: 'low' },
 ];
 
 export function classify(

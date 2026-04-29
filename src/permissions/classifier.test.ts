@@ -34,4 +34,28 @@ describe('classify', () => {
 	it('classifies edit to .pem as high risk', () => {
 		expect(classify('edit', { path: '/workspace/certs/server.pem' })).toBe('high');
 	});
+
+	it('classifies task as low risk', () => {
+		expect(classify('task', {})).toBe('low');
+	});
+
+	it('classifies todowrite as low risk', () => {
+		expect(classify('todowrite', {})).toBe('low');
+	});
+
+	it('classifies question as low risk', () => {
+		expect(classify('question', {})).toBe('low');
+	});
+
+	it('classifies tool_list as low risk', () => {
+		expect(classify('tool_list', {})).toBe('low');
+	});
+
+	it('classifies agent_session_search as low risk', () => {
+		expect(classify('agent_session_search', {})).toBe('low');
+	});
+
+	it('classifies unknown_tool as high risk (negative control)', () => {
+		expect(classify('unknown_tool', {})).toBe('high');
+	});
 });
