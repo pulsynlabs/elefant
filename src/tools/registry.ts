@@ -18,6 +18,7 @@ import { questionTool } from './question/index.js';
 import { readTool } from './read.js';
 import { bashTool } from './shell/index.js';
 import { skillTool } from './skill/index.js';
+import { createSpecToolContext, createSpecTools } from './spec/index.ts';
 import { createTaskTool, type TaskToolDeps } from './task/index.js';
 import type { MetadataEmitter } from './task/metadata-emitter.js';
 import { todoreadTool, todowriteTool } from './todo/index.js';
@@ -380,6 +381,15 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 		currentRun: deps.currentRun,
 	}
 	registry.register(createAgentSessionSearchTool(agentSessionSearchDeps))
+
+	const specCtx = createSpecToolContext({
+		database: deps.database,
+		projectId: deps.currentRun.projectId,
+		runId: deps.currentRun.runId,
+	})
+	for (const tool of createSpecTools(specCtx)) {
+		registry.register(tool)
+	}
 
 	// tool_list MUST be last (reflects full set)
 	registry.register(createToolListTool(registry))
