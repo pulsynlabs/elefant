@@ -2,7 +2,7 @@ import type { Database } from '../../database.ts';
 import { RowNotFoundError } from './base.ts';
 import { SpecDocumentsRepo, type OutOfScopeItem } from './documents.ts';
 import type { SpecDocType } from './documents.ts';
-import { MustHavesRepo, type MustHave, type AcceptanceCriterion, type ValidationContract } from './must-haves.ts';
+import { MustHavesRepo, type AcceptanceCriterion, type ValidationContract } from './must-haves.ts';
 import { SpecWorkflowsRepo } from './workflows.ts';
 import type { SpecWorkflow } from '../../../state/schema.ts';
 

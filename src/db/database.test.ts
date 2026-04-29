@@ -34,6 +34,7 @@ describe('Database', () => {
 
 		expect(rows.map((row) => row.name)).toEqual([
 			'_migrations',
+			'agent_profiles',
 			'agent_run_messages',
 			'agent_runs',
 			'checkpoints',
@@ -47,6 +48,7 @@ describe('Database', () => {
 			'spec_blueprints',
 			'spec_chronicle_entries',
 			'spec_documents',
+			'spec_idempotency',
 			'spec_must_haves',
 			'spec_out_of_scope',
 			'spec_tasks',
@@ -108,6 +110,8 @@ describe('Database', () => {
 			{ version: 3 },
 			{ version: 4 },
 			{ version: 5 },
+			{ version: 6 },
+			{ version: 7 },
 		]);
 	});
 });
