@@ -44,6 +44,7 @@ function childRun(runId: string, title: string, createdAt: string): AgentRun {
 		startedAt: null,
 		endedAt: null,
 		errorMessage: null,
+		orchestratorPrompt: null,
 	};
 }
 

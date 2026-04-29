@@ -317,6 +317,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 				status: 'running',
 				context_mode: contextMode,
 				started_at: new Date().toISOString(),
+				orchestrator_prompt: params.prompt,
 			})
 			if (!createResult.ok) {
 				// Log but don't abort — child can still run without a DB row
@@ -340,6 +341,7 @@ Use agent_session_search to query the child's full message history by runId.`,
 		publishRunEvent(childCtx, sseManager, 'agent_run.spawned', {
 			contextMode,
 			parentRunId: currentRun.runId,
+			orchestratorPrompt: params.prompt,
 		})
 
 		// Emit status change: null -> running (MH5 contract requirement)

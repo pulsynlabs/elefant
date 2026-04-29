@@ -101,6 +101,42 @@ describe('runs/dal', () => {
 		database.close()
 	})
 
+	it('stores and retrieves orchestrator_prompt', () => {
+		const database = new Database(createTempDbPath())
+		const { projectId, sessionId } = insertProjectAndSession(database)
+
+		const prompt = 'Research Pulsyn comprehensively and return a summary.'
+		const created = createRun(database, {
+			run_id: crypto.randomUUID(),
+			session_id: sessionId,
+			project_id: projectId,
+			parent_run_id: null,
+			agent_type: 'researcher',
+			title: 'Research Pulsyn',
+			context_mode: 'none',
+			orchestrator_prompt: prompt,
+		})
+		expect(created.ok).toBe(true)
+		if (!created.ok) {
+			database.close()
+			return
+		}
+
+		const fetched = getRun(database, created.data.run_id)
+		expect(fetched.ok).toBe(true)
+		if (fetched.ok) {
+			expect(fetched.data.orchestrator_prompt).toBe(prompt)
+		}
+
+		const listed = listRunsBySession(database, sessionId)
+		expect(listed.ok).toBe(true)
+		if (listed.ok) {
+			expect(listed.data[0]?.orchestrator_prompt).toBe(prompt)
+		}
+
+		database.close()
+	})
+
 	it('returns empty list when parent run has no children', () => {
 		const database = new Database(createTempDbPath())
 		const { projectId, sessionId } = insertProjectAndSession(database)

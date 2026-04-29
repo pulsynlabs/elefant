@@ -19,6 +19,7 @@ export const AgentRunRowSchema = z.object({
 	ended_at: z.string().nullable(),
 	context_mode: AgentRunContextModeSchema,
 	error_message: z.string().nullable(),
+	orchestrator_prompt: z.string().nullable(),
 })
 export type AgentRunRow = z.infer<typeof AgentRunRowSchema>
 
@@ -37,6 +38,7 @@ export const InsertAgentRunSchema = AgentRunRowSchema.partial({
 	title: z.string().min(1),
 	context_mode: AgentRunContextModeSchema,
 	status: AgentRunStatusSchema.optional().default('running'),
+	orchestrator_prompt: z.string().nullable().optional(),
 })
 export type InsertAgentRun = z.infer<typeof InsertAgentRunSchema>
 

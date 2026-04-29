@@ -82,6 +82,7 @@ export function mountAgentRunRoutes(
 			title: parsedBody.data.title,
 			status: 'running',
 			context_mode: parsedBody.data.contextMode,
+			orchestrator_prompt: parsedBody.data.prompt,
 		})
 
 		if (!createResult.ok) {
@@ -126,6 +127,7 @@ export function mountAgentRunRoutes(
 				parentRunId: parsedBody.data.parentRunId ?? null,
 				agentType: parsedBody.data.agentType,
 				title: parsedBody.data.title,
+				orchestratorPrompt: parsedBody.data.prompt,
 			})
 		}
 

@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia'
+import { dirname, join } from 'node:path'
 
 import type { HookRegistry } from '../hooks/index.ts'
 import type { ProviderRouter } from '../providers/router.ts'
@@ -82,9 +83,10 @@ export function createApp(
 			status: 'running',
 			uptime: process.uptime(),
 			timestamp: new Date().toISOString(),
-			// Absolute path to the entry point so the desktop app can restart
-			// the daemon without any manual path configuration.
-			entryPath: import.meta.filename,
+		// Absolute path to the entry point so the desktop app can restart
+		// the daemon without any manual path configuration.
+		// Resolved from this file's location: src/server/app.ts -> src/daemon/server-entry.ts
+		entryPath: join(dirname(dirname(import.meta.filename)), 'daemon', 'server-entry.ts'),
 		}))
 
 	// Graceful shutdown endpoint — called by the desktop app's daemon
