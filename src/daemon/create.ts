@@ -11,6 +11,8 @@ import { ProviderRouter } from '../providers/router.ts'
 import { createApp } from '../server/app.ts'
 import { StateManager } from '../state/manager.ts'
 import { createToolRegistry } from '../tools/registry.ts'
+import { createPhaseAllowListFromSpecTools, createSpecPhaseGateHandler } from '../hooks/spec-phase-gate.ts'
+import { instantiateSpecTools } from '../tools/spec/index.ts'
 import { sessionManager } from '../tools/shell/index.js'
 import { ElefantWsServer } from '../transport/ws-server.ts'
 import { SseManager } from '../transport/sse-manager.ts'
@@ -62,7 +64,17 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 		id: projectInfo.projectId,
 		name: basename(projectInfo.projectPath),
 		path: projectInfo.projectPath,
+		database: db,
+		hookRegistry,
 	})
+	hookRegistry.on(
+		'tool:before',
+		createSpecPhaseGateHandler(
+			stateManager,
+			createPhaseAllowListFromSpecTools(instantiateSpecTools()),
+		),
+		{ priority: 10 },
+	)
 
 	const contextBase = {
 		config,

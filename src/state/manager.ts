@@ -3,6 +3,9 @@ import type { Database as BunDatabase } from 'bun:sqlite';
 import type { Database } from '../db/database.ts';
 import { SpecAdlRepo } from '../db/repo/spec/adl.ts';
 import { SpecWorkflowsRepo } from '../db/repo/spec/workflows.ts';
+import { emit } from '../hooks/emit.ts';
+import type { HookContextMap, HookEventName } from '../hooks/types.ts';
+import type { HookRegistry } from '../hooks/registry.ts';
 import { statePath } from '../project/paths.ts';
 import { atomicWriteJson } from './atomic.ts';
 import {
@@ -45,6 +48,7 @@ type StateManagerOptions = {
   name: string;
   path: string;
   database?: Database;
+  hookRegistry?: HookRegistry;
 };
 
 type SpecWorkflowRow = {
@@ -131,6 +135,7 @@ export class StateManager {
   private readonly specMutexes = new Map<string, AsyncMutex>();
   private readonly filePath: string;
   private readonly db: Database | null;
+  private readonly hooks?: HookRegistry;
   private readonly projectMeta: { id: string; name: string; path: string };
 
   constructor(projectPath: string, options: StateManagerOptions) {
@@ -140,8 +145,16 @@ export class StateManager {
       path: options.path,
     };
     this.db = options.database ?? null;
+    this.hooks = options.hookRegistry;
     this.filePath = statePath(projectPath);
     this.state = this.load();
+  }
+
+  private emitHook<E extends HookEventName>(event: E, context: HookContextMap[E]): void {
+    if (!this.hooks) return;
+    void emit(this.hooks, event, context).catch((error) => {
+      console.error(`[elefant] Failed to emit ${event}:`, error);
+    });
   }
 
   private requireDb(): BunDatabase {
@@ -507,7 +520,13 @@ export class StateManager {
         this.updateSpecWorkflowFields(db, projectId, workflowId, { phase: to }),
       )();
 
-      // TODO(Wave 3 Task 3.2): emit spec:phase_transitioned hook event here.
+      this.emitHook('spec:phase_transitioned', {
+        workflowId,
+        projectId,
+        from: current.phase,
+        to,
+        forced: opts.force === true && !allowed.includes(to),
+      });
       return updated;
     });
   }
@@ -525,7 +544,11 @@ export class StateManager {
         const updated = db.transaction(() =>
           this.updateSpecWorkflowFields(db, projectId, workflowId, { spec_locked: 1 }),
         )();
-        // TODO(Wave 3 Task 3.2): emit spec:locked hook event here.
+        this.emitHook('spec:locked', {
+          workflowId,
+          projectId,
+          lockedAt: updated.updatedAt,
+        });
         return updated;
       });
     }
@@ -548,7 +571,7 @@ export class StateManager {
         const updated = db.transaction(() =>
           this.updateSpecWorkflowFields(db, projectId, workflowId, { spec_locked: 0 }),
         )();
-        // TODO(Wave 3 Task 3.2): emit spec:unlocked hook event here.
+        this.emitHook('spec:unlocked', { workflowId, projectId });
         return updated;
       });
     }
@@ -751,13 +774,28 @@ export class StateManager {
       const db = this.requireDb();
       const mutex = this.getSpecMutex(projectId, workflowId);
       return mutex.withLock(async () => {
+        const previous = this.getSpecWorkflowOrThrow(db, projectId, workflowId);
         const updated = db.transaction(() =>
           this.updateSpecWorkflowFields(db, projectId, workflowId, {
             current_wave: currentWave,
             total_waves: totalWaves,
           }),
         )();
-        // TODO(Wave 3 Task 3.2): emit spec:wave_updated hook event here.
+        if (currentWave > previous.currentWave) {
+          if (previous.currentWave > 0) {
+            this.emitHook('wave:completed', {
+              workflowId,
+              projectId,
+              waveNumber: previous.currentWave,
+            });
+          }
+          this.emitHook('wave:started', {
+            workflowId,
+            projectId,
+            waveNumber: currentWave,
+            taskCount: 0,
+          });
+        }
         return updated;
       });
     }

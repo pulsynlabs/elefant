@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import type { Database } from '../../db/database.ts';
 import type { StateManager } from '../../state/manager.ts';
+import type { HookRegistry } from '../../hooks/registry.ts';
 import type { SpecWorkflow, SpecWorkflowPhase } from '../../state/schema.ts';
 import { InvalidTransitionError, SpecLockedError, WorkflowNotFoundError } from '../../state/errors.ts';
 import { SpecToolError } from './errors.ts';
@@ -19,6 +20,7 @@ export interface SpecToolContext {
 	workflowId: string;
 	projectId: string;
 	runId?: string;
+	hookRegistry?: HookRegistry;
 }
 
 export type SpecToolResult<TResult> = TResult | SpecToolError;

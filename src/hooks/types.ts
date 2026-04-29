@@ -9,6 +9,14 @@ export interface ToolBeforeContext {
 	readonly toolName: string;
 	readonly args: Readonly<Record<string, unknown>>;
 	readonly conversationId: string;
+	readonly veto?: boolean;
+	readonly error?: {
+		readonly code: string;
+		readonly message: string;
+		readonly expected?: readonly string[];
+		readonly actual?: string;
+		readonly tool?: string;
+	};
 }
 
 export interface ToolAfterContext {
@@ -142,6 +150,15 @@ export interface HookContextMap {
 		readonly tool: string;
 		readonly conversationId: string;
 	};
+	'spec:locked': { readonly workflowId: string; readonly projectId: string; readonly lockedAt: string };
+	'spec:unlocked': { readonly workflowId: string; readonly projectId: string };
+	'spec:amended': { readonly workflowId: string; readonly projectId: string; readonly version: number; readonly rationale: string };
+	'spec:phase_transitioned': { readonly workflowId: string; readonly projectId: string; readonly from: string; readonly to: string; readonly forced: boolean };
+	'blueprint:created': { readonly workflowId: string; readonly projectId: string };
+	'wave:started': { readonly workflowId: string; readonly projectId: string; readonly waveNumber: number; readonly taskCount: number };
+	'wave:completed': { readonly workflowId: string; readonly projectId: string; readonly waveNumber: number };
+	'task:assigned': { readonly workflowId: string; readonly projectId: string; readonly taskId: string; readonly agentRunId: string };
+	'task:completed': { readonly workflowId: string; readonly projectId: string; readonly taskId: string };
 }
 
 export type HookEventName = keyof HookContextMap;
@@ -174,4 +191,13 @@ export const HOOK_EVENT_NAMES: readonly HookEventName[] = [
 	'permission:ask',
 	'tool:block',
 	'tool:allow',
+	'spec:locked',
+	'spec:unlocked',
+	'spec:amended',
+	'spec:phase_transitioned',
+	'blueprint:created',
+	'wave:started',
+	'wave:completed',
+	'task:assigned',
+	'task:completed',
 ];

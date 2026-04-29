@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { Database } from '../db/database.ts';
+import { SpecAdlRepo } from '../db/repo/spec/adl.ts';
+import { MustHavesRepo } from '../db/repo/spec/must-haves.ts';
 import { emit } from '../hooks/emit.ts';
 import { HookRegistry } from '../hooks/registry.ts';
 import { insertEvent } from '../db/repo/events.ts';
+import { StateManager } from '../state/manager.ts';
 import { createDefaultState } from '../state/schema.ts';
 import {
 	__getFileReadCountForTests,
@@ -16,6 +19,7 @@ import {
 	buildStateBlock,
 	buildToolInstructionsBlock,
 	createCompactionBlockTransform,
+  buildSpecModeBlock,
 } from './blocks.ts';
 
 function seedProjectAndSession(
@@ -40,6 +44,13 @@ function seedProjectAndSession(
       null,
       new Date().toISOString(),
     ],
+  );
+}
+
+function seedProject(db: Database, projectId: string, projectPath: string): void {
+  db.db.run(
+    'INSERT INTO projects (id, name, path, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [projectId, projectId, projectPath, null, new Date().toISOString(), new Date().toISOString()],
   );
 }
 
@@ -242,5 +253,77 @@ describe('compaction blocks', () => {
 			'B',
 			'task',
 		]);
+	});
+
+	it('buildSpecModeBlock includes workflow, must-haves, and ADL details', async () => {
+		const directory = mkdtempSync(join(tmpdir(), 'elefant-spec-mode-block-'));
+		tempDirs.push(directory);
+		mkdirSync(join(directory, '.elefant'), { recursive: true });
+		const db = new Database(join(directory, '.elefant', 'db.sqlite'));
+		const projectId = 'project-1';
+		const workflowId = 'spec-mode';
+		seedProject(db, projectId, directory);
+		const state = new StateManager(directory, { id: projectId, name: projectId, path: directory, database: db });
+		const workflow = await state.createSpecWorkflow({ projectId, workflowId, phase: 'execute', mode: 'standard', depth: 'deep', specLocked: true, currentWave: 3, totalWaves: 5 });
+		const mustHaves = new MustHavesRepo(db);
+		for (let index = 1; index <= 3; index += 1) {
+			mustHaves.create({ workflowId: workflow.id, mhId: `MH${index}`, title: `Requirement ${index}`, description: 'Desc', ordinal: index }, { amend: true });
+		}
+		const adl = new SpecAdlRepo(db);
+		adl.append(workflow.id, { type: 'decision', title: 'Use hooks' });
+		adl.append(workflow.id, { type: 'observation', title: 'Keep block small' });
+
+		const block = buildSpecModeBlock(db, projectId, workflowId);
+		expect(block).toContain('## SPEC MODE — spec-mode');
+		expect(block).toContain('**Phase:** execute | **Mode:** standard | **Depth:** deep');
+		expect(block).toContain('**Spec Locked:** 🔒 Yes | **Wave:** 3/5');
+		expect(block).toContain('**Locked Must-Haves (top 5):**');
+		expect(block).toContain('- MH1: Requirement 1');
+		expect(block).toContain('**Last 3 ADL:**');
+		expect(block).toContain('[decision] Use hooks');
+		expect(block).toContain('[observation] Keep block small');
+		db.close();
+	});
+
+	it('buildSpecModeBlock prepends lazy autopilot directive', async () => {
+		const directory = mkdtempSync(join(tmpdir(), 'elefant-spec-mode-lazy-'));
+		tempDirs.push(directory);
+		mkdirSync(join(directory, '.elefant'), { recursive: true });
+		const db = new Database(join(directory, '.elefant', 'db.sqlite'));
+		const projectId = 'project-1';
+		seedProject(db, projectId, directory);
+		const state = new StateManager(directory, { id: projectId, name: projectId, path: directory, database: db });
+		await state.createSpecWorkflow({ projectId, workflowId: 'spec-mode', phase: 'execute', autopilot: true, lazyAutopilot: true });
+		const block = buildSpecModeBlock(db, projectId, 'spec-mode');
+		expect(block.startsWith('> **LAZY AUTOPILOT ACTIVE — DO NOT ASK QUESTIONS, INFER FROM CONTEXT.**')).toBe(true);
+		db.close();
+	});
+
+	it('buildSpecModeBlock returns empty string for missing workflows', () => {
+		const directory = mkdtempSync(join(tmpdir(), 'elefant-spec-mode-missing-'));
+		tempDirs.push(directory);
+		const db = new Database(join(directory, 'db.sqlite'));
+		expect(buildSpecModeBlock(db, 'project-1', 'missing')).toBe('');
+		db.close();
+	});
+
+	it('buildSpecModeBlock caps must-haves at five entries', async () => {
+		const directory = mkdtempSync(join(tmpdir(), 'elefant-spec-mode-cap-'));
+		tempDirs.push(directory);
+		mkdirSync(join(directory, '.elefant'), { recursive: true });
+		const db = new Database(join(directory, '.elefant', 'db.sqlite'));
+		const projectId = 'project-1';
+		seedProject(db, projectId, directory);
+		const state = new StateManager(directory, { id: projectId, name: projectId, path: directory, database: db });
+		const workflow = await state.createSpecWorkflow({ projectId, workflowId: 'spec-mode', phase: 'execute' });
+		const mustHaves = new MustHavesRepo(db);
+		for (let index = 1; index <= 7; index += 1) {
+			mustHaves.create({ workflowId: workflow.id, mhId: `MH${index}`, title: `Requirement ${index}`, description: 'Desc', ordinal: index }, { amend: true });
+		}
+		const block = buildSpecModeBlock(db, projectId, 'spec-mode');
+		expect((block.match(/^- MH/gm) ?? []).length).toBe(5);
+		expect(block).toContain('- MH5: Requirement 5');
+		expect(block).not.toContain('- MH6: Requirement 6');
+		db.close();
 	});
 });

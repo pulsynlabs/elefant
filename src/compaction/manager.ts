@@ -14,6 +14,7 @@ import {
   buildStateBlock,
   buildToolInstructionsBlock,
 } from './blocks.ts';
+import { buildSpecModeBlock } from './spec-mode-block.ts';
 import type { CompactionInput, CompactionOutput } from './types.ts';
 
 const COMPACTION_THRESHOLD = 0.7;
@@ -92,9 +93,11 @@ export class CompactionManager {
     const state = this.ctx.state.getState();
     const specPath = this.resolveSpecPath(state);
     const toolNames = this.getToolNames();
+    const activeSpec = this.resolveActiveSpecWorkflow();
 
     const blocks = [
       buildStateBlock(state),
+      activeSpec ? buildSpecModeBlock(this.ctx.db, activeSpec.projectId, activeSpec.workflowId) : '',
       buildSpecBlock(specPath),
       buildAdlBlock(this.ctx.db),
       buildToolInstructionsBlock(toolNames),
@@ -212,5 +215,13 @@ export class CompactionManager {
 
   private getToolNames(): string[] {
     return this.ctx.tools.getAll().map((tool) => tool.name);
+  }
+
+  private resolveActiveSpecWorkflow(): { projectId: string; workflowId: string } | null {
+    const projectId = this.ctx.project.projectId;
+    const row = this.ctx.db.db
+      .query('SELECT workflow_id FROM spec_workflows WHERE project_id = ? AND is_active = 1 LIMIT 1')
+      .get(projectId) as { workflow_id: string } | null;
+    return row ? { projectId, workflowId: row.workflow_id } : null;
   }
 }

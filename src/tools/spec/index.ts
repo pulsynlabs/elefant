@@ -2,6 +2,7 @@ import { ok, type Result } from '../../types/result.ts';
 import type { ElefantError } from '../../types/errors.ts';
 import type { ToolDefinition } from '../../types/tools.ts';
 import { StateManager } from '../../state/manager.ts';
+import type { HookRegistry } from '../../hooks/registry.ts';
 import { SpecTool, type SpecToolContext } from './base.ts';
 import { SpecStatusTool, SpecStateTool, SpecWorkflowTool } from './state-tools.ts';
 import { SpecBlueprintTool, SpecRequirementsTool, SpecSpecTool } from './document-tools.ts';
@@ -56,6 +57,7 @@ export function createSpecToolContext(input: {
 	database: SpecToolContext['database'];
 	projectId: string;
 	runId?: string;
+	hookRegistry?: HookRegistry;
 }): SpecToolContext {
 	const project = input.database.db
 		.query('SELECT id, name, path FROM projects WHERE id = ?')
@@ -75,6 +77,8 @@ export function createSpecToolContext(input: {
 			name: projectMeta.name,
 			path: projectMeta.path,
 			database: input.database,
+			hookRegistry: input.hookRegistry,
 		}),
+		hookRegistry: input.hookRegistry,
 	};
 }

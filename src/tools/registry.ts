@@ -225,11 +225,35 @@ export class ToolRegistry {
 		const conversationId = toConversationId(hookArgs);
 		const startedAt = Date.now();
 
-		await emit(this.hookRegistry, 'tool:before', {
+		const beforeContext = await emit(this.hookRegistry, 'tool:before', {
 			toolName: name,
 			args: hookArgs,
 			conversationId,
 		});
+		if (beforeContext.veto === true) {
+			const errorPayload = beforeContext.error ?? {
+				code: 'TOOL_VETOED',
+				message: `Tool '${name}' was vetoed by a before hook`,
+			};
+			const message = errorPayload.message;
+			const code = errorPayload.code === 'INVALID_PHASE'
+				? 'INVALID_PHASE'
+				: errorPayload.code === 'TOOL_VETOED'
+					? 'TOOL_VETOED'
+					: 'TOOL_EXECUTION_FAILED';
+			await emit(this.hookRegistry, 'tool:after', {
+				toolName: name,
+				args: hookArgs,
+				result: toHookResult(message, true),
+				durationMs: Date.now() - startedAt,
+				conversationId,
+			});
+			return err({
+				code,
+				message,
+				details: errorPayload,
+			});
+		}
 
 		const validatedArgs = validateToolArgs(tool, args);
 		if (!validatedArgs.ok) {
@@ -386,6 +410,7 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 		database: deps.database,
 		projectId: deps.currentRun.projectId,
 		runId: deps.currentRun.runId,
+		hookRegistry: deps.hookRegistry,
 	})
 	for (const tool of createSpecTools(specCtx)) {
 		registry.register(tool)

@@ -32,6 +32,15 @@ function createEmptyStore(): HandlerStore {
 		'permission:ask': [],
 		'tool:block': [],
 		'tool:allow': [],
+		'spec:locked': [],
+		'spec:unlocked': [],
+		'spec:amended': [],
+		'spec:phase_transitioned': [],
+		'blueprint:created': [],
+		'wave:started': [],
+		'wave:completed': [],
+		'task:assigned': [],
+		'task:completed': [],
 	};
 }
 
@@ -77,6 +86,14 @@ export class HookRegistry {
 				eventHandlers.splice(index, 1);
 			}
 		};
+	}
+
+	public on<E extends HookEventName>(
+		event: E,
+		handler: HookHandler<E>,
+		options?: { priority?: number },
+	): Disposer {
+		return this.register(event, handler, options);
 	}
 
 	public getHandlers<E extends HookEventName>(event: E): readonly HookHandler<E>[] {

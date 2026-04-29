@@ -4,6 +4,7 @@ import { SpecDocumentsRepo } from '../../db/repo/spec/documents.ts';
 import { MustHavesRepo } from '../../db/repo/spec/must-haves.ts';
 import { SpecRenderer } from '../../db/repo/spec/render.ts';
 import { SpecTasksRepo } from '../../db/repo/spec/tasks.ts';
+import { emit } from '../../hooks/emit.ts';
 import { SpecToolError } from './errors.ts';
 import { resolveSpecWorkflow, SpecTool, type SpecToolContext } from './base.ts';
 
@@ -68,13 +69,22 @@ export class SpecSpecTool extends SpecTool<SpecArgs, unknown> {
 			if (missing.length > 0) return new SpecToolError('VALIDATION_CONTRACT_INCOMPLETE', 'Every must-have requires at least one validation contract before lock', { missing: missing.map((item) => item.mhId) });
 			return ctx.stateManager.lockSpec(args.projectId, args.workflowId);
 		}
-		return docs.applyAmendment(workflow.id, {
+		const result = docs.applyAmendment(workflow.id, {
 			rationale: args.rationale,
 			mutate: (tx) => {
 				const content = typeof args.changes.content === 'string' ? args.changes.content : docs.getSpec(workflow.id)?.contentMd ?? '';
 				tx.documents.writeSpec(workflow.id, content, { amend: true });
 			},
 		});
+		if (ctx.hookRegistry) {
+			void emit(ctx.hookRegistry, 'spec:amended', {
+				workflowId: args.workflowId,
+				projectId: args.projectId,
+				version: result.version,
+				rationale: args.rationale,
+			}).catch((error) => console.error('[elefant] Failed to emit spec:amended:', error));
+		}
+		return result;
 	}
 }
 
@@ -98,7 +108,17 @@ export class SpecBlueprintTool extends SpecTool<BlueprintArgs, unknown> {
 		const workflow = await resolveSpecWorkflow(ctx, args);
 		const docs = new SpecDocumentsRepo(ctx.database);
 		if (args.action === 'read') return { contentMd: new SpecRenderer(ctx.database).renderBlueprint(workflow.id) };
-		if (args.action === 'write') return docs.writeBlueprint(workflow.id, args.content);
+		if (args.action === 'write') {
+			const creating = docs.getBlueprint(workflow.id) === null;
+			const result = docs.writeBlueprint(workflow.id, args.content);
+			if (creating && ctx.hookRegistry) {
+				void emit(ctx.hookRegistry, 'blueprint:created', {
+					workflowId: args.workflowId,
+					projectId: args.projectId,
+				}).catch((error) => console.error('[elefant] Failed to emit blueprint:created:', error));
+			}
+			return result;
+		}
 		const blueprint = ctx.database.db.query('SELECT id FROM spec_blueprints WHERE workflow_id = ? ORDER BY version DESC LIMIT 1').get(workflow.id) as { id: string } | null;
 		if (!blueprint) return { wave: args.wave, tasks: [] };
 		const wave = new SpecTasksRepo(ctx.database).listWaves(blueprint.id).find((item) => item.waveNumber === args.wave);

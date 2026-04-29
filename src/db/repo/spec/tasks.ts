@@ -2,6 +2,8 @@ import type { SQLQueryBindings } from 'bun:sqlite';
 import { z } from 'zod';
 
 import type { Database } from '../../database.ts';
+import { emit } from '../../../hooks/emit.ts';
+import type { HookRegistry } from '../../../hooks/registry.ts';
 import {
 	BaseRepo,
 	RowNotFoundError,
@@ -165,8 +167,45 @@ function rowToSpecTask(row: SpecTaskRow): SpecTask {
 // ---------------------------------------------------------------------------
 
 export class SpecTasksRepo extends BaseRepo {
-	constructor(database: Database) {
+	constructor(database: Database, private readonly hooks?: HookRegistry) {
 		super(database);
+	}
+
+	private getWorkflowForTask(taskId: string): { projectId: string; workflowId: string } | null {
+		const row = this.db
+			.query(
+				`SELECT sw.project_id AS projectId, sw.workflow_id AS workflowId
+				 FROM spec_tasks t
+				 JOIN spec_waves w ON w.id = t.wave_id
+				 JOIN spec_blueprints b ON b.id = w.blueprint_id
+				 JOIN spec_workflows sw ON sw.id = b.workflow_id
+				 WHERE t.id = ?`,
+			)
+			.get(taskId) as { projectId: string; workflowId: string } | null;
+		return row;
+	}
+
+	private emitTaskAssigned(task: SpecTask, agentRunId: string): void {
+		if (!this.hooks) return;
+		const workflow = this.getWorkflowForTask(task.id);
+		if (!workflow) return;
+		void emit(this.hooks, 'task:assigned', {
+			workflowId: workflow.workflowId,
+			projectId: workflow.projectId,
+			taskId: task.taskId,
+			agentRunId,
+		}).catch((error) => console.error('[elefant] Failed to emit task:assigned:', error));
+	}
+
+	private emitTaskCompleted(task: SpecTask): void {
+		if (!this.hooks) return;
+		const workflow = this.getWorkflowForTask(task.id);
+		if (!workflow) return;
+		void emit(this.hooks, 'task:completed', {
+			workflowId: workflow.workflowId,
+			projectId: workflow.projectId,
+			taskId: task.taskId,
+		}).catch((error) => console.error('[elefant] Failed to emit task:completed:', error));
 	}
 
 	// ---- Wave operations ---------------------------------------------------
@@ -307,11 +346,13 @@ export class SpecTasksRepo extends BaseRepo {
 	}
 
 	assign(id: string, agentRunId: string): SpecTask {
-		return this.mutateStatus(id, {
+		const task = this.mutateStatus(id, {
 			status: 'in_progress',
 			agentRunId,
 			startedAt: new Date().toISOString(),
 		});
+		this.emitTaskAssigned(task, agentRunId);
+		return task;
 	}
 
 	/**
@@ -325,10 +366,12 @@ export class SpecTasksRepo extends BaseRepo {
 	markComplete(id: string, opts?: { outputs?: string }): SpecTask {
 		// opts.outputs is intentionally unused here — documented in JSDoc above.
 		void opts;
-		return this.mutateStatus(id, {
+		const task = this.mutateStatus(id, {
 			status: 'complete',
 			completedAt: new Date().toISOString(),
 		});
+		this.emitTaskCompleted(task);
+		return task;
 	}
 
 	markBlocked(_id: string, _reason: string): SpecTask {
