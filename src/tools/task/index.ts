@@ -44,6 +44,12 @@ interface TaskExecutionParams extends TaskParams {
 export const DEFAULT_MAX_CHILDREN = 4
 export const DEFAULT_MAX_TASK_DEPTH = 4
 
+export function wireParentAbortToChild(parentSignal: AbortSignal, childController: AbortController): () => void {
+	const onParentAbort = (): void => childController.abort()
+	parentSignal.addEventListener('abort', onParentAbort, { once: true })
+	return () => parentSignal.removeEventListener('abort', onParentAbort)
+}
+
 type PersistedRole = 'system' | 'user' | 'assistant' | 'tool_call' | 'tool_result'
 
 interface CollectedMessage {
@@ -136,6 +142,17 @@ Use agent_session_search to query the child's full message history by runId.`,
 
 			const childRunId = crypto.randomUUID()
 			const childController = new AbortController()
+			if (currentRun.signal.aborted) {
+				childController.abort()
+				return err({
+					code: 'TOOL_EXECUTION_FAILED',
+					message: `Task tool aborted before starting: parent run "${currentRun.runId}" is already cancelled.`,
+				})
+			}
+
+			const cleanupParentAbort = wireParentAbortToChild(currentRun.signal, childController)
+
+			try {
 			const childCtx: RunContext = {
 				runId: childRunId,
 				parentRunId: currentRun.runId,
@@ -454,6 +471,9 @@ Use agent_session_search to query the child's full message history by runId.`,
 					result,
 				}),
 			)
+			} finally {
+				cleanupParentAbort()
+			}
 		},
 	}
 }

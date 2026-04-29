@@ -1,13 +1,14 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 
 import { HookRegistry } from '../../hooks/registry.ts'
+import type { StreamEvent } from '../../providers/types.ts'
 import { createRun } from '../../runs/dal.js'
 import { RunRegistry } from '../../runs/registry.ts'
 import type { RunContext } from '../../runs/types.js'
 import { ok } from '../../types/result.ts'
 import type { Message } from '../../types/providers.js'
 import { Database } from '../../db/database.js'
-import { createTaskTool, type TaskToolDeps } from './index.js'
+import { createTaskTool, wireParentAbortToChild, type TaskToolDeps } from './index.js'
 import { listMessages } from '../../runs/messages.js'
 import * as agentLoopModule from '../../server/agent-loop.js'
 
@@ -121,12 +122,10 @@ type MockAgentLoopEvent =
 function mockRunAgentLoop(events: MockAgentLoopEvent[]) {
 	return spyOn(agentLoopModule, 'runAgentLoop').mockImplementation(
 		async function* (
-			_router: unknown,
-			_registry: unknown,
-			_params: unknown,
-		): AsyncGenerator<MockAgentLoopEvent> {
+			..._args: Parameters<typeof agentLoopModule.runAgentLoop>
+		): AsyncGenerator<StreamEvent> {
 			for (const event of events) {
-				yield event as MockAgentLoopEvent
+				yield event as unknown as StreamEvent
 			}
 		},
 	)
@@ -633,18 +632,18 @@ describe('createTaskTool', () => {
 
 	it('aborting parent run via registry cascades to registered child', async () => {
 		// Create a deferred mock that allows us to control when it completes
-		let continueExecution: (() => void) | null = null
+		const execution = { continue: (): void => undefined }
 		const executionPromise = new Promise<void>((resolve) => {
-			continueExecution = resolve
+			execution.continue = resolve
 		})
 
 		const mockSpy = spyOn(agentLoopModule, 'runAgentLoop').mockImplementation(
-			async function* (_router: unknown, _registry: unknown, _params: unknown): AsyncGenerator<MockAgentLoopEvent> {
+			async function* (..._args: Parameters<typeof agentLoopModule.runAgentLoop>): AsyncGenerator<StreamEvent> {
 				// Yield one event then wait for the signal to complete
-				yield { type: 'text_delta', text: 'working...' }
+				yield { type: 'text_delta', text: 'working...' } as StreamEvent
 				// Wait for the test to signal us to continue (or for abort)
 				await executionPromise
-				yield { type: 'done' }
+				yield { type: 'done' } as unknown as StreamEvent
 			},
 		)
 
@@ -688,12 +687,120 @@ describe('createTaskTool', () => {
 		expect(childEntry.controller.signal.aborted).toBe(true)
 
 		// Signal the mock to complete
-		continueExecution?.()
+		execution.continue()
 
 		// Now await the result
 		const result = await executePromise
 		expect(result.ok).toBe(true)
 
+		mockSpy.mockRestore()
+		database.close()
+	})
+
+	it('returns a deterministic error when parent is already aborted before child starts', async () => {
+		const mockSpy = mockRunAgentLoop([{ type: 'done' }])
+		const { deps, parentController, runRegistry, database } = buildDeps()
+		parentController.abort()
+
+		const tool = createTaskTool(deps)
+		const result = await tool.execute({
+			description: 'pre-aborted parent test',
+			prompt: 'do something',
+			agent_type: 'researcher',
+		})
+
+		expect(result.ok).toBe(false)
+		if (result.ok) return
+
+		expect(result.error.code).toBe('TOOL_EXECUTION_FAILED')
+		expect(result.error.message).toBe(
+			'Task tool aborted before starting: parent run "parent-run-id" is already cancelled.',
+		)
+		expect(mockSpy).toHaveBeenCalledTimes(0)
+		expect(runRegistry.getChildRunIds(deps.currentRun.runId)).toEqual([])
+
+		mockSpy.mockRestore()
+		database.close()
+	})
+
+	it('direct parent abort propagates to running child without calling runRegistry.abortRun', async () => {
+		const execution = { continue: (): void => undefined }
+		const executionPromise = new Promise<void>((resolve) => {
+			execution.continue = resolve
+		})
+
+		const mockSpy = spyOn(agentLoopModule, 'runAgentLoop').mockImplementation(
+			async function* (..._args: Parameters<typeof agentLoopModule.runAgentLoop>): AsyncGenerator<StreamEvent> {
+				yield { type: 'text_delta', text: 'working...' } as StreamEvent
+				await executionPromise
+				yield { type: 'done' } as unknown as StreamEvent
+			},
+		)
+
+		const { deps, runRegistry, parentController, database } = buildDeps()
+		const abortRunSpy = spyOn(runRegistry, 'abortRun')
+		const tool = createTaskTool(deps)
+
+		const executePromise = tool.execute({
+			description: 'direct signal abort test',
+			prompt: 'do something',
+			agent_type: 'researcher',
+		})
+
+		for (let attempts = 0; attempts < 20 && runRegistry.getChildRunIds(deps.currentRun.runId).length === 0; attempts += 1) {
+			await new Promise((resolve) => setTimeout(resolve, 1))
+		}
+
+		const childRunIds = runRegistry.getChildRunIds(deps.currentRun.runId)
+		expect(childRunIds.length).toBe(1)
+
+		const childEntry = runRegistry.getRun(childRunIds[0])
+		expect(childEntry).toBeDefined()
+		if (!childEntry) {
+			mockSpy.mockRestore()
+			abortRunSpy.mockRestore()
+			database.close()
+			return
+		}
+
+		parentController.abort()
+		expect(childEntry.controller.signal.aborted).toBe(true)
+		expect(abortRunSpy).toHaveBeenCalledTimes(0)
+
+		execution.continue()
+		const result = await executePromise
+		expect(result.ok).toBe(true)
+
+		abortRunSpy.mockRestore()
+		mockSpy.mockRestore()
+		database.close()
+	})
+
+	it('removes parent abort listener after normal child completion', async () => {
+		const mockSpy = mockRunAgentLoop([{ type: 'done' }])
+		const { deps, parentController, database } = buildDeps()
+		const addListenerSpy = spyOn(deps.currentRun.signal, 'addEventListener')
+		const removeListenerSpy = spyOn(deps.currentRun.signal, 'removeEventListener')
+		const tool = createTaskTool(deps)
+
+		const result = await tool.execute({
+			description: 'listener cleanup test',
+			prompt: 'do something',
+			agent_type: 'researcher',
+		})
+
+		expect(result.ok).toBe(true)
+		expect(addListenerSpy).toHaveBeenCalledTimes(1)
+		expect(removeListenerSpy).toHaveBeenCalledTimes(1)
+
+		const childController = new AbortController()
+		const cleanup = wireParentAbortToChild(parentController.signal, childController)
+		cleanup()
+		parentController.abort()
+		expect(childController.signal.aborted).toBe(false)
+
+		removeListenerSpy.mockRestore()
+		addListenerSpy.mockRestore()
 		mockSpy.mockRestore()
 		database.close()
 	})
