@@ -7,6 +7,7 @@ import type { HookContextMap } from '../hooks/types.ts';
 import { hasUnpairedToolCall } from '../runs/messages.ts';
 import type { StateManager } from '../state/manager.ts';
 import type { Message } from '../types/providers.ts';
+import { estimateMessageTokens } from '../utils/tokens.ts';
 import {
   buildAdlBlock,
   buildSpecBlock,
@@ -17,20 +18,6 @@ import type { CompactionInput, CompactionOutput } from './types.ts';
 
 const COMPACTION_THRESHOLD = 0.7;
 const RETAINED_MESSAGE_RATIO = 0.3;
-
-function estimateTokens(messages: Message[]): number {
-  const content = messages
-    .map((message) => {
-      if (typeof message.content === 'string') {
-        return message.content;
-      }
-
-      return JSON.stringify(message.content);
-    })
-    .join(' ');
-
-  return Math.ceil(content.length / 4);
-}
 
 export class CompactionManager {
   constructor(private readonly ctx: DaemonContext) {}
@@ -126,7 +113,7 @@ export class CompactionManager {
       content: block,
     }));
     const compactedMessages = [summaryMessage, ...blockMessages, ...keptMessages];
-    const tokenCountAfter = estimateTokens(compactedMessages);
+    const tokenCountAfter = estimateMessageTokens(compactedMessages);
 
     try {
       insertEvent(this.ctx.db, {

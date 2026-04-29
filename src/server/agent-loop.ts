@@ -12,6 +12,7 @@ import { type Message } from '../types/providers.ts'
 import type { Result } from '../types/result.ts'
 import type { ToolCall, ToolDefinition, ToolResult } from '../types/tools.ts'
 import type { SseManager } from '../transport/sse-manager.ts'
+import { estimateMessageTokens } from '../utils/tokens.ts'
 
 export interface ToolExecutor {
 	execute(name: string, args: unknown): Promise<Result<string, ElefantError>>
@@ -35,11 +36,6 @@ export interface AgentLoopOptions {
 	questionEmitter?: QuestionEmitter
 	metadataEmitter?: MetadataEmitter
 	sseManager?: SseManager
-}
-
-function estimateTokenCount(messages: Message[]): number {
-	const content = messages.map((message) => message.content).join(' ')
-	return Math.ceil(content.length / 4)
 }
 
 function createToolResult(toolCallId: string, content: string, isError: boolean): ToolResult {
@@ -83,7 +79,7 @@ export async function* runAgentLoop(
 ): AsyncGenerator<StreamEvent> {
 	let messages = [...options.messages]
 	let iterations = 0
-	let tokenCount = estimateTokenCount(messages)
+	let tokenCount = estimateMessageTokens(messages)
 	const contextWindow = options.contextWindowTokens ?? 200_000
 	const sessionId = options.runContext.sessionId
 	const maxIterations = options.maxIterations ?? 50
@@ -289,7 +285,7 @@ export async function* runAgentLoop(
 			content: assistantText,
 			toolCalls: pendingToolCalls,
 		})
-		tokenCount = estimateTokenCount(messages)
+		tokenCount = estimateMessageTokens(messages)
 
 		for (const toolCall of pendingToolCalls) {
 			yield { type: 'tool_call_complete', toolCall }
@@ -349,12 +345,12 @@ export async function* runAgentLoop(
 				toolResult,
 			}
 
-			messages.push({
-				role: 'tool',
-				content: toolResult.content,
-				toolCallId: toolResult.toolCallId,
-			})
-			tokenCount = estimateTokenCount(messages)
+		messages.push({
+			role: 'tool',
+			content: toolResult.content,
+			toolCallId: toolResult.toolCallId,
+		})
+		tokenCount = estimateMessageTokens(messages)
 		}
 	}
 
