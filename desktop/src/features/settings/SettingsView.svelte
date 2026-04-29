@@ -2,13 +2,15 @@
 	import GeneralSettings from './GeneralSettings.svelte';
 	import ProviderSettings from './ProviderSettings.svelte';
 	import DaemonControlSection from './DaemonControlSection.svelte';
+	import ProjectSettings from './ProjectSettings.svelte';
 
-	type Section = 'general' | 'providers' | 'daemon';
+	type Section = 'general' | 'providers' | 'daemon' | 'project';
 
 	let activeSection = $state<Section>('general');
 
 	const sections: Array<{ id: Section; label: string }> = [
 		{ id: 'general', label: 'General' },
+		{ id: 'project', label: 'Project' },
 		{ id: 'providers', label: 'Providers' },
 		{ id: 'daemon', label: 'Daemon' },
 	];
@@ -36,6 +38,8 @@
 		<div class="settings-content">
 			{#if activeSection === 'general'}
 				<GeneralSettings />
+			{:else if activeSection === 'project'}
+				<ProjectSettings />
 			{:else if activeSection === 'providers'}
 				<ProviderSettings />
 			{:else if activeSection === 'daemon'}

@@ -20,11 +20,27 @@ export type MigrationInput = {
 export type MigrationResult =
   | {
       status: 'skipped';
-      reason: 'no_state_file' | 'no_legacy_workflows' | 'already_migrated';
+      reason:
+        | 'no_state_file'
+        | 'no_legacy_workflows'
+        | 'already_migrated'
+        | 'legacy_mode_enabled';
       backupPath: null;
     }
   | { status: 'migrated'; workflowsMigrated: number; backupPath: string | null }
   | { status: 'failed'; error: string; backupPath: null };
+
+function isLegacyModeEnabled(database: Database, projectId: string): boolean {
+  try {
+    const row = database.db
+      .query('SELECT legacy_state_mode FROM projects WHERE id = ?')
+      .get(projectId) as { legacy_state_mode: number } | null;
+    return Boolean(row?.legacy_state_mode);
+  } catch {
+    // Migration 0008 may not have applied yet on very old DBs — treat as off.
+    return false;
+  }
+}
 
 type RawWorkflowEntry = Omit<WorkflowEntry, 'phase'> & {
   status?: string;
@@ -145,6 +161,10 @@ export async function runLegacyMigration(
 ): Promise<MigrationResult> {
   const statePath = join(input.projectPath, '.elefant', 'state.json');
   const clock = input.now ?? (() => new Date());
+
+  if (isLegacyModeEnabled(input.database, input.projectId)) {
+    return { status: 'skipped', reason: 'legacy_mode_enabled', backupPath: null };
+  }
 
   try {
     await access(statePath);

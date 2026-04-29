@@ -255,4 +255,64 @@ describe('runLegacyMigration', () => {
   // runner accepts injectable filesystem operations. POSIX directory permissions
   // behave inconsistently under privileged CI users, making chmod-based coverage
   // brittle here.
+
+  it('migrates multi-workflow legacy state and marks the active workflow', async () => {
+    const projectId = 'proj-multi';
+    const { projectPath, database } = createProjectWithDatabase(
+      projectId,
+      fixture('multi-workflow.json'),
+    );
+
+    const result = await runLegacyMigration({ projectPath, database, projectId });
+    expect(result.status).toBe('migrated');
+    if (result.status !== 'migrated') return;
+    expect(result.workflowsMigrated).toBe(2);
+    expect(countRows(database, projectId)).toBe(2);
+
+    const onboarding = getWorkflow(database, projectId, 'feat-onboarding');
+    expect(onboarding).not.toBeNull();
+    expect(onboarding!.is_active).toBe(1);
+    expect(onboarding!.phase).toBe('execute');
+    expect(onboarding!.current_wave).toBe(3);
+
+    const billing = getWorkflow(database, projectId, 'fix-billing-rounding');
+    expect(billing).not.toBeNull();
+    expect(billing!.is_active).toBe(0);
+    expect(billing!.phase).toBe('plan');
+    expect(billing!.mode).toBe('quick');
+    expect(billing!.depth).toBe('shallow');
+  });
+
+  it('skips when legacy_state_mode is enabled on the project', async () => {
+    const projectId = 'proj-legacy-mode';
+    const { projectPath, database } = createProjectWithDatabase(
+      projectId,
+      fixture('single-workflow.json'),
+    );
+    database.db.run('UPDATE projects SET legacy_state_mode = 1 WHERE id = ?', [projectId]);
+    const statePath = join(projectPath, '.elefant', 'state.json');
+
+    const result = await runLegacyMigration({ projectPath, database, projectId });
+    expect(result).toEqual({
+      status: 'skipped',
+      reason: 'legacy_mode_enabled',
+      backupPath: null,
+    });
+    expect(existsSync(statePath)).toBe(true);
+    expect(countRows(database, projectId)).toBe(0);
+  });
+
+  it('returns failed without mutation for the malformed fixture', async () => {
+    const projectId = 'proj-malformed';
+    const { projectPath, database } = createProjectWithDatabase(
+      projectId,
+      fixture('malformed.json'),
+    );
+    const statePath = join(projectPath, '.elefant', 'state.json');
+
+    const result = await runLegacyMigration({ projectPath, database, projectId });
+    expect(result.status).toBe('failed');
+    expect(existsSync(statePath)).toBe(true);
+    expect(countRows(database, projectId)).toBe(0);
+  });
 });

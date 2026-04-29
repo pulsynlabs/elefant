@@ -19,22 +19,37 @@ Accessibility:
 	import { onDestroy } from 'svelte';
 	import { specModeStore } from '$lib/stores/spec-mode.svelte.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
+	import { DAEMON_URL } from '$lib/daemon/client.js';
 	import WorkflowSwitcher from './WorkflowSwitcher.svelte';
 	import PhaseRail from './PhaseRail.svelte';
 	import SpecViewer from './SpecViewer.svelte';
 	import WaveTaskBoard from './WaveTaskBoard.svelte';
-	import { HugeiconsIcon, WarningIcon } from '$lib/icons/index.js';
+	import { HugeiconsIcon, WarningIcon, InfoIcon } from '$lib/icons/index.js';
 
 	type View = 'spec' | 'tasks';
 
 	let activeView = $state<View>('spec');
 	let unsubscribe: (() => void) | null = null;
+	let legacyMode = $state(false);
 
 	const projectId = $derived(projectsStore.activeProjectId);
+
+	async function checkLegacyMode(id: string): Promise<void> {
+		try {
+			const response = await fetch(`${DAEMON_URL}/api/projects/${encodeURIComponent(id)}/settings`);
+			if (response.ok) {
+				const json = (await response.json()) as { ok: true; data: { legacyStateMode: boolean } } | { ok: false };
+				legacyMode = 'data' in json ? json.data.legacyStateMode : false;
+			}
+		} catch {
+			legacyMode = false;
+		}
+	}
 
 	$effect(() => {
 		const id = projectId;
 		if (!id) return;
+		void checkLegacyMode(id);
 		void specModeStore.loadWorkflows(id);
 		// Tear down the prior subscription before reconnecting on project switch.
 		if (unsubscribe) unsubscribe();
@@ -58,6 +73,23 @@ Accessibility:
 			<p class="text-sm text-gray-500 dark:text-gray-400">
 				Open a project to view its spec workflows.
 			</p>
+		</div>
+	{:else if legacyMode}
+		<div
+			role="alert"
+			class="rounded-md border border-amber-300 bg-amber-50 px-4 py-6 text-amber-900 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-100"
+		>
+			<div class="flex items-start gap-3">
+				<HugeiconsIcon icon={InfoIcon} size={18} strokeWidth={1.5} />
+				<div>
+					<p class="text-sm font-semibold">Legacy mode — Spec Mode disabled</p>
+					<p class="mt-1 text-xs">
+						This project is configured to use <code>.elefant/state.json</code> for
+						workflow state. Disable "Use legacy state.json" in Settings → Project to
+						enable Spec Mode.
+					</p>
+				</div>
+			</div>
 		</div>
 	{:else}
 		<header class="flex flex-col gap-3 rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
