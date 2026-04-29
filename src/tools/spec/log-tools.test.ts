@@ -7,7 +7,7 @@ import { Database } from '../../db/database.ts';
 import { StateManager } from '../../state/manager.ts';
 import type { SpecToolContext } from './base.ts';
 import { SpecToolError } from './errors.ts';
-import { SpecCheckpointTool, SpecChronicleTool } from './log-tools.ts';
+import { distillAdlToMemory, SpecAdlTool, SpecCheckpointTool, SpecChronicleTool } from './log-tools.ts';
 
 const tempDirs: string[] = [];
 
@@ -56,6 +56,73 @@ describe('log spec tools', () => {
 		const loaded = await tool.run(ctx, { action: 'load', projectId: 'project-1', workflowId: 'spec-mode', id: 'cp-1' });
 		expect((loaded as { payload: { id: string; context: { note: string } } }).payload.id).toBe('cp-1');
 		expect((loaded as { payload: { id: string; context: { note: string } } }).payload.context.note).toBe('ok');
+		ctx.cleanup();
+	});
+
+	it('distillAdlToMemory writes a memory entry for significant decisions', async () => {
+		const ctx = setup('execute');
+		const longBody = 'a'.repeat(120);
+		const entry = {
+			id: 'a',
+			workflowId: ctx.workflowPk,
+			type: 'decision' as const,
+			title: 'Use jose over jsonwebtoken',
+			body: longBody,
+			rule: null,
+			files: ['src/auth/service.ts'],
+			createdAt: new Date().toISOString(),
+		};
+		const ok = await distillAdlToMemory(entry, ctx.database);
+		expect(ok).toBe(true);
+		const row = ctx.database.db
+			.query('SELECT title, type, content, concepts FROM memory_entries WHERE title = ?')
+			.get('Use jose over jsonwebtoken') as { title: string; type: string; content: string; concepts: string } | null;
+		expect(row).not.toBeNull();
+		expect(row!.type).toBe('decision');
+		expect(row!.concepts).toContain('spec-mode');
+		expect(row!.concepts).toContain('adl');
+		ctx.cleanup();
+	});
+
+	it('distillAdlToMemory skips observations and short non-rule-4 decisions', async () => {
+		const ctx = setup('execute');
+		const observation = {
+			id: 'b',
+			workflowId: ctx.workflowPk,
+			type: 'observation' as const,
+			title: 'Noticed pattern',
+			body: 'tiny',
+			rule: null,
+			files: [],
+			createdAt: new Date().toISOString(),
+		};
+		const shortDecision = { ...observation, type: 'decision' as const, body: 'short' };
+		expect(await distillAdlToMemory(observation, ctx.database)).toBe(false);
+		expect(await distillAdlToMemory(shortDecision, ctx.database)).toBe(false);
+		const count = ctx.database.db.query('SELECT COUNT(*) AS c FROM memory_entries').get() as { c: number };
+		expect(count.c).toBe(0);
+		ctx.cleanup();
+	});
+
+	it('SpecAdlTool.append triggers distillation for rule-4 decisions', async () => {
+		const ctx = setup('execute');
+		const tool = new SpecAdlTool();
+		await tool.run(ctx, {
+			action: 'append',
+			projectId: 'project-1',
+			workflowId: 'spec-mode',
+			type: 'decision',
+			title: 'Switch to PostgreSQL',
+			body: 'Architectural decision invoked under Rule 4 with concrete rationale.',
+			rule: 4,
+			files: ['migrations/0010.sql'],
+		});
+		// Allow the fire-and-forget distillation a tick to land.
+		await new Promise<void>((r) => setTimeout(r, 10));
+		const row = ctx.database.db
+			.query('SELECT title FROM memory_entries WHERE title = ?')
+			.get('Switch to PostgreSQL') as { title: string } | null;
+		expect(row).not.toBeNull();
 		ctx.cleanup();
 	});
 });

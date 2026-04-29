@@ -2,10 +2,44 @@ import { readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 
-import { SpecAdlEntryTypeSchema, SpecAdlRepo } from '../../db/repo/spec/adl.ts';
+import type { Database } from '../../db/database.ts';
+import { SpecAdlEntryTypeSchema, type SpecAdlEntry, SpecAdlRepo } from '../../db/repo/spec/adl.ts';
 import { SpecChronicleRepo } from '../../db/repo/spec/chronicle.ts';
 import { resolveSpecWorkflow, SpecTool, type SpecToolContext } from './base.ts';
 import { SpecToolError } from './errors.ts';
+
+/**
+ * Distill a spec ADL entry into a memory_entries observation. Only `decision`
+ * entries with material content (rule=4 or body length > 100 chars) are
+ * persisted — everything else stays inside the workflow's ADL log to avoid
+ * memory pollution. Best-effort: if the memory table is missing or the insert
+ * throws, we swallow rather than failing the originating tool call.
+ *
+ * Exported for unit tests.
+ */
+export async function distillAdlToMemory(entry: SpecAdlEntry, database: Database): Promise<boolean> {
+	if (entry.type !== 'decision') return false;
+	const significant = entry.rule === 4 || (entry.body?.length ?? 0) > 100;
+	if (!significant) return false;
+
+	try {
+		database.db
+			.prepare(
+				`INSERT INTO memory_entries (type, title, content, importance, concepts, source_files, created_at, updated_at)
+				 VALUES ('decision', ?, ?, 8, ?, ?, unixepoch(), unixepoch())`,
+			)
+			.run(
+				entry.title,
+				entry.body ?? '',
+				JSON.stringify(['spec-mode', 'adl', entry.type]),
+				JSON.stringify(entry.files ?? []),
+			);
+		return true;
+	} catch {
+		// Memory distillation is best-effort.
+		return false;
+	}
+}
 
 const wf = { projectId: z.string().min(1), workflowId: z.string().min(1) };
 const idempotency = { idempotency_key: z.string().min(1).optional() };
@@ -65,7 +99,13 @@ export class SpecAdlTool extends SpecTool<AdlArgs, unknown> {
 	protected async execute(ctx: SpecToolContext, args: AdlArgs): Promise<unknown> {
 		const workflow = await resolveSpecWorkflow(ctx, args);
 		const repo = new SpecAdlRepo(ctx.database);
-		if (args.action === 'append') return repo.append(workflow.id, { type: args.type, title: args.title, body: args.body, rule: args.rule, files: args.files });
+		if (args.action === 'append') {
+			const entry = repo.append(workflow.id, { type: args.type, title: args.title, body: args.body, rule: args.rule, files: args.files });
+			// Fire-and-forget memory distillation. Never await failures back into
+			// the caller — the ADL append is the primary side effect.
+			void distillAdlToMemory(entry, ctx.database);
+			return entry;
+		}
 		if (args.action === 'last-n') return repo.getLastN(workflow.id, args.n);
 		return repo.list(workflow.id, { limit: args.limit, type: args.type });
 	}
