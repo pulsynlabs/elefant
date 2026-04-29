@@ -5,11 +5,14 @@ import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 
 import {
+	AUTO_PROGRESSION,
+	executeAutoProgression,
 	parseSlashCommand,
 	loadCommandRegistry,
 	suggestCommands,
 	type SlashCommandDefinition,
 } from './slash-commands.ts';
+import type { StateManager } from '../state/manager.ts';
 
 let tmpDir: string;
 
@@ -217,5 +220,54 @@ describe('suggestCommands', () => {
 	it('respects limit', () => {
 		const suggestions = suggestCommands('/spec', registry, 1);
 		expect(suggestions).toHaveLength(1);
+	});
+});
+
+describe('executeAutoProgression', () => {
+	function makeStateManager(workflow: { autopilot: boolean } | null): StateManager {
+		// We only exercise getSpecWorkflow on the manager.
+		return {
+			getSpecWorkflow: async () => workflow,
+		} as unknown as StateManager;
+	}
+
+	beforeEach(async () => {
+		await writeRegistry(tmpDir, [
+			{ name: 'spec-plan', trigger: '/spec-plan', description: 'Plan', category: 'spec-mode' },
+		]);
+		await writeCommandFile(tmpDir, 'spec-plan', '# /spec-plan\n\nbody');
+	});
+
+	it('returns the next command when autopilot is true', async () => {
+		const state = makeStateManager({ autopilot: true });
+		const match = await executeAutoProgression('/spec-discuss', state, 'wf', 'proj', tmpDir);
+		expect(match).not.toBeNull();
+		expect(match!.command.trigger).toBe('/spec-plan');
+	});
+
+	it('returns null when autopilot is false', async () => {
+		const state = makeStateManager({ autopilot: false });
+		const match = await executeAutoProgression('/spec-discuss', state, 'wf', 'proj', tmpDir);
+		expect(match).toBeNull();
+	});
+
+	it('returns null for /spec-accept (no successor)', async () => {
+		const state = makeStateManager({ autopilot: true });
+		const match = await executeAutoProgression('/spec-accept', state, 'wf', 'proj', tmpDir);
+		expect(match).toBeNull();
+	});
+
+	it('returns null when workflow is missing', async () => {
+		const state = makeStateManager(null);
+		const match = await executeAutoProgression('/spec-discuss', state, 'wf', 'proj', tmpDir);
+		expect(match).toBeNull();
+	});
+
+	it('AUTO_PROGRESSION covers every non-accept phase command', () => {
+		expect(AUTO_PROGRESSION['/spec-discuss']).toBe('/spec-plan');
+		expect(AUTO_PROGRESSION['/spec-plan']).toBe('/spec-execute');
+		expect(AUTO_PROGRESSION['/spec-execute']).toBe('/spec-audit');
+		expect(AUTO_PROGRESSION['/spec-audit']).toBe('/spec-accept');
+		expect(AUTO_PROGRESSION['/spec-accept']).toBeUndefined();
 	});
 });

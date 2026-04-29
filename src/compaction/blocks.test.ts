@@ -299,6 +299,20 @@ describe('compaction blocks', () => {
 		db.close();
 	});
 
+	it('buildSpecModeBlock omits lazy directive when lazyAutopilot is false', async () => {
+		const directory = mkdtempSync(join(tmpdir(), 'elefant-spec-mode-not-lazy-'));
+		tempDirs.push(directory);
+		mkdirSync(join(directory, '.elefant'), { recursive: true });
+		const db = new Database(join(directory, '.elefant', 'db.sqlite'));
+		const projectId = 'project-1';
+		seedProject(db, projectId, directory);
+		const state = new StateManager(directory, { id: projectId, name: projectId, path: directory, database: db });
+		await state.createSpecWorkflow({ projectId, workflowId: 'spec-mode', phase: 'execute', autopilot: false, lazyAutopilot: false });
+		const block = buildSpecModeBlock(db, projectId, 'spec-mode');
+		expect(block).not.toContain('LAZY AUTOPILOT ACTIVE');
+		db.close();
+	});
+
 	it('buildSpecModeBlock returns empty string for missing workflows', () => {
 		const directory = mkdtempSync(join(tmpdir(), 'elefant-spec-mode-missing-'));
 		tempDirs.push(directory);

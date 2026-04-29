@@ -1,5 +1,7 @@
 import path from 'node:path';
 
+import type { StateManager } from '../state/manager.ts';
+
 export interface SlashCommandDefinition {
 	name: string; // e.g., "spec-discuss"
 	trigger: string; // e.g., "/spec-discuss"
@@ -122,4 +124,37 @@ export async function parseSlashCommand(
 
 	const promptContent = await file.text();
 	return { command: cmd, args, promptContent };
+}
+
+/**
+ * Map of slash commands to their auto-progression follow-up. When the
+ * workflow has `autopilot=true`, the agent loop calls
+ * `executeAutoProgression` after a command completes; if a follow-up is
+ * registered the next turn is primed with that command's prompt body so
+ * the workflow advances without the user typing again.
+ *
+ * `/spec-accept` deliberately has no successor — acceptance is always a
+ * human gate even in lazy autopilot.
+ */
+export const AUTO_PROGRESSION: Readonly<Record<string, string>> = Object.freeze({
+	'/spec-discuss': '/spec-plan',
+	'/spec-plan': '/spec-execute',
+	'/spec-execute': '/spec-audit',
+	'/spec-audit': '/spec-accept',
+});
+
+export async function executeAutoProgression(
+	currentCommand: string,
+	stateManager: StateManager,
+	workflowId: string,
+	projectId: string,
+	commandsDir: string,
+): Promise<SlashCommandMatch | null> {
+	const workflow = await stateManager.getSpecWorkflow(projectId, workflowId);
+	if (!workflow?.autopilot) return null;
+
+	const nextTrigger = AUTO_PROGRESSION[currentCommand];
+	if (!nextTrigger) return null;
+
+	return parseSlashCommand(nextTrigger, commandsDir);
 }
