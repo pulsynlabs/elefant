@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import type { Database as BunDatabase } from 'bun:sqlite';
 import type { Database } from '../db/database.ts';
+import { SpecAdlRepo } from '../db/repo/spec/adl.ts';
+import { SpecWorkflowsRepo } from '../db/repo/spec/workflows.ts';
 import { statePath } from '../project/paths.ts';
 import { atomicWriteJson } from './atomic.ts';
 import {
@@ -241,16 +243,20 @@ export class StateManager {
     workflowId: string,
     context: object,
   ): Promise<void> {
-    // TODO(Wave 1 Task 1.4): Replace with INSERT INTO spec_adl_entries.
-    console.warn(
-      JSON.stringify({
-        event: 'spec_adl_forced_stub',
-        projectId,
-        workflowId,
-        context,
-        ts: new Date().toISOString(),
-      }),
-    );
+    if (!this.db) return;
+
+    const workflowsRepo = new SpecWorkflowsRepo(this.db);
+    const workflow = workflowsRepo.get(projectId, workflowId);
+    if (!workflow) return;
+
+    const adlRepo = new SpecAdlRepo(this.db);
+    adlRepo.append(workflow.id, {
+      type: 'deviation',
+      title: 'Forced phase transition',
+      body: JSON.stringify(context),
+      rule: null,
+      files: [],
+    });
   }
 
   private load(): ElefantState {

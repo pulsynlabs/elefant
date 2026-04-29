@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import {
   existsSync,
   mkdirSync,
@@ -182,9 +182,8 @@ describe('StateManager spec-mode', () => {
     expect(workflow?.phase).toBe('idle');
   });
 
-  it('transitionSpecPhase allows invalid forced transitions and logs the ADL stub', async () => {
-    const { manager, projectId } = createSpecManager();
-    const warnSpy = spyOn(console, 'warn').mockImplementation(() => undefined);
+  it('transitionSpecPhase allows invalid forced transitions and logs to ADL repo', async () => {
+    const { manager, projectId, database } = createSpecManager();
     await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
 
     const workflow = await manager.transitionSpecPhase(projectId, 'flow-a', 'execute', {
@@ -193,9 +192,20 @@ describe('StateManager spec-mode', () => {
     });
 
     expect(workflow.phase).toBe('execute');
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(String(warnSpy.mock.calls[0]?.[0])).toContain('spec_adl_forced_stub');
-    warnSpy.mockRestore();
+
+    // Verify ADL entry was persisted to spec_adl_entries
+    const rows = database.db
+      .query(
+        `SELECT * FROM spec_adl_entries WHERE workflow_id = ? ORDER BY created_at DESC LIMIT 1`,
+      )
+      .all(workflow.id) as { type: string; title: string; body: string }[];
+    expect(rows.length).toBe(1);
+    expect(rows[0].type).toBe('deviation');
+    expect(rows[0].title).toBe('Forced phase transition');
+    const body = JSON.parse(rows[0].body) as { from: string; to: string; reason: string };
+    expect(body.from).toBe('idle');
+    expect(body.to).toBe('execute');
+    expect(body.reason).toBe('operator override');
   });
 
   it('lockSpec and unlockSpec toggle spec_locked', async () => {
