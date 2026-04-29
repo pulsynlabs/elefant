@@ -11,7 +11,9 @@
     "build": "bun build --target bun --outdir dist bin/elefant.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "validate:prompts": "bun run scripts/validate-agent-prompts.ts"
+    "validate:prompts": "bun run scripts/validate-agent-prompts.ts",
+    "bench:spec-mode": "bash bench/run-spec-mode-bench.sh",
+    "test:spec": "bun test src/tools/spec/ src/db/repo/spec/ src/hooks/spec* src/permissions/orchestrator*"
   },
   "dependencies": {
     "@tauri-apps/plugin-dialog": "^2.7.0",
