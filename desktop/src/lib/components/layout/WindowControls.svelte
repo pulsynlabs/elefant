@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+	import { HugeiconsIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, WindowCloseIcon } from "$lib/icons/index.js";
 
 	let isMaximized = $state(false);
 
@@ -37,31 +38,21 @@
 
 <div class="window-controls">
 	<button class="win-btn minimize" aria-label="Minimize" onclick={handleMinimize}>
-		<svg width="10" height="2" viewBox="0 0 10 2" fill="none">
-			<rect width="10" height="2" rx="0.5" fill="currentColor" />
-		</svg>
+		<HugeiconsIcon icon={MinimizeIcon} size={12} strokeWidth={1.5} />
 	</button>
 
 	{#if isMaximized}
 		<button class="win-btn restore" aria-label="Restore" onclick={handleRestore}>
-			<svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-				<rect x="1" y="1" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="0.75" />
-				<rect x="3" y="3" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="0.75" />
-			</svg>
+			<HugeiconsIcon icon={RestoreIcon} size={12} strokeWidth={1.5} />
 		</button>
 	{:else}
 		<button class="win-btn maximize" aria-label="Maximize" onclick={handleMaximize}>
-			<svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-				<rect x="0.5" y="0.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="0.75" />
-			</svg>
+			<HugeiconsIcon icon={MaximizeIcon} size={12} strokeWidth={1.5} />
 		</button>
 	{/if}
 
 	<button class="win-btn close" aria-label="Close" onclick={handleClose}>
-		<svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-			<line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="0.75" stroke-linecap="round" />
-			<line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="0.75" stroke-linecap="round" />
-		</svg>
+		<HugeiconsIcon icon={WindowCloseIcon} size={12} strokeWidth={1.5} />
 	</button>
 </div>
 
@@ -69,34 +60,41 @@
 	.window-controls {
 		display: flex;
 		align-items: center;
-		gap: 0;
 		flex-shrink: 0;
+		/* Match the topbar height exactly */
+		height: var(--topbar-height, 48px);
 	}
 
 	.win-btn {
-		width: 38px;
+		width: 40px;
 		height: 100%;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		background: transparent;
 		border: none;
-		color: var(--color-text-secondary);
+		color: var(--color-text-muted);
 		cursor: pointer;
 		padding: 0;
 		margin: 0;
+		/* Make icons crisp vs glass backgrounds */
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
 		transition:
-			background-color var(--duration-fast) var(--ease-out-expo),
-			color var(--duration-fast) var(--ease-out-expo);
+			background-color 0.2s var(--ease-out-expo),
+			color 0.2s var(--ease-out-expo);
 	}
+
+	/* Default state: nearly invisible — reads as part of the titlebar */
 
 	.win-btn:hover {
 		color: var(--color-text-primary);
-		background-color: var(--color-surface-hover);
+		background-color: rgba(255, 255, 255, 0.06);
 	}
 
 	.win-btn.close:hover {
-		color: #ffffff;
-		background-color: var(--color-error, #ef4444);
+		/* Soft desaturated red tint — premium feel, not a harsh error block */
+		color: #ff9aa2;
+		background-color: rgba(232, 17, 35, 0.15);
 	}
 </style>
