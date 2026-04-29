@@ -16,6 +16,8 @@ import { mountAgentRunRoutes } from '../runs/routes.ts'
 import { mountWorktreeRoutes } from '../worktree/routes.ts'
 import { createConfigRoutes } from './config-routes.ts'
 import { gracefulShutdown } from '../daemon/shutdown.ts'
+import type { StateManager } from '../state/manager.ts'
+import { mountSpecRoutes } from './routes-spec.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,
@@ -24,6 +26,7 @@ export function createApp(
 	db: Database,
 	ws?: ElefantWsServer,
 	sse?: SseManager,
+	stateManager?: StateManager,
 ) {
 	const CORS_HEADERS = {
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -139,6 +142,10 @@ export function createApp(
 
 	// Mount agent config routes (MH4)
 	createConfigRoutes(baseApp, providerRouter, configManager)
+
+	if (stateManager) {
+		mountSpecRoutes(baseApp, { db, stateManager, hookRegistry })
+	}
 
 	return baseApp
 }
