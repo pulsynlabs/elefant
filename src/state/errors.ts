@@ -59,13 +59,15 @@ export class InvalidTransitionError extends Error {
 
 export class SpecLockedError extends Error {
   readonly code = 'SPEC_LOCKED' as const;
-  readonly projectId: string;
   readonly workflowId: string;
+  readonly attempted: string;
+  readonly projectId?: string;
 
-  constructor(input: { code: 'SPEC_LOCKED'; projectId: string; workflowId: string }) {
-    super(`Spec is locked for workflow ${input.workflowId} in project ${input.projectId}`);
+  constructor(input: { code?: 'SPEC_LOCKED'; workflowId: string; attempted: string; projectId?: string }) {
+    super(`Spec is locked for workflow ${input.workflowId}; attempted write to ${input.attempted}`);
     this.name = 'SpecLockedError';
-    this.projectId = input.projectId;
     this.workflowId = input.workflowId;
+    this.attempted = input.attempted;
+    this.projectId = input.projectId;
   }
 }

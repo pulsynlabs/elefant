@@ -1,6 +1,10 @@
 import type { Database as BunDatabase } from 'bun:sqlite';
 
 import type { Database } from '../../database.ts';
+import {
+	SpecLockedError,
+	WorkflowNotFoundError,
+} from '../../../state/errors.ts';
 
 // ---------------------------------------------------------------------------
 // Table-name validation whitelist (all tables from migrations 0004–0005)
@@ -116,6 +120,13 @@ export function mapSqliteError(
 		);
 	}
 
+	if (message.includes('CHECK constraint') || message.includes('CHECK')) {
+		return new RepoConstraintViolationError(
+			`CHECK constraint violation on ${context.table} during ${context.operation}: ${message}`,
+			err,
+		);
+	}
+
 	return err;
 }
 
@@ -174,5 +185,46 @@ export class BaseRepo {
 	/** Convenience wrapper around `assertExists` for the `spec_workflows` table. */
 	assertWorkflowExists(workflowId: string): void {
 		this.assertExists('spec_workflows', workflowId, { idColumn: 'workflow_id' });
+	}
+
+	/**
+	 * Assert that a protected write can proceed for a workflow.
+	 *
+	 * This helper reads `spec_workflows.spec_locked` and throws `SpecLockedError`
+	 * when the workflow is locked and the caller is not running an amendment.
+	 * Outside a transaction, the read+subsequent write would be a TOCTOU window;
+	 * therefore every lock-protected public write MUST call this from inside
+	 * `withTransaction`, making the lock check and protected table mutation atomic
+	 * on the shared SQLite connection.
+	 *
+	 * @throws {WorkflowNotFoundError} when the workflow primary key is unknown.
+	 * @throws {SpecLockedError} when the workflow is locked and opts.amend is not true.
+	 */
+	protected assertNotLocked(
+		workflowId: string,
+		attempted: string,
+		opts?: { amend?: boolean },
+	): void {
+		if (opts?.amend) return;
+
+		const row = this.db
+			.query('SELECT project_id, workflow_id, spec_locked FROM spec_workflows WHERE id = ?')
+			.get(workflowId) as { project_id: string; workflow_id: string; spec_locked: number } | null;
+
+		if (!row) {
+			throw new WorkflowNotFoundError({
+				code: 'WORKFLOW_NOT_FOUND',
+				projectId: 'unknown',
+				workflowId,
+			});
+		}
+
+		if (row.spec_locked === 1) {
+			throw new SpecLockedError({
+				workflowId,
+				attempted,
+				projectId: row.project_id,
+			});
+		}
 	}
 }
