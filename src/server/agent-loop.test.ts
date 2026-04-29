@@ -140,6 +140,106 @@ describe('runAgentLoop', () => {
 		expect(calls[1].some((entry) => entry.role === 'tool' && entry.toolCallId === 'call-1')).toBe(true)
 	})
 
+	it('executes tool calls concurrently when multiple are returned in one turn', async () => {
+		const startTimes: Record<string, number> = {}
+		const endTimes: Record<string, number> = {}
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(): AsyncGenerator<StreamEvent> {
+				yield {
+					type: 'tool_call_complete',
+					toolCall: { id: 'call-a', name: 'slow-a', arguments: {} },
+				}
+				yield {
+					type: 'tool_call_complete',
+					toolCall: { id: 'call-b', name: 'slow-b', arguments: {} },
+				}
+				yield { type: 'done', finishReason: 'tool_calls' }
+			},
+		}
+
+		const registry: ToolExecutor = {
+			execute: async (name) => {
+				startTimes[name] = Date.now()
+				await new Promise((resolve) => setTimeout(resolve, 50))
+				endTimes[name] = Date.now()
+				return { ok: true, data: `${name}-result` }
+			},
+		}
+
+		const events = await collectEvents(
+			runAgentLoop(createRouter(adapter), registry, {
+				messages: [{ role: 'user', content: 'go' }],
+				tools: EMPTY_TOOLS,
+				hookRegistry: new HookRegistry(),
+				maxIterations: 1,
+				runContext: createRunContext('conv-parallel'),
+			}),
+		)
+
+		expect(startTimes['slow-a']).toBeDefined()
+		expect(startTimes['slow-b']).toBeDefined()
+		expect(endTimes['slow-a']).toBeDefined()
+		expect(endTimes['slow-b']).toBeDefined()
+		expect(Math.abs(startTimes['slow-a'] - startTimes['slow-b'])).toBeLessThan(30)
+		expect(events.slice(0, 4)).toEqual([
+			{
+				type: 'tool_call_complete',
+				toolCall: { id: 'call-a', name: 'slow-a', arguments: {} },
+			},
+			{
+				type: 'tool_result',
+				toolResult: {
+					toolCallId: 'call-a',
+					content: 'slow-a-result',
+					isError: false,
+				},
+			},
+			{
+				type: 'tool_call_complete',
+				toolCall: { id: 'call-b', name: 'slow-b', arguments: {} },
+			},
+			{
+				type: 'tool_result',
+				toolResult: {
+					toolCallId: 'call-b',
+					content: 'slow-b-result',
+					isError: false,
+				},
+			},
+		])
+	})
+
+	it('uses UsageEvent.inputTokens for tokenCount when a usage event is received', async () => {
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(): AsyncGenerator<StreamEvent> {
+				yield { type: 'usage', inputTokens: 999, outputTokens: 100 }
+				yield { type: 'text_delta', text: 'done' }
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		const events = await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'go' }],
+				tools: EMPTY_TOOLS,
+				hookRegistry: new HookRegistry(),
+				runContext: createRunContext('conv-usage-token'),
+			}),
+		)
+
+		const usageEvents = events.filter((event) => event.type === 'usage')
+		expect(usageEvents.length).toBe(1)
+		const usageEvent = usageEvents[0]
+		if (usageEvent.type === 'usage') {
+			expect(usageEvent.inputTokens).toBe(999)
+			expect(usageEvent.outputTokens).toBe(100)
+		}
+	})
+
 	it('emits error event when max iterations is reached', async () => {
 		const adapter: ProviderAdapter = {
 			name: 'mock',

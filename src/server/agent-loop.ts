@@ -2,7 +2,7 @@ import { emit, type HookRegistry } from '../hooks/index.ts'
 import type { CompactionManager } from '../compaction/manager.ts'
 import type { PermissionGate } from '../permissions/gate.ts'
 import type { ProviderRouter } from '../providers/router.ts'
-import type { StreamEvent } from '../providers/types.ts'
+import type { StreamEvent, UsageEvent } from '../providers/types.ts'
 import { clearRunEventSequence, publishRunEvent, publishStatusChange } from '../runs/events.ts'
 import type { RunContext } from '../runs/types.ts'
 import { createQuestionEmitter, type QuestionEmitter } from '../tools/question/emitter.ts'
@@ -152,6 +152,7 @@ export async function* runAgentLoop(
 		const pendingToolCalls: ToolCall[] = []
 		let finishReason: 'stop' | 'tool_calls' | 'length' | 'error' = 'stop'
 		let assistantText = ''
+		let lastUsage: UsageEvent | null = null
 
 		// system:transform ordering: [fixed system header] → [injected blocks, deterministic] → [rest of messages]
 		const outgoingMessagesBase = cloneMessages(messages)
@@ -200,6 +201,12 @@ export async function* runAgentLoop(
 					text: event.text,
 				})
 				assistantText += event.text
+				yield event
+				continue
+			}
+
+			if (event.type === 'usage') {
+				lastUsage = event
 				yield event
 				continue
 			}
@@ -284,73 +291,88 @@ export async function* runAgentLoop(
 			content: assistantText,
 			toolCalls: pendingToolCalls,
 		})
-		tokenCount = estimateMessageTokens(messages)
+		// Prefer real usage data from the provider; fall back to estimator.
+		tokenCount = lastUsage !== null ? lastUsage.inputTokens : estimateMessageTokens(messages)
 
-		for (const toolCall of pendingToolCalls) {
-			yield { type: 'tool_call_complete', toolCall }
+		type TaskOutput = {
+			events: StreamEvent[]
+			message: Message
+		}
 
-			// Permission gate check before tool execution
-			if (options.permissions) {
-				const permResult = await options.permissions.check(
-					toolCall.name,
-					toolCall.arguments as Record<string, unknown>,
-					options.runContext.runId,
-					{
-						sessionId: options.runContext.sessionId,
-						projectId: options.runContext.projectId,
-						agent: options.runContext.agentType,
-					},
-				)
+		const toolTasks = pendingToolCalls.map((toolCall) =>
+			(async (): Promise<TaskOutput> => {
+				const taskEvents: StreamEvent[] = []
+				taskEvents.push({ type: 'tool_call_complete', toolCall })
 
-				if (!permResult.ok || !permResult.data.approved) {
-					const reason = permResult.ok
-						? permResult.data.reason
-						: permResult.error.message
-					const toolResult = createToolResult(
-						toolCall.id,
-						`Tool call denied: ${reason}`,
-						true,
+				// Permission gate check before tool execution
+				if (options.permissions) {
+					const permResult = await options.permissions.check(
+						toolCall.name,
+						toolCall.arguments as Record<string, unknown>,
+						options.runContext.runId,
+						{
+							sessionId: options.runContext.sessionId,
+							projectId: options.runContext.projectId,
+							agent: options.runContext.agentType,
+						},
 					)
 
-					yield {
-						type: 'tool_result',
-						toolResult,
-					}
+					if (!permResult.ok || !permResult.data.approved) {
+						const reason = permResult.ok
+							? permResult.data.reason
+							: permResult.error.message
+						const toolResult = createToolResult(
+							toolCall.id,
+							`Tool call denied: ${reason}`,
+							true,
+						)
+						taskEvents.push({ type: 'tool_result', toolResult })
 
-					messages.push({
+						return {
+							events: taskEvents,
+							message: {
+								role: 'tool',
+								content: toolResult.content,
+								toolCallId: toolResult.toolCallId,
+							},
+						}
+					}
+				}
+
+				const executeResult = await registry.execute(
+					toolCall.name,
+					toToolArguments(toolCall.arguments, options.runContext.runId, toolCall.id, runQuestionEmitter),
+				)
+				const toolResult = createToolResult(
+					toolCall.id,
+					executeResult.ok ? executeResult.data : executeResult.error.message,
+					!executeResult.ok,
+				)
+				emitRunEvent('agent_run.tool_result', {
+					toolResult,
+				})
+				taskEvents.push({ type: 'tool_result', toolResult })
+
+				return {
+					events: taskEvents,
+					message: {
 						role: 'tool',
 						content: toolResult.content,
 						toolCallId: toolResult.toolCallId,
-					})
-					continue
+					},
 				}
+			})(),
+		)
+
+		const taskOutputs = await Promise.all(toolTasks)
+
+		for (const output of taskOutputs) {
+			for (const event of output.events) {
+				yield event
 			}
-
-			const executeResult = await registry.execute(
-				toolCall.name,
-				toToolArguments(toolCall.arguments, options.runContext.runId, toolCall.id, runQuestionEmitter),
-			)
-			const toolResult = createToolResult(
-				toolCall.id,
-				executeResult.ok ? executeResult.data : executeResult.error.message,
-				!executeResult.ok,
-			)
-			emitRunEvent('agent_run.tool_result', {
-				toolResult,
-			})
-
-			yield {
-				type: 'tool_result',
-				toolResult,
-			}
-
-		messages.push({
-			role: 'tool',
-			content: toolResult.content,
-			toolCallId: toolResult.toolCallId,
-		})
-		tokenCount = estimateMessageTokens(messages)
+			messages.push(output.message)
 		}
+		tokenCount = estimateMessageTokens(messages)
 
 		await emit(options.hookRegistry, 'message:after', {
 			messages,
