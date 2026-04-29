@@ -289,6 +289,12 @@ export class AnthropicAdapter implements ProviderAdapter {
 		const pendingToolUses = new Map<number, PendingToolUseBlock>()
 		let doneEmitted = false
 
+		// Usage tracking variables
+		let inputTokens = 0
+		let outputTokens = 0
+		let cacheReadTokens: number | undefined
+		let cacheWriteTokens: number | undefined
+
 		for await (const sseEvent of parseSseEvents(response.body)) {
 			let data: unknown
 			try {
@@ -300,6 +306,31 @@ export class AnthropicAdapter implements ProviderAdapter {
 					error,
 				})
 				return
+			}
+
+			if (sseEvent.event === 'message_start') {
+				const messageStartData = data as {
+					message?: {
+						usage?: {
+							input_tokens?: number
+							cache_read_input_tokens?: number
+							cache_creation_input_tokens?: number
+						}
+					}
+				}
+				const usage = messageStartData.message?.usage
+				if (usage) {
+					if (typeof usage.input_tokens === 'number') {
+						inputTokens = usage.input_tokens
+					}
+					if (typeof usage.cache_read_input_tokens === 'number') {
+						cacheReadTokens = usage.cache_read_input_tokens
+					}
+					if (typeof usage.cache_creation_input_tokens === 'number') {
+						cacheWriteTokens = usage.cache_creation_input_tokens
+					}
+				}
+				continue
 			}
 
 			if (sseEvent.event === 'content_block_start') {
@@ -396,7 +427,18 @@ export class AnthropicAdapter implements ProviderAdapter {
 			}
 
 			if (sseEvent.event === 'message_delta') {
-				const stopReason = extractStopReason(data as AnthropicMessageDelta)
+				const messageDeltaData = data as AnthropicMessageDelta & {
+					usage?: {
+						output_tokens?: number
+					}
+				}
+
+				// Parse output tokens from usage field
+				if (messageDeltaData.usage?.output_tokens !== undefined) {
+					outputTokens = messageDeltaData.usage.output_tokens
+				}
+
+				const stopReason = extractStopReason(messageDeltaData)
 				if (stopReason) {
 					yield {
 						type: 'done',
@@ -414,6 +456,23 @@ export class AnthropicAdapter implements ProviderAdapter {
 						finishReason: 'stop',
 					}
 				}
+
+				// Yield usage event if we have any token data
+				if (inputTokens > 0 || outputTokens > 0) {
+					const usageEvent: StreamEvent = {
+						type: 'usage',
+						inputTokens,
+						outputTokens,
+					}
+					if (cacheReadTokens !== undefined) {
+						usageEvent.cacheReadTokens = cacheReadTokens
+					}
+					if (cacheWriteTokens !== undefined) {
+						usageEvent.cacheWriteTokens = cacheWriteTokens
+					}
+					yield usageEvent
+				}
+
 				return
 			}
 

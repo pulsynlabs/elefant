@@ -182,4 +182,75 @@ describe('AnthropicAdapter', () => {
 			expect(events[0].error.code).toBe('PROVIDER_ERROR')
 		}
 	})
+
+	it('yields UsageEvent with input and output tokens from stream', async () => {
+		globalThis.fetch = withMockPreconnect(
+			async () =>
+				createSseResponse([
+					'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":100,"cache_read_input_tokens":20,"cache_creation_input_tokens":10}}}\n\n',
+					'event: content_block_delta\ndata: {"type":"text_delta","text":"Hello"}\n\n',
+					'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":50}}\n\n',
+					'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+				]),
+			originalFetch,
+		)
+
+		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const events = await collectEvents(adapter)
+
+		// Find the usage event
+		const usageEvent = events.find((e): e is StreamEvent & { type: 'usage' } => e.type === 'usage')
+
+		expect(usageEvent).toBeDefined()
+		expect(usageEvent?.type).toBe('usage')
+		expect(usageEvent?.inputTokens).toBe(100)
+		expect(usageEvent?.outputTokens).toBe(50)
+		expect(usageEvent?.cacheReadTokens).toBe(20)
+		expect(usageEvent?.cacheWriteTokens).toBe(10)
+
+		// Verify other events are still present and unaffected
+		expect(events.some((e) => e.type === 'text_delta' && e.text === 'Hello')).toBe(true)
+		expect(events.some((e) => e.type === 'done')).toBe(true)
+	})
+
+	it('yields UsageEvent without cache fields when not provided', async () => {
+		globalThis.fetch = withMockPreconnect(
+			async () =>
+				createSseResponse([
+					'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":50}}}\n\n',
+					'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":25}}\n\n',
+					'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+				]),
+			originalFetch,
+		)
+
+		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const events = await collectEvents(adapter)
+
+		const usageEvent = events.find((e): e is StreamEvent & { type: 'usage' } => e.type === 'usage')
+
+		expect(usageEvent).toBeDefined()
+		expect(usageEvent?.inputTokens).toBe(50)
+		expect(usageEvent?.outputTokens).toBe(25)
+		expect(usageEvent?.cacheReadTokens).toBeUndefined()
+		expect(usageEvent?.cacheWriteTokens).toBeUndefined()
+	})
+
+	it('does not yield UsageEvent when stream errors before message_stop', async () => {
+		globalThis.fetch = withMockPreconnect(
+			async () =>
+				createSseResponse([
+					'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":100}}}\n\n',
+					'event: error\ndata: {"error":{"message":"Stream interrupted"}}\n\n',
+				]),
+			originalFetch,
+		)
+
+		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const events = await collectEvents(adapter)
+
+		// Should have error event but no usage event
+		expect(events.some((e) => e.type === 'error')).toBe(true)
+		expect(events.some((e) => e.type === 'usage')).toBe(false)
+	})
 })
