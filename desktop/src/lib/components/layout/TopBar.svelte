@@ -2,7 +2,7 @@
 	import { HugeiconsIcon, MenuIcon } from "$lib/icons/index.js";
 	import { projectsStore } from "$lib/stores/projects.svelte.js";
 	import { navigationStore } from "$lib/stores/navigation.svelte.js";
-
+import WindowControls from "./WindowControls.svelte";
 	type Props = {
 		onToggleSidebar?: () => void;
 		children?: import("svelte").Snippet;
@@ -15,9 +15,15 @@
 	function handleSwitchProject(): void {
 		navigationStore.goToProjectPicker();
 	}
+
+	let isDesktop = $state(false);
+
+	$effect(() => {
+		isDesktop = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+	});
 </script>
 
-<div class="topbar-content">
+<div class="topbar-content" data-tauri-drag-region>
 	<button
 		class="sidebar-toggle"
 		onclick={onToggleSidebar}
@@ -42,6 +48,12 @@
 	<div class="topbar-spacer"></div>
 
 	{@render children?.()}
+
+	{#if isDesktop}
+		<WindowControls />
+	{:else}
+		<!-- Native window decorations on non-Tauri -->
+	{/if}
 </div>
 
 <style>

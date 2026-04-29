@@ -17,6 +17,7 @@
 	} from '$lib/types/agent-run.js';
 	import StreamingMessage from '../chat/StreamingMessage.svelte';
 	import ToolCallCard from '../chat/ToolCallCard.svelte';
+	import MarkdownRenderer from '../chat/MarkdownRenderer.svelte';
 	import AgentTaskCard from './AgentTaskCard.svelte';
 	import { computeRenderBlocks } from './agent-run-transcript-blocks.js';
 	import {
@@ -200,7 +201,7 @@
 					<span class="orchestrator-badge">Orchestrator</span>
 				</div>
 				<div class="orchestrator-prompt-body">
-					{run.orchestratorPrompt}
+					<MarkdownRenderer source={run.orchestratorPrompt} />
 				</div>
 			</div>
 		{/if}
@@ -231,7 +232,9 @@
 						{:else if block.kind === 'question'}
 							<div class="question-card" role="region" aria-label="Agent question">
 								<h3 class="question-heading">Question</h3>
-								<p class="question-body">{block.question}</p>
+								<div class="question-body">
+									<MarkdownRenderer source={block.question} />
+								</div>
 								{#if block.options.length > 0}
 									<ul class="question-options">
 										{#each block.options as option, i (i)}
@@ -494,8 +497,6 @@
 		font-size: var(--font-size-md);
 		color: var(--color-text-primary);
 		line-height: var(--line-height-relaxed);
-		white-space: pre-wrap;
-		word-break: break-word;
 	}
 
 	@media (max-width: 640px) {
