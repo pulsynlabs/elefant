@@ -47,6 +47,8 @@ describe('runMigrations', () => {
 			{ version: 3 },
 			{ version: 4 },
 			{ version: 5 },
+			{ version: 6 },
+			{ version: 7 },
 		]);
 	});
 
@@ -60,7 +62,7 @@ describe('runMigrations', () => {
 
 		db.close();
 
-		expect(count.count).toBe(5);
+		expect(count.count).toBe(7);
 	});
 
 	it('rolls back a failing migration and keeps existing schema intact', () => {

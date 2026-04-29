@@ -4,6 +4,8 @@ export {
 	toolPolicyConfigSchema,
 	agentRuntimeLimitsSchema,
 	agentBehaviorConfigSchema,
+	agentPermissionsSchema,
+	agentContextModeSchema,
 	agentProfileSchema,
 	defaultAgentProfiles,
 } from './schema.ts';
@@ -13,6 +15,8 @@ export type {
 	ToolPolicyConfig,
 	AgentRuntimeLimits,
 	AgentBehaviorConfig,
+	AgentPermissions,
+	AgentContextMode,
 	AgentProfile,
 } from './schema.ts';
 export {

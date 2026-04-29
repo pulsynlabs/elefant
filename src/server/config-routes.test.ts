@@ -179,4 +179,76 @@ describe('config routes - agent profiles', () => {
 		expect(payload.ok).toBe(true);
 		expect(payload.data.id).toBe('executor');
 	});
+
+	it('GET /api/config/agents returns the Spec Mode fleet with verifier fresh context', async () => {
+		const response = await app.handle(new Request('http://localhost/api/config/agents'));
+		expect(response.status).toBe(200);
+
+		const payload = (await response.json()) as {
+			ok: boolean;
+			data: Record<string, { contextMode: string; promptFile: string | null }>;
+		};
+
+		const requiredAgents = [
+			'orchestrator',
+			'planner',
+			'researcher',
+			'explorer',
+			'verifier',
+			'debugger',
+			'tester',
+			'writer',
+			'librarian',
+			'executor-low',
+			'executor-medium',
+			'executor-high',
+			'executor-frontend',
+		];
+
+		expect(payload.ok).toBe(true);
+		for (const agentId of requiredAgents) {
+			expect(payload.data[agentId]).toBeDefined();
+			expect(payload.data[agentId]?.promptFile).toBe(`src/agents/prompts/${agentId}.md`);
+		}
+		expect(payload.data.verifier?.contextMode).toBe('none');
+	});
+
+	it('PATCH /api/config/agents/:agentId accepts extended agent config fields', async () => {
+		const response = await app.handle(
+			new Request(`http://localhost/api/config/agents/executor-high?projectId=${projectId}`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					model: 'gpt-5.5-high',
+					provider: 'openai',
+					toolsAllowlist: ['read', 'bash'],
+					permissions: { read: true, write: true, execute: true },
+					contextMode: 'snapshot',
+					promptFile: 'src/agents/prompts/executor-high.md',
+					promptOverride: '# Override\n\n## Role\nCustom',
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		const payload = (await response.json()) as {
+			ok: boolean;
+			data: {
+				model: string;
+				provider: string;
+				toolsAllowlist: string[];
+				permissions: { read: boolean; write: boolean; execute: boolean };
+				contextMode: string;
+				promptOverride: string | null;
+			};
+		};
+
+		expect(payload.ok).toBe(true);
+		expect(payload.data.model).toBe('gpt-5.5-high');
+		expect(payload.data.provider).toBe('openai');
+		expect(payload.data.toolsAllowlist).toEqual(['read', 'bash']);
+		expect(payload.data.permissions.execute).toBe(true);
+		expect(payload.data.contextMode).toBe('snapshot');
+		expect(payload.data.promptOverride).toContain('Override');
+	});
 });

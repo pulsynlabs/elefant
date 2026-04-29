@@ -218,6 +218,8 @@ async function discoverConfig(): Promise<RawConfig> {
 function cloneAgentProfile(profile: AgentProfile): AgentProfile {
 	return {
 		...profile,
+		toolsAllowlist: profile.toolsAllowlist ? [...profile.toolsAllowlist] : null,
+		permissions: { ...profile.permissions },
 		behavior: { ...profile.behavior },
 		limits: { ...profile.limits },
 		tools: {
@@ -234,6 +236,8 @@ function cloneAgentProfile(profile: AgentProfile): AgentProfile {
 function cloneAgentProfileOverride(profile: AgentProfileOverride): AgentProfileOverride {
 	return {
 		...profile,
+		toolsAllowlist: profile.toolsAllowlist ? [...profile.toolsAllowlist] : undefined,
+		permissions: profile.permissions ? { ...profile.permissions } : undefined,
 		behavior: profile.behavior ? { ...profile.behavior } : undefined,
 		limits: profile.limits ? { ...profile.limits } : undefined,
 		tools: profile.tools
