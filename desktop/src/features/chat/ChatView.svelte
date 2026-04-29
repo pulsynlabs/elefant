@@ -9,6 +9,8 @@
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
 
+	let abortController: AbortController | null = null;
+
 	// Subscribe to the active project's SSE event stream so the
 	// agent-runs store receives `agent_run.spawned` and
 	// `agent_run.tool_call_metadata` envelopes for child runs the
