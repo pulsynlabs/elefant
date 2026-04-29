@@ -72,6 +72,82 @@
 		}
 	});
 
+	async function handleSend(content: string): Promise<void> {
+		if (chatStore.isStreaming || !content.trim()) return;
+
+		// Add user message to conversation
+		chatStore.addUserMessage(content.trim());
+
+		// Build API messages from conversation history (user messages only, before the assistant placeholder)
+		const apiMessages: MessageRole[] = chatStore.getApiMessages().map((m) => ({
+			role: m.role as MessageRole['role'],
+			content: m.content,
+		}));
+
+		// Start assistant message placeholder
+		chatStore.startAssistantMessage();
+
+		abortController = new AbortController();
+		const client = getDaemonClient();
+
+		try {
+			// Build the request payload through the store helper so the
+			// AdvancedOptions fields and any per-run AgentOverrideDialog
+			// override flow through a single, testable code path.
+			const fields = chatStore.buildChatRequestFields(projectsStore.activeSessionId, projectsStore.activeProjectId);
+			const stream = client.streamChat(
+				{ messages: apiMessages, ...fields },
+				abortController.signal,
+			);
+
+			for await (const event of stream) {
+				if (event.type === 'token') {
+					chatStore.appendToken(event.text);
+				} else if (event.type === 'tool_call') {
+					// Early announcement — name + id, arguments may be empty.
+					// The card renders immediately and shows a spinner.
+					chatStore.addToolCall({
+						id: event.id,
+						name: event.name,
+						arguments: event.arguments,
+					});
+				} else if (event.type === 'tool_call_update') {
+					// Arguments are now fully streamed — patch the existing card
+					// so TaskToolCard (and others) can render their full state.
+					chatStore.updateToolCallArguments(event.id, event.arguments);
+				} else if (event.type === 'tool_call_metadata') {
+					// Daemon-supplied runId/title/agentType for a just-spawned
+					// child run. TaskToolCard reads `metadata.runId` to resolve
+					// its child deterministically — no title-match needed.
+					chatStore.patchToolCallMetadata(event.toolCallId, {
+						runId: event.runId,
+						agentType: event.agentType,
+						title: event.title,
+						parentRunId: event.parentRunId,
+					});
+				} else if (event.type === 'tool_result') {
+					chatStore.addToolResult(event.toolCallId, event.content, event.isError);
+				} else if (event.type === 'question') {
+					chatStore.addQuestion(event);
+				} else if (event.type === 'done') {
+					chatStore.finalizeMessage(event.finishReason);
+					break;
+				} else if (event.type === 'error') {
+					chatStore.setStreamingError(`${event.code}: ${event.message}`);
+					break;
+				}
+			}
+		} catch (err) {
+			if (err instanceof Error && err.name !== 'AbortError') {
+				chatStore.setStreamingError(err.message);
+			} else {
+				chatStore.finalizeMessage('stop');
+			}
+		} finally {
+			abortController = null;
+		}
+	}
+
 	function handleStop(): void {
 		abortController?.abort();
 		chatStore.finalizeMessage('stop');
