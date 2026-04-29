@@ -23,8 +23,18 @@ interface OpenAIChoice {
 	finish_reason?: 'stop' | 'tool_calls' | 'length' | null
 }
 
+interface OpenAIUsage {
+	prompt_tokens: number
+	completion_tokens: number
+	total_tokens?: number
+	prompt_tokens_details?: {
+		cached_tokens?: number
+	}
+}
+
 interface OpenAIChunk {
 	choices?: OpenAIChoice[]
+	usage?: OpenAIUsage
 }
 
 interface PendingToolCall {
@@ -161,6 +171,7 @@ export class OpenAIAdapter implements ProviderAdapter {
 			model: this.config.model,
 			messages: toOpenAIMessages(messages),
 			stream: true,
+			stream_options: { include_usage: true },
 		}
 
 		// Only include tools if there are any — many providers reject empty arrays
@@ -217,6 +228,7 @@ export class OpenAIAdapter implements ProviderAdapter {
 
 		const pendingToolCalls = new Map<number, PendingToolCall>()
 		let doneEmitted = false
+		let latestUsage: OpenAIUsage | null = null
 
 		for await (const event of parseSseEvents(response.body)) {
 			if (event.data === '[DONE]') {
@@ -224,6 +236,14 @@ export class OpenAIAdapter implements ProviderAdapter {
 					yield {
 						type: 'done',
 						finishReason: 'stop',
+					}
+				}
+				if (latestUsage) {
+					yield {
+						type: 'usage',
+						inputTokens: latestUsage.prompt_tokens,
+						outputTokens: latestUsage.completion_tokens,
+						cacheReadTokens: latestUsage.prompt_tokens_details?.cached_tokens,
 					}
 				}
 				return
@@ -238,6 +258,11 @@ export class OpenAIAdapter implements ProviderAdapter {
 					error,
 				})
 				return
+			}
+
+			// Capture usage data if present on this chunk
+			if (chunk.usage) {
+				latestUsage = chunk.usage
 			}
 
 			const choice = chunk.choices?.[0]
@@ -331,6 +356,14 @@ export class OpenAIAdapter implements ProviderAdapter {
 					finishReason: 'tool_calls',
 				}
 				doneEmitted = true
+				if (latestUsage) {
+					yield {
+						type: 'usage',
+						inputTokens: latestUsage.prompt_tokens,
+						outputTokens: latestUsage.completion_tokens,
+						cacheReadTokens: latestUsage.prompt_tokens_details?.cached_tokens,
+					}
+				}
 				return
 			}
 
@@ -340,6 +373,14 @@ export class OpenAIAdapter implements ProviderAdapter {
 					finishReason: choice.finish_reason,
 				}
 				doneEmitted = true
+				if (latestUsage) {
+					yield {
+						type: 'usage',
+						inputTokens: latestUsage.prompt_tokens,
+						outputTokens: latestUsage.completion_tokens,
+						cacheReadTokens: latestUsage.prompt_tokens_details?.cached_tokens,
+					}
+				}
 				return
 			}
 		}

@@ -160,4 +160,69 @@ function withMockPreconnect(mockFetch: MockFetchFunction, originalFetch: typeof 
 			expect(events[0].error.code).toBe('PROVIDER_ERROR')
 		}
 	})
+
+	it('includes stream_options with include_usage in request body', async () => {
+		let capturedBody: { stream_options?: { include_usage?: boolean } } | null = null
+
+		globalThis.fetch = withMockPreconnect(
+			async (_url, init) => {
+				if (init?.body) {
+					capturedBody = JSON.parse(init.body as string) as { stream_options?: { include_usage?: boolean } }
+				}
+				return createSseResponse([
+					'data: {"choices":[{"delta":{"content":"Hi"},"finish_reason":null}]}\n\n',
+					'data: [DONE]\n\n',
+				])
+			},
+			originalFetch,
+		)
+
+		const adapter = new OpenAIAdapter(OPENAI_CONFIG)
+		await collectEvents(adapter)
+
+		expect(capturedBody).not.toBeNull()
+		expect(capturedBody!.stream_options).toEqual({ include_usage: true })
+	})
+
+	it('yields UsageEvent when final chunk includes usage data', async () => {
+		globalThis.fetch = withMockPreconnect(
+			async () =>
+				createSseResponse([
+					'data: {"choices":[{"delta":{"content":"Hello"},"finish_reason":null}]}\n\n',
+					'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":50,"total_tokens":150,"prompt_tokens_details":{"cached_tokens":15}}}\n\n',
+				]),
+			originalFetch,
+		)
+
+		const adapter = new OpenAIAdapter(OPENAI_CONFIG)
+		const events = await collectEvents(adapter)
+
+		const usageEvent = events.find((e): e is StreamEvent & { type: 'usage' } => e.type === 'usage')
+		expect(usageEvent).toBeDefined()
+		expect(usageEvent?.type).toBe('usage')
+		expect(usageEvent?.inputTokens).toBe(100)
+		expect(usageEvent?.outputTokens).toBe(50)
+		expect(usageEvent?.cacheReadTokens).toBe(15)
+	})
+
+	it('handles absence of usage data gracefully (no UsageEvent)', async () => {
+		globalThis.fetch = withMockPreconnect(
+			async () =>
+				createSseResponse([
+					'data: {"choices":[{"delta":{"content":"Hello"},"finish_reason":null}]}\n\n',
+					'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+				]),
+			originalFetch,
+		)
+
+		const adapter = new OpenAIAdapter(OPENAI_CONFIG)
+		const events = await collectEvents(adapter)
+
+		const usageEvent = events.find((e) => e.type === 'usage')
+		expect(usageEvent).toBeUndefined()
+
+		// Verify other events still work normally
+		expect(events.some((e) => e.type === 'text_delta')).toBe(true)
+		expect(events.some((e) => e.type === 'done')).toBe(true)
+	})
 })
