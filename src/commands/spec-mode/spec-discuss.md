@@ -23,6 +23,7 @@ When starting a new Spec Mode workflow and you need to capture the user's vision
 4. Write the document via `spec_requirements.write({ workflowId, content })`.
 5. Call `spec_state({ action: "complete-interview" })`.
 6. Present the synthesized REQUIREMENTS to the user for confirmation.
+7. **Memory protocol:** Save discovery to memory so subsequent workflows on this project surface it via `memory_search`. Call `memory_save({ type: "note", title: "Discovery: <workflowId>", importance: 7, concepts: ["spec-mode", "<workflowId>", "discovery"], content: "<vision> | Must-haves: <mh-titles> | Out of scope: <oos> | Risks: <risk-titles>" })`. The exact structured payload is built by `onDiscoveryComplete` in `src/state/spec-memory-hooks.ts`; agents should call `memory_save` directly with that envelope when running outside the daemon hook path.
 
 ## Tools Used
 - `spec_state` — read current state, complete interview
