@@ -12,16 +12,17 @@ After all waves of `/spec-execute` are complete. This is the quality gate before
 - CHRONICLE must contain the list of files changed during execution.
 
 ## Process
-1. Read the locked SPEC's full validation contract (all per-MH VCs + aggregate AVCs) via `spec_spec.read({ workflowId, section: "validation-contract" })`.
-2. Read the list of changed files from CHRONICLE via `spec_chronicle.read({ workflowId, kind: "file_modified" })`.
-3. Dispatch the `verifier` agent via `task({ subagent_type: "verifier", contextMode: "none", input: { validationContract, changedFiles } })`. The `contextMode: "none"` is critical — the verifier must not inherit executor reasoning.
-4. The verifier produces structured output: `{ results: Array<{ id, status: "pass"|"fail"|"partial"|"skipped", evidence, severity? }>, summary }`.
-5. Route the results by severity:
-   - **minor failures:** Dispatch `executor-medium` to patch. Re-run audit after patch.
-   - **moderate failures:** Dispatch `planner` to amend the SPEC/BLUEPRINT. Re-run audit after amendment.
-   - **major failures:** HALT. Surface to user via `permission:ask`. Do NOT auto-remediate.
-   - **partial VCs:** HALT. Require user judgement.
-6. If all VCs pass, write the verifier output to the `verifier_runs` table and log to CHRONICLE.
+1. Read the locked SPEC's full validation contract (all per-MH VCs + aggregate AVCs) via `spec_spec({ action: "read", workflowId })` — pull every VC entry, not just the per-MH ones.
+2. Read the list of changed files from CHRONICLE via `spec_chronicle({ action: "read", workflowId, kind: "task_completed" })` and extract file paths from each entry payload.
+3. Dispatch the `verifier` agent via `task({ subagent_type: "verifier", contextMode: "none", input: { validationContract, changedFiles, perMhAcceptanceCriteria } })`. The `contextMode: "none"` is critical — the verifier must not inherit executor reasoning.
+4. Parse the verifier's response envelope. The `<verification>` block contains JSON matching `AuditReportSchema` from `src/tools/spec/verifier-output.ts` — `{ workflowId, auditedAt, results: [{ vcId, status, evidence, severity?, recommendation? }], summary, recommendation }`.
+5. Persist the parsed report as a `spec_chronicle_entries` row with `kind: "audit_report"` and `payload: { auditReport }`.
+6. Route by `recommendation` (computed by `classifyAuditFailures` in `src/server/audit-router.ts`):
+   - **`minor-fix`:** Dispatch `executor-medium` to patch the failing VCs. Re-run `/spec-audit` after the patch lands.
+   - **`moderate-fix`:** Dispatch `planner` to amend the SPEC/BLUEPRINT. Re-run `/spec-audit` after amendment.
+   - **`major-stop`:** HALT. Surface to user via `permission:ask` with the failed VC IDs. Do NOT auto-remediate.
+   - **`accept`:** All VCs pass. Log to CHRONICLE and progress to `/spec-accept`.
+7. If any result is `partial`, treat it as moderate at minimum; require explicit user confirmation before continuing.
 
 ## Tools Used
 - `spec_spec.read` — read the validation contract

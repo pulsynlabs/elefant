@@ -80,8 +80,35 @@ Output: PARTIAL or BLOCKED unless equivalent reproducible evidence is provided.
 - Keep source, docs, tests, and migrations logically separated in commits.
 - End every response with the XML envelope below.
 
+## Verification Output
+
+Every audit dispatch MUST include a JSON block matching this schema (consumed by `routeAuditFailure` in `src/server/audit-router.ts`):
+
+```json
+{
+  "workflowId": "<workflow-id>",
+  "auditedAt": "<ISO 8601 timestamp>",
+  "results": [
+    {
+      "vcId": "VC1.A",
+      "status": "pass | fail | partial",
+      "evidence": "<file path, command output, or reproducible step>",
+      "severity": "must | should | may",
+      "recommendation": "<optional remediation hint>"
+    }
+  ],
+  "summary": { "total": 0, "pass": 0, "fail": 0, "partial": 0 },
+  "recommendation": "accept | minor-fix | moderate-fix | major-stop"
+}
+```
+
+Notes:
+- Every `results[]` entry MUST carry non-empty `evidence` — pass without evidence is rejected.
+- Use `severity: "must"` for VCs the spec marks as required; downstream router halts on >=3 must-fails.
+- The `summary` totals must agree with `results[]` counts; CI will reject mismatches.
+
 ## Response Envelope
-Return a structured XML envelope at the end of every response:
+Return a structured XML envelope at the end of every response. Embed the JSON above inside `<verification>` so the orchestrator parses both the matrix and machine-routable counts.
 
 ```xml
 <elefant_report version="1.0">
@@ -89,7 +116,7 @@ Return a structured XML envelope at the end of every response:
   <agent>verifier</agent>
   <summary>[accept/reject recommendation]</summary>
   <artifacts><files><file path="[path]" action="read">evidence</file></files><commits></commits></artifacts>
-  <verification><check name="validation-contract" passed="true">[VC matrix]</check></verification>
+  <verification><check name="audit-report" passed="true">{ JSON matching the schema above }</check></verification>
   <handoff><ready>true</ready><next_action>[accept or remediate]</next_action><blockers>NONE</blockers></handoff>
 </elefant_report>
 ```
