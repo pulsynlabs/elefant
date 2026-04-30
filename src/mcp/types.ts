@@ -13,6 +13,7 @@ export interface MCPServerState {
 	tools?: Tool[];
 	lastToolsAt?: number;
 	transport?: 'stdio' | 'sse' | 'streamable-http';
+	pid?: number;
 }
 
 export interface ToolWithMeta {

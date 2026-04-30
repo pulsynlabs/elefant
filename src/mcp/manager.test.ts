@@ -31,11 +31,12 @@ function createServerConfig(overrides: Record<string, unknown> = {}): Record<str
 	};
 }
 
-function createMockTransport(): StdioClientTransport {
+function createMockTransport(pid?: number): StdioClientTransport {
 	return {
 		start: async () => undefined,
 		close: async () => undefined,
 		send: async () => undefined,
+		pid: pid ?? null,
 	} as unknown as StdioClientTransport;
 }
 
@@ -136,11 +137,29 @@ describe('MCPManager', () => {
 
 		expect(manager.getStatus(serverId)).toBe('connected');
 		expect(getState(manager, serverId)?.transport).toBe('stdio');
+		expect(getState(manager, serverId)?.pid).toBeUndefined();
 		expect(getState(manager, serverId)?.tools).toEqual([]);
 		expect(mock.calls.connect).toBe(1);
 		expect(mock.calls.listTools).toBe(1);
 		expect(mock.calls.setNotificationHandler).toBe(1);
 		expect(statuses).toEqual(['connecting', 'connected']);
+	});
+
+	it('stores the stdio transport pid after connect', async () => {
+		const serverId = '00000000-0000-4000-8000-000000000107';
+		const mock = createMockClient(async () => undefined);
+		const manager = new MCPManager(
+			createConfigManager({ mcp: [createServerConfig({ id: serverId })] }),
+			undefined,
+			{
+				clientFactory: () => mock.client,
+				createStdioTransport: () => createMockTransport(12_345),
+			},
+		);
+
+		await manager.connect(serverId);
+
+		expect(getState(manager, serverId)?.pid).toBe(12_345);
 	});
 
 	it('caches listed tools after connect and returns flat tools across connected servers', async () => {
@@ -286,4 +305,5 @@ describe('MCPManager', () => {
 		expect(getState(manager, serverId)?.error).toBe('MCP connection timed out after 5ms');
 		expect(mock.calls.close).toBe(1);
 	});
+
 });

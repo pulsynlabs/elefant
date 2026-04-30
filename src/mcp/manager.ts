@@ -11,6 +11,7 @@ import {
 	type MCPRemoteTransport,
 	type MCPTransport,
 } from './transports.ts';
+import { killDescendants } from './cleanup.ts';
 import { searchMcpTools } from './search.ts';
 import type {
 	MCPServerState,
@@ -137,6 +138,7 @@ export class MCPManager {
 				tools,
 				lastToolsAt,
 				transport: connected.transport,
+				pid: connected.pid,
 			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -232,8 +234,21 @@ export class MCPManager {
 	}
 
 	public async shutdown(): Promise<void> {
-		const closeOperations = Array.from(this.servers.values()).map(async (state) => {
-			await state.client?.close();
+		const closeOperations = Array.from(this.servers.entries()).map(async ([id, state]) => {
+			if (!state.client) {
+				return;
+			}
+
+			try {
+				if (state.transport === 'stdio' && state.pid) {
+					await killDescendants(state.pid);
+				}
+				await state.client.close();
+			} catch (error) {
+				console.warn(
+					`Failed to close MCP client ${id} during shutdown: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
 		});
 
 		await Promise.all(closeOperations);
@@ -244,20 +259,20 @@ export class MCPManager {
 		await this.connect(id);
 	}
 
-	private async connectStdio(config: Extract<McpServerConfig, { transport: 'stdio' }>): Promise<{ client: MCPClient; transport: 'stdio' }> {
+	private async connectStdio(config: Extract<McpServerConfig, { transport: 'stdio' }>): Promise<{ client: MCPClient; transport: 'stdio'; pid?: number }> {
 		const client = this.clientFactory();
 		const transport = this.makeStdioTransport(config);
 
 		try {
 			await this.connectClient(client, transport, config.timeout);
-			return { client, transport: 'stdio' };
+			return { client, transport: 'stdio', pid: transport.pid ?? undefined };
 		} catch (error) {
 			await this.closeAfterFailedConnect(client, transport);
 			throw error;
 		}
 	}
 
-	private async connectRemote(config: Extract<McpServerConfig, { transport: 'sse' | 'streamable-http' }>): Promise<{ client: MCPClient; transport: 'sse' | 'streamable-http' }> {
+	private async connectRemote(config: Extract<McpServerConfig, { transport: 'sse' | 'streamable-http' }>): Promise<{ client: MCPClient; transport: 'sse' | 'streamable-http'; pid?: number }> {
 		const streamableClient = this.clientFactory();
 		const streamableTransport = await this.makeRemoteTransport(config);
 
