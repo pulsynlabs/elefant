@@ -146,21 +146,37 @@
 			: 'none',
 	);
 
+	type NavItemId =
+		| 'settings'
+		| 'models'
+		| 'about'
+		| 'agent-config'
+		| 'agent-runs'
+		| 'worktrees'
+		| 'spec-mode';
+
 	type BottomNavItem = {
-		id: 'settings' | 'models' | 'about' | 'agent-config' | 'agent-runs' | 'worktrees' | 'spec-mode';
+		id: NavItemId;
 		label: string;
 		icon: IconSvgElement;
 	};
 
-	const bottomNavItems: BottomNavItem[] = [
+	/* Nav items that require an active project — hidden when no project is open */
+	const projectNavItems: BottomNavItem[] = [
 		{ id: 'agent-config', label: 'Agent Config', icon: AgentsIcon },
 		{ id: 'agent-runs', label: 'Runs', icon: RunsIcon },
 		{ id: 'spec-mode', label: 'Spec', icon: SpecModeIcon },
 		{ id: 'worktrees', label: 'Worktrees', icon: WorktreesIcon },
+	];
+
+	/* Nav items that are always available — independent of project state */
+	const globalNavItems: BottomNavItem[] = [
 		{ id: 'settings', label: 'Settings', icon: SettingsIcon },
 		{ id: 'models', label: 'Models', icon: ModelsIcon },
 		{ id: 'about', label: 'About', icon: AboutIcon },
 	];
+
+	const hasActiveProject = $derived(Boolean(projectsStore.activeProjectId));
 
 	function toggleProject(project: Project): void {
 		const wasExpanded = expandedProjectIds[project.id] === true;
@@ -289,7 +305,33 @@
 
 	<!-- Bottom section: pinned nav -->
 	<ul class="bottom-nav" role="list">
-		{#each bottomNavItems as item (item.id)}
+		<!-- Project-dependent items — only when a project is open -->
+		{#if hasActiveProject}
+			{#each projectNavItems as item (item.id)}
+				<li>
+					<button
+						type="button"
+						class="nav-item"
+						class:active={navigationStore.isActive(item.id)}
+						onclick={() => navigationStore.navigate(item.id)}
+						title={collapsed ? item.label : undefined}
+						aria-label={item.label}
+						aria-current={navigationStore.isActive(item.id) ? 'page' : undefined}
+					>
+						<span class="nav-icon" aria-hidden="true">
+							<HugeiconsIcon icon={item.icon} size={18} strokeWidth={1.5} />
+						</span>
+						{#if !collapsed}
+							<span class="nav-label">{item.label}</span>
+						{/if}
+					</button>
+				</li>
+			{/each}
+			<li class="nav-separator" aria-hidden="true"></li>
+		{/if}
+
+		<!-- Global items — always available -->
+		{#each globalNavItems as item (item.id)}
 			<li>
 				<button
 					type="button"
@@ -462,6 +504,11 @@
 		height: 1px;
 		background: var(--color-border);
 		opacity: 0.6;
+	}
+
+	/* Spacer between project-dependent and global nav groups */
+	.nav-separator {
+		height: var(--space-2);
 	}
 
 	/* ── Nav items — the core redesign ──────────────────────────── */

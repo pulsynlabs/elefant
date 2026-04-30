@@ -119,7 +119,7 @@
 		font-family: var(--font-serif);
 		font-style: italic;
 		flex-shrink: 0;
-		box-shadow: var(--glow-primary), var(--shadow-md);
+		box-shadow: var(--shadow-md);
 	}
 
 	.brand-info {

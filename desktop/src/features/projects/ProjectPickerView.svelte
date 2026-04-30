@@ -347,11 +347,9 @@
 		font-weight: var(--font-weight-semibold);
 		letter-spacing: var(--tracking-snug);
 		cursor: pointer;
-		box-shadow: var(--glow-primary);
 		transition:
 			background-color var(--transition-fast),
 			border-color var(--transition-fast),
-			box-shadow var(--transition-fast),
 			transform var(--transition-fast);
 		white-space: nowrap;
 	}
@@ -359,12 +357,11 @@
 	.primary-button:hover {
 		background-color: var(--color-primary-hover);
 		border-color: var(--color-primary-hover);
-		box-shadow: var(--glow-primary-strong);
 	}
 
 	.primary-button:focus-visible {
 		outline: none;
-		box-shadow: var(--glow-focus), var(--glow-primary-strong);
+		box-shadow: var(--glow-focus);
 	}
 
 	.primary-button:active {

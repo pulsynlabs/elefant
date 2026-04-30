@@ -425,7 +425,6 @@
 		border-radius: var(--radius-full);
 		background-color: var(--color-primary);
 		flex-shrink: 0;
-		box-shadow: var(--glow-primary);
 	}
 
 	.session-label {
@@ -452,7 +451,6 @@
 		width: 8px;
 		height: 8px;
 		background-color: var(--color-primary);
-		box-shadow: var(--glow-primary);
 		animation: pulse 1.5s ease-in-out infinite;
 	}
 

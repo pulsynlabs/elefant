@@ -72,17 +72,16 @@
 
 	/* Hover lift — composes with the .quire-interactive class from quire.css.
 	   Local rule preserves the existing hoverable API: a subtle vertical
-	   shift plus an indigo ambient glow. */
+	   shift plus a tightened border. */
 	.quire-card-shell.hoverable {
 		transition:
 			transform var(--transition-fast),
-			box-shadow var(--transition-fast),
 			border-color var(--transition-fast);
 	}
 
 	.quire-card-shell.hoverable:hover {
 		transform: translateY(-1px);
-		box-shadow: var(--glow-primary);
+		border-color: var(--border-emphasis);
 	}
 
 	.quire-card-shell.hoverable:active {
