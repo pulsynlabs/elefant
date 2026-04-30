@@ -1,7 +1,16 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import type { ConfigManager } from '../config/loader.ts';
 import type { McpServerConfig } from '../config/schema.ts';
+import {
+	createRemoteTransport,
+	createSSETransport,
+	createStdioTransport,
+	type MCPRemoteTransport,
+	type MCPTransport,
+} from './transports.ts';
 import type {
 	MCPServerState,
 	MCPServerStatus,
@@ -11,15 +20,33 @@ import type {
 
 const DEFAULT_INIT_CONCURRENCY = 8;
 
+type MCPClient = Client;
+
+interface MCPManagerDependencies {
+	clientFactory?: () => MCPClient;
+	createStdioTransport?: typeof createStdioTransport;
+	createRemoteTransport?: typeof createRemoteTransport;
+	createSSETransport?: typeof createSSETransport;
+}
+
 export class MCPManager {
 	private readonly servers = new Map<string, MCPServerState>();
 	private readonly initConcurrency: number;
+	private readonly clientFactory: () => MCPClient;
+	private readonly makeStdioTransport: typeof createStdioTransport;
+	private readonly makeRemoteTransport: typeof createRemoteTransport;
+	private readonly makeSSETransport: typeof createSSETransport;
 
 	constructor(
 		private config: ConfigManager,
 		private onStatusChange?: (event: MCPStatusEvent) => void,
+		dependencies: MCPManagerDependencies = {},
 	) {
 		this.initConcurrency = DEFAULT_INIT_CONCURRENCY;
+		this.clientFactory = dependencies.clientFactory ?? (() => new Client({ name: 'elefant', version: '0.1.0' }, { capabilities: {} }));
+		this.makeStdioTransport = dependencies.createStdioTransport ?? createStdioTransport;
+		this.makeRemoteTransport = dependencies.createRemoteTransport ?? createRemoteTransport;
+		this.makeSSETransport = dependencies.createSSETransport ?? createSSETransport;
 	}
 
 	public async init(): Promise<void> {
@@ -55,8 +82,44 @@ export class MCPManager {
 	}
 
 	public async connect(id: string): Promise<void> {
-		void id;
-		throw new Error('not implemented');
+		const serverConfig = await this.getServerConfig(id);
+		if (!serverConfig) {
+			this.updateStatus(id, 'failed', `MCP server ${id} was not found in config`);
+			return;
+		}
+
+		if (serverConfig.enabled === false) {
+			await this.servers.get(id)?.client?.close();
+			this.setState(id, {
+				config: serverConfig,
+				status: 'disabled',
+				transport: serverConfig.transport,
+			});
+			return;
+		}
+
+		await this.servers.get(id)?.client?.close();
+		this.setState(id, {
+			config: serverConfig,
+			status: 'connecting',
+			transport: serverConfig.transport,
+		});
+
+		try {
+			const connected = serverConfig.transport === 'stdio'
+				? await this.connectStdio(serverConfig)
+				: await this.connectRemote(serverConfig);
+
+			this.setState(id, {
+				config: serverConfig,
+				client: connected.client,
+				status: 'connected',
+				transport: connected.transport,
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.updateStatus(id, 'failed', message);
+		}
 	}
 
 	public async disconnect(id: string): Promise<void> {
@@ -66,7 +129,11 @@ export class MCPManager {
 		}
 
 		await state.client?.close();
-		this.servers.delete(id);
+		this.setState(id, {
+			config: state.config,
+			status: 'disabled',
+			transport: state.transport,
+		});
 	}
 
 	public async reconnect(id: string): Promise<void> {
@@ -165,12 +232,78 @@ export class MCPManager {
 	}
 
 	private async connectSafely(id: string): Promise<void> {
+		await this.connect(id);
+	}
+
+	private async connectStdio(config: Extract<McpServerConfig, { transport: 'stdio' }>): Promise<{ client: MCPClient; transport: 'stdio' }> {
+		const client = this.clientFactory();
+		const transport = this.makeStdioTransport(config);
+
 		try {
-			await this.connect(id);
+			await this.connectClient(client, transport, config.timeout);
+			return { client, transport: 'stdio' };
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			this.updateStatus(id, 'failed', message);
+			await this.closeAfterFailedConnect(client, transport);
+			throw error;
 		}
+	}
+
+	private async connectRemote(config: Extract<McpServerConfig, { transport: 'sse' | 'streamable-http' }>): Promise<{ client: MCPClient; transport: 'sse' | 'streamable-http' }> {
+		const streamableClient = this.clientFactory();
+		const streamableTransport = await this.makeRemoteTransport(config);
+
+		try {
+			await this.connectClient(streamableClient, streamableTransport, config.timeout);
+			return { client: streamableClient, transport: 'streamable-http' };
+		} catch (streamableError) {
+			await this.closeAfterFailedConnect(streamableClient, streamableTransport);
+			const streamableMessage = streamableError instanceof Error ? streamableError.message : String(streamableError);
+			console.debug(`StreamableHTTP MCP connection failed for ${config.name}; falling back to SSE: ${streamableMessage}`);
+
+			const client = this.clientFactory();
+			const transport = this.makeSSETransport(config);
+
+			try {
+				await this.connectClient(client, transport, config.timeout);
+				return { client, transport: 'sse' };
+			} catch (sseError) {
+				await this.closeAfterFailedConnect(client, transport);
+				const sseMessage = sseError instanceof Error ? sseError.message : String(sseError);
+				throw new Error(`StreamableHTTP failed: ${streamableMessage}; SSE failed: ${sseMessage}`);
+			}
+		}
+	}
+
+	private async connectClient(client: MCPClient, transport: MCPTransport | MCPRemoteTransport, timeout: number): Promise<void> {
+		let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+		try {
+			await Promise.race([
+				client.connect(transport as Transport),
+				new Promise<never>((_, reject) => {
+					timeoutHandle = setTimeout(() => reject(new Error(`MCP connection timed out after ${timeout}ms`)), timeout);
+				}),
+			]);
+		} finally {
+			if (timeoutHandle) {
+				clearTimeout(timeoutHandle);
+			}
+		}
+	}
+
+	private async closeAfterFailedConnect(client: MCPClient, transport: MCPTransport | MCPRemoteTransport): Promise<void> {
+		await Promise.allSettled([
+			client.close(),
+			transport.close(),
+		]);
+	}
+
+	private async getServerConfig(id: string): Promise<McpServerConfig | undefined> {
+		const configResult = await this.config.getConfig();
+		if (!configResult.ok) {
+			return undefined;
+		}
+
+		return configResult.data.mcp.find((serverConfig) => serverConfig.id === id);
 	}
 
 	private setState(id: string, state: MCPServerState): void {
