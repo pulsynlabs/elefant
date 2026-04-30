@@ -3,6 +3,7 @@ import type {
 	ChatRequest,
 	ChatStreamEvent,
 	ProviderEntry,
+	RegistryProvider,
 } from './types.js';
 import { parseSSEStream } from './sse-parser.js';
 
@@ -122,6 +123,31 @@ export class DaemonClient {
 		// In v1, providers come from the config file (not a daemon API endpoint)
 		// This is a placeholder that returns empty — the config service reads them directly
 		return [];
+	}
+
+	/**
+	 * Fetch the bundled provider registry from the daemon.
+	 * Returns the full list of known providers with metadata.
+	 */
+	async fetchProviderRegistry(): Promise<RegistryProvider[]> {
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+		try {
+			const response = await fetch(`${this.baseUrl}/api/providers/registry`, {
+				signal: controller.signal,
+				headers: { 'Accept': 'application/json' },
+			});
+
+			if (!response.ok) {
+				throw new Error(`Provider registry fetch failed: HTTP ${response.status}`);
+			}
+
+			const data = (await response.json()) as { providers: RegistryProvider[] };
+			return data.providers;
+		} finally {
+			clearTimeout(timeoutId);
+		}
 	}
 
 	async answerQuestion(
