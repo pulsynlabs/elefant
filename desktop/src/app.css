@@ -21,4 +21,5 @@
 @import "./lib/styles/typography.css";
 @import "./lib/styles/glass.css";
 @import "./lib/styles/texture.css";
+@import "./lib/styles/forms.css";
 @import "./lib/styles/shadcn-overrides.css";

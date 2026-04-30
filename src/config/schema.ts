@@ -5,7 +5,7 @@ const providerSchema = z.object({
 	baseURL: z.string().url(),
 	apiKey: z.string().min(1),
 	model: z.string().min(1),
-	format: z.enum(["openai", "anthropic"]),
+	format: z.enum(["openai", "anthropic", "anthropic-compatible"]),
 }).strict();
 
 const toolPolicyConfigSchema = z.object({

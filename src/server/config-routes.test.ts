@@ -252,3 +252,35 @@ describe('config routes - agent profiles', () => {
 		expect(payload.data.promptOverride).toContain('Override');
 	});
 });
+
+describe('config routes - provider registry', () => {
+	let app: Elysia;
+
+	beforeEach(() => {
+		app = createConfigRoutes(new Elysia(), createMockProviderRouter(), new ConfigManager({
+			globalConfigPath: join(tmpdir(), 'elefant.config.json'),
+			projectPathResolver: () => ({ ok: false as const, error: { code: 'FILE_NOT_FOUND' as const, message: '' } }),
+		}));
+	});
+
+	it('GET /api/providers/registry returns 200 with providers array', async () => {
+		const response = await app.handle(
+			new Request('http://localhost/api/providers/registry'),
+		);
+		expect(response.status).toBe(200);
+
+		const payload = (await response.json()) as { providers: unknown[] };
+		expect(Array.isArray(payload.providers)).toBe(true);
+		expect(payload.providers.length).toBeGreaterThan(0);
+	});
+
+	it('GET /api/providers/registry returns at least 20 providers', async () => {
+		const response = await app.handle(
+			new Request('http://localhost/api/providers/registry'),
+		);
+		expect(response.status).toBe(200);
+
+		const payload = (await response.json()) as { providers: unknown[] };
+		expect(payload.providers.length).toBeGreaterThanOrEqual(20);
+	});
+});

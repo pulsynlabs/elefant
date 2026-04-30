@@ -14,8 +14,69 @@ import {
 	type ResolvedAgentConfig,
 } from '../config/index.ts';
 import type { ProviderRouter } from '../providers/router.ts';
+import { getProviderRegistry } from '../providers/registry/index.ts';
 
 const CONFIG_PATH = join(homedir(), '.config', 'elefant', 'elefant.config.json');
+
+interface FetchedModel {
+	id: string;
+	name: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function fetchProviderModels(
+	baseURL: string,
+	apiKey: string,
+	format: 'openai' | 'anthropic' | 'anthropic-compatible',
+): Promise<FetchedModel[]> {
+	const normalized = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+	const modelsEndpoint = normalized.endsWith('/v1')
+		? `${normalized}/models`
+		: `${normalized}/v1/models`;
+
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json',
+	};
+
+	if (format === 'openai') {
+		headers['Authorization'] = `Bearer ${apiKey}`;
+	} else {
+		headers['x-api-key'] = apiKey;
+		if (format === 'anthropic') {
+			headers['anthropic-version'] = '2023-06-01';
+		}
+	}
+
+	const response = await fetch(modelsEndpoint, {
+		method: 'GET',
+		headers,
+		signal: AbortSignal.timeout(15_000),
+	});
+
+	if (!response.ok) {
+		const body = await response.text().catch(() => '');
+		throw new Error(`Provider returned ${response.status}: ${body.slice(0, 200)}`);
+	}
+
+	const data = (await response.json()) as unknown;
+
+	// OpenAI-compatible: { data: [{ id, owned_by }] }
+	// Anthropic: { data: [{ id, display_name }] }
+	if (isRecord(data) && Array.isArray(data.data)) {
+		return data.data
+			.filter((m: unknown) => isRecord(m) && typeof m.id === 'string')
+			.map((m: Record<string, unknown>) => ({
+				id: m.id as string,
+				name: (m.display_name as string | undefined) ?? (m.id as string),
+			}))
+			.sort((a: FetchedModel, b: FetchedModel) => a.id.localeCompare(b.id));
+	}
+
+	throw new Error('Unexpected response format from provider');
+}
 
 // projectId is optional — agent profiles can be global (no project) or
 // project-scoped when a projectId is provided.
@@ -270,6 +331,38 @@ export function createConfigRoutes<TApp extends Elysia>(
 		return { ok: true };
 	});
 
+	app.get('/api/providers/registry', () => {
+		const providers = getProviderRegistry();
+		return { providers };
+	});
+
+	app.post('/api/providers/models', async ({ body, set }) => {
+		const { baseURL, apiKey, format } = body as {
+			baseURL?: string;
+			apiKey?: string;
+			format?: string;
+		};
+
+		if (!baseURL || !apiKey || !format) {
+			set.status = 400;
+			return { ok: false, error: 'baseURL, apiKey, and format are required' };
+		}
+
+		try {
+			const models = await fetchProviderModels(
+				baseURL,
+				apiKey,
+				format as 'openai' | 'anthropic' | 'anthropic-compatible',
+			);
+			return { ok: true, models };
+		} catch (error) {
+			return {
+				ok: false,
+				error: error instanceof Error ? error.message : 'Failed to fetch models',
+			};
+		}
+	});
+
 	app.get('/api/config/agents', async ({ query, set }) => {
 		const queryParse = ProjectQuerySchema.safeParse(query);
 		const projectId = queryParse.success ? queryParse.data.projectId : undefined;
@@ -440,6 +533,11 @@ export function createConfigRoutes<TApp extends Elysia>(
 			...baseProfile,
 			...patchParse.data,
 			id: params.agentId,
+			permissions: {
+				read: patchParse.data.permissions?.read ?? baseProfile.permissions.read,
+				write: patchParse.data.permissions?.write ?? baseProfile.permissions.write,
+				execute: patchParse.data.permissions?.execute ?? baseProfile.permissions.execute,
+			},
 			behavior: {
 				...baseProfile.behavior,
 				...(patchParse.data.behavior ?? {}),

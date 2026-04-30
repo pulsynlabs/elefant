@@ -3,7 +3,13 @@
  * The desktop never touches the filesystem directly.
  */
 
-import type { ElefantConfig, ProviderEntry } from '$lib/daemon/types.js';
+import type {
+	ElefantConfig,
+	FetchedModel,
+	ProviderEntry,
+	ProviderFormat,
+	RegistryProvider,
+} from '$lib/daemon/types.js';
 import { getDaemonClient } from '$lib/daemon/client.js';
 
 function baseUrl(): string {
@@ -81,10 +87,34 @@ export async function deleteProvider(name: string): Promise<void> {
 	}
 }
 
+/**
+ * Fetch the bundled provider registry from the daemon.
+ * Thin wrapper over the daemon client so callers can consume registry
+ * data through the same `configService` they already use for provider CRUD.
+ */
+export async function fetchProviderRegistry(): Promise<RegistryProvider[]> {
+	return getDaemonClient().fetchProviderRegistry();
+}
+
+/**
+ * Fetch the list of models a provider exposes at runtime, using the supplied
+ * API key. The daemon proxies to the provider so the desktop never sends
+ * credentials to a third party directly.
+ */
+export async function fetchProviderModels(
+	baseURL: string,
+	apiKey: string,
+	format: ProviderFormat,
+): Promise<FetchedModel[]> {
+	return getDaemonClient().fetchProviderModels(baseURL, apiKey, format);
+}
+
 export const configService = {
 	readConfig,
 	updateConfig,
 	addProvider,
 	updateProvider,
 	deleteProvider,
+	fetchProviderRegistry,
+	fetchProviderModels,
 };

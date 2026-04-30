@@ -2,7 +2,10 @@ import type {
 	HealthResponse,
 	ChatRequest,
 	ChatStreamEvent,
+	FetchedModel,
 	ProviderEntry,
+	ProviderFormat,
+	RegistryProvider,
 } from './types.js';
 import { parseSSEStream } from './sse-parser.js';
 
@@ -122,6 +125,71 @@ export class DaemonClient {
 		// In v1, providers come from the config file (not a daemon API endpoint)
 		// This is a placeholder that returns empty — the config service reads them directly
 		return [];
+	}
+
+	/**
+	 * Fetch the bundled provider registry from the daemon.
+	 * Returns the full list of known providers with metadata.
+	 */
+	async fetchProviderRegistry(): Promise<RegistryProvider[]> {
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+		try {
+			const response = await fetch(`${this.baseUrl}/api/providers/registry`, {
+				signal: controller.signal,
+				headers: { 'Accept': 'application/json' },
+			});
+
+			if (!response.ok) {
+				throw new Error(`Provider registry fetch failed: HTTP ${response.status}`);
+			}
+
+			const data = (await response.json()) as { providers: RegistryProvider[] };
+			return data.providers;
+		} finally {
+			clearTimeout(timeoutId);
+		}
+	}
+
+	/**
+	 * Ask the daemon to list available models for a given provider configuration
+	 * by querying the live provider endpoint with the supplied API key.
+	 *
+	 * Uses a slightly longer timeout than other calls because remote providers
+	 * (especially Anthropic-compatible ones routed through proxies) can take
+	 * a few seconds to respond on cold paths.
+	 */
+	async fetchProviderModels(
+		baseURL: string,
+		apiKey: string,
+		format: ProviderFormat,
+	): Promise<FetchedModel[]> {
+		const controller = new AbortController();
+		// Allow up to 15s for upstream provider model-list calls.
+		const timeoutId = setTimeout(() => controller.abort(), 15_000);
+
+		try {
+			const response = await fetch(`${this.baseUrl}/api/providers/models`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Accept: 'application/json',
+				},
+				body: JSON.stringify({ baseURL, apiKey, format }),
+				signal: controller.signal,
+			});
+
+			if (!response.ok) {
+				const text = await response.text().catch(() => `HTTP ${response.status}`);
+				throw new Error(`Failed to fetch models: ${text}`);
+			}
+
+			const data = (await response.json()) as { models: FetchedModel[] };
+			return Array.isArray(data?.models) ? data.models : [];
+		} finally {
+			clearTimeout(timeoutId);
+		}
 	}
 
 	async answerQuestion(

@@ -225,4 +225,46 @@ function withMockPreconnect(mockFetch: MockFetchFunction, originalFetch: typeof 
 		expect(events.some((e) => e.type === 'text_delta')).toBe(true)
 		expect(events.some((e) => e.type === 'done')).toBe(true)
 	})
+
+	it('routes to correct endpoint and sends proper headers for Groq base URL', async () => {
+		let capturedUrl = ''
+		let capturedHeaders: Record<string, string> = {}
+		let capturedBody: Record<string, unknown> = {}
+
+		globalThis.fetch = withMockPreconnect(
+			async (url, init) => {
+				capturedUrl = typeof url === 'string' ? url : url.toString()
+				capturedHeaders = (init?.headers as Record<string, string>) ?? {}
+				capturedBody = init?.body ? JSON.parse(init.body as string) as Record<string, unknown> : {}
+				return createSseResponse([
+					'data: {"choices":[{"delta":{"content":"Hello from Groq"},"finish_reason":null}]}\n\n',
+					'data: [DONE]\n\n',
+				])
+			},
+			originalFetch,
+		)
+
+		const groqConfig: ProviderConfig = {
+			name: 'groq',
+			baseURL: 'https://api.groq.com/openai/v1',
+			apiKey: 'gsk-test-key',
+			model: 'llama-3.3-70b-versatile',
+			format: 'openai',
+		}
+
+		const adapter = new OpenAIAdapter(groqConfig)
+		await collectEvents(adapter)
+
+		// Verify endpoint: buildOpenAIEndpoint handles /v1 suffix
+		expect(capturedUrl).toBe('https://api.groq.com/openai/v1/chat/completions')
+
+		// Verify auth header uses Bearer token (OpenAI-compatible convention)
+		expect(capturedHeaders['Authorization']).toBe('Bearer gsk-test-key')
+		expect(capturedHeaders['Content-Type']).toBe('application/json')
+
+		// Verify body includes model and stream settings
+		expect(capturedBody.model).toBe('llama-3.3-70b-versatile')
+		expect(capturedBody.stream).toBe(true)
+		expect(capturedBody.stream_options).toEqual({ include_usage: true })
+	})
 })

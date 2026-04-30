@@ -128,7 +128,7 @@ export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-export type ProviderFormat = 'openai' | 'anthropic';
+export type ProviderFormat = 'openai' | 'anthropic' | 'anthropic-compatible';
 
 export interface ProviderEntry {
 	name: string;
@@ -143,4 +143,36 @@ export interface ElefantConfig {
 	providers: ProviderEntry[];
 	defaultProvider: string;
 	logLevel: LogLevel;
+}
+
+/** A single model entry within a provider's model list. */
+export interface RegistryModel {
+	id: string;
+	name: string;
+}
+
+/**
+ * A model returned by the daemon's runtime model-list endpoint
+ * (`POST /api/providers/models`). The daemon resolves the call against
+ * the live provider, so the shape is identical to `RegistryModel` but
+ * comes from the provider rather than the bundled registry.
+ */
+export interface FetchedModel {
+	id: string;
+	name: string;
+}
+
+/**
+ * A provider entry from the bundled provider registry.
+ * Mirrors the daemon's `RegistryProvider` type.
+ */
+export interface RegistryProvider {
+	id: string;
+	name: string;
+	baseURL: string;
+	format: 'openai' | 'anthropic-compatible';
+	envVar: string[];
+	iconSvg: string;
+	docUrl: string;
+	models: RegistryModel[];
 }
