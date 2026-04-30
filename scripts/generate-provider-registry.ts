@@ -100,15 +100,23 @@ function resolveBaseURL(id: string, api: string | undefined): string | undefined
   return api ?? BASE_URL_SUPPLEMENT[id];
 }
 
-function modelIdFromPath(modelPath: string): string {
-  return modelPath.slice(modelPath.lastIndexOf("/") + 1, -".toml".length);
+function modelIdFromPath(modelsDir: string, modelPath: string): string {
+  // Use the path relative to the models/ directory (minus .toml extension) as
+  // the model id. This preserves nested ids like
+  // "accounts/fireworks/models/deepseek-v3p1" that providers such as
+  // Fireworks AI use as their actual API model identifiers.
+  const rel = relative(modelsDir, modelPath);
+  return rel.slice(0, -".toml".length);
 }
 
 async function readModels(providerDir: string, providerId: string): Promise<RegistryModelDraft[]> {
   const models: RegistryModelDraft[] = [];
-  const modelGlob = new Bun.Glob("models/*.toml");
+  const modelsDir = join(providerDir, "models");
+  // Use ** so we recurse into nested subdirectories (e.g. Fireworks AI stores
+  // models under models/accounts/fireworks/models/*.toml).
+  const modelGlob = new Bun.Glob("**/*.toml");
 
-  for await (const modelPath of modelGlob.scan({ cwd: providerDir, absolute: true })) {
+  for await (const modelPath of modelGlob.scan({ cwd: modelsDir, absolute: true })) {
     try {
       const modelToml = parseModelToml(await importToml(modelPath));
       if (modelToml === undefined) {
@@ -116,7 +124,7 @@ async function readModels(providerDir: string, providerId: string): Promise<Regi
         continue;
       }
 
-      models.push({ id: modelIdFromPath(modelPath), name: modelToml.name });
+      models.push({ id: modelIdFromPath(modelsDir, modelPath), name: modelToml.name });
     } catch (error: unknown) {
       console.warn(`Skipping unreadable model ${relative(process.cwd(), modelPath)} for provider ${providerId}: ${errorMessage(error)}`);
     }
