@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { BASE_URL_SUPPLEMENT, POPULAR_PROVIDERS } from "./provider-registry-supplement.ts";
+import { BASE_URL_SUPPLEMENT } from "./provider-registry-supplement.ts";
 
 const PROVIDERS_ROOT = resolve(".references/models.dev-dev/providers");
 const OUTPUT_PATH = resolve("src/providers/registry/generated.ts");
@@ -126,8 +126,6 @@ async function readModels(providerDir: string, providerId: string): Promise<Regi
 }
 
 async function readIconSvg(providerDir: string, providerId: string): Promise<string> {
-  if (!POPULAR_PROVIDERS.includes(providerId)) return "";
-
   const logoPath = join(providerDir, "logo.svg");
   const logoFile = Bun.file(logoPath);
   if (!(await logoFile.exists())) return "";
