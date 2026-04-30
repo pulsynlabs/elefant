@@ -19,7 +19,7 @@
 		tier?: Tier;
 		/** Quire tone. */
 		tone?: Tone;
-		/** Italic body variant (Newsreader italic axis). */
+		/** Italic body variant (Geist Sans italic). */
 		italic?: boolean;
 		/** Legacy variant — maps to tier. */
 		variant?: TextVariant;

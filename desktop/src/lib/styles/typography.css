@@ -1,18 +1,18 @@
 /* =========================================
    QUIRE — TYPOGRAPHY
-   Fraunces (display) + Newsreader (body) + Geist Mono (telemetry)
-   Body text is serif. This is the Quire signature.
+   Fraunces (display) + Geist Sans (body) + Geist Mono (telemetry)
+   Clean neo-grotesque body paired with editorial display.
 
    Variation axes:
      • Fraunces  — opsz, wght, italic
-     • Newsreader — opsz, wght, italic
+     • Geist Sans — wght, italic
      • Geist Mono — wght (no italic axis available)
    ========================================= */
 
 :root {
 	/* Font families */
 	--font-display: "Fraunces Variable", "Fraunces", Georgia, "Times New Roman", serif;
-	--font-body: "Newsreader Variable", "Newsreader", Georgia, "Times New Roman", serif;
+	--font-body: "Geist Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--font-mono: "Geist Mono Variable", "Geist Mono", "JetBrains Mono", "SF Mono",
 		"Cascadia Code", monospace;
 
@@ -69,7 +69,7 @@
 /* =========================================
    SEVEN NAMED TIERS — canonical type tokens
    Each tier sets family, size, weight, leading, and explicit
-   font-variation-settings for Newsreader/Fraunces opsz axis.
+   font-variation-settings for Fraunces opsz axis.
    ========================================= */
 
 .text-caption {
@@ -97,7 +97,6 @@
 	font-size: var(--font-size-base);
 	font-weight: var(--font-weight-regular);
 	line-height: var(--leading-base);
-	font-variation-settings: "opsz" 14, "wght" 400;
 	color: var(--text-prose);
 }
 
@@ -106,7 +105,6 @@
 	font-size: var(--font-size-lg);
 	font-weight: var(--font-weight-regular);
 	line-height: var(--leading-relaxed);
-	font-variation-settings: "opsz" 16, "wght" 400;
 	color: var(--text-prose);
 	max-width: 65ch;
 }
@@ -149,9 +147,9 @@
 
 /* =========================================
    BASE ELEMENT DEFAULTS
-   body — Newsreader at opsz 14
+   body — Geist Sans at 14px/400
    h1-h3 — Fraunces with opsz scaled to size
-   h4-h6 — Newsreader semibold (body family at heading scale)
+   h4-h6 — Geist Sans semibold (body family at heading scale)
    code/pre/kbd — Geist Mono
    ========================================= */
 body {
@@ -162,7 +160,6 @@ body {
 	letter-spacing: var(--tracking-normal);
 	color: var(--text-prose);
 	background-color: var(--surface-substrate);
-	font-variation-settings: "opsz" 14, "wght" 400;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	text-rendering: optimizeLegibility;
@@ -205,17 +202,14 @@ h6 {
 
 h4 {
 	font-size: var(--font-size-lg);
-	font-variation-settings: "opsz" 16, "wght" 600;
 }
 
 h5 {
 	font-size: var(--font-size-base);
-	font-variation-settings: "opsz" 14, "wght" 600;
 }
 
 h6 {
 	font-size: var(--font-size-sm);
-	font-variation-settings: "opsz" 14, "wght" 600;
 }
 
 code,

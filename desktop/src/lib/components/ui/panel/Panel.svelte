@@ -15,7 +15,7 @@
 		 * precedence over the `title` string prop when both are set.
 		 */
 		titleSnippet?: Snippet;
-		/** Optional Newsreader subtitle below the title. */
+		/** Optional Geist Sans subtitle below the title. */
 		subtitle?: Snippet;
 		/** Right-aligned toolbar — typically actions, mono caps metadata. */
 		toolbar?: Snippet;
@@ -119,7 +119,6 @@
 		margin: 0;
 		font-family: var(--font-body);
 		font-size: var(--font-size-sm);
-		font-variation-settings: "opsz" 14, "wght" 400;
 		line-height: var(--leading-snug);
 		color: var(--text-meta);
 	}

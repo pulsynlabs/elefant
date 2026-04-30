@@ -4,7 +4,7 @@
 	type Props = {
 		/** Plain-text title. Required for backward-compat with existing consumers. */
 		title: string;
-		/** Optional plain-text description (Newsreader body). */
+		/** Optional plain-text description (Geist Sans body). */
 		description?: string;
 		/** Optional icon snippet rendered above the title (~32px). */
 		icon?: Snippet;
@@ -39,7 +39,7 @@
 
 <style>
 	/* Editorial empty state — pure typographic composition; no card, no
-	   surface. The page-grade serif title and Newsreader body do the work.
+	   surface. The page-grade serif title and Geist Sans body do the work.
 	   Vertical rhythm: 16px icon→title, 12px title→body, 24px body→action. */
 	.empty-state {
 		display: flex;
@@ -76,7 +76,6 @@
 		margin: 12px 0 0 0;
 		font-family: var(--font-body);
 		font-size: var(--font-size-base);
-		font-variation-settings: "opsz" 16, "wght" 400;
 		line-height: var(--leading-relaxed);
 		color: var(--text-meta);
 		max-width: 50ch;

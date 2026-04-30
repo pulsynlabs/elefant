@@ -81,8 +81,8 @@
 		{ name: 'hero', family: 'Fraunces', sample: 'The quick brown fox' },
 		{ name: 'display', family: 'Fraunces', sample: 'The quick brown fox' },
 		{ name: 'title', family: 'Fraunces', sample: 'The quick brown fox jumps' },
-		{ name: 'prose', family: 'Newsreader', sample: 'The quick brown fox jumps over the lazy dog.' },
-		{ name: 'body', family: 'Newsreader', sample: 'The quick brown fox jumps over the lazy dog.' },
+		{ name: 'prose', family: 'Geist Sans', sample: 'The quick brown fox jumps over the lazy dog.' },
+		{ name: 'body', family: 'Geist Sans', sample: 'The quick brown fox jumps over the lazy dog.' },
 		{ name: 'meta', family: 'Geist Mono', sample: 'the.quick.brown.fox' },
 		{ name: 'caption', family: 'Geist Mono', sample: 'CAPTION TELEMETRY' },
 	] as const;
@@ -149,7 +149,7 @@
 			<span class="text-caption ds-section-eyebrow">01 · Type</span>
 			<Heading level={2} tier="title">Typography</Heading>
 			<Text tag="p" tier="body" tone="meta">
-				Three voices. Fraunces sets the masthead, Newsreader carries the
+				Three voices. Fraunces sets the masthead, Geist Sans carries the
 				prose, Geist Mono keeps telemetry honest.
 			</Text>
 		</div>
@@ -344,7 +344,7 @@
 				<span class="text-caption">Textarea</span>
 				<textarea
 					rows="3"
-					placeholder="Body text uses Newsreader at opsz 14."
+					placeholder="Body text uses Geist Sans at 14px."
 				></textarea>
 			</label>
 
@@ -520,7 +520,7 @@
 				<span class="text-caption">md · square</span>
 			</div>
 			<div class="ds-avatar-cell">
-				<Avatar name="Newsreader" size="lg" shape="square" />
+				<Avatar name="Geist Sans" size="lg" shape="square" />
 				<span class="text-caption">lg · square</span>
 			</div>
 			<div class="ds-avatar-cell">
@@ -569,7 +569,7 @@
 			{/snippet}
 
 			<Text tag="p" tier="prose">
-				The panel body carries the longer-form prose. Newsreader at the
+				The panel body carries the longer-form prose. Geist Sans at the
 				prose tier (opsz 16, weight 400, leading 1.6, max-width 65ch)
 				is the canonical body voice — you are reading it now.
 			</Text>
@@ -592,7 +592,7 @@
 		<div class="ds-empty-frame">
 			<EmptyState
 				title="No quires here yet"
-				description="An empty state in Quire is pure typographic composition — Fraunces italic title, Newsreader body, optional centred action. No card, no surface."
+				description="An empty state in Quire is pure typographic composition — Fraunces italic title, Geist Sans body, optional centred action. No card, no surface."
 			>
 				{#snippet icon()}
 					<svg
@@ -678,7 +678,7 @@
 			<Tooltip content="Quire is bound editorial sheets." position="top">
 				<Button variant="secondary">Hover (top)</Button>
 			</Tooltip>
-			<Tooltip content="Newsreader at meta size, 6×10 padding." position="bottom">
+			<Tooltip content="Geist Sans at meta size, 6×10 padding." position="bottom">
 				<Button variant="secondary">Hover (bottom)</Button>
 			</Tooltip>
 			<Tooltip content="Per-position 2px lift on mount." position="left">

@@ -13,7 +13,7 @@ The visual token system for Elefant Desktop, built on the **Quire** material lan
 | File | Purpose |
 |---|---|
 | `tokens.css` | Color, surface, border, text, motion, radius, spacing tokens for both themes; shadcn-svelte CSS variable mapping |
-| `typography.css` | Fraunces (display), Newsreader (body), Geist Mono (telemetry) variable axes; seven canonical type tiers |
+| `typography.css` | Fraunces (display), Geist Sans (body), Geist Mono (telemetry) variable axes; seven canonical type tiers |
 | `quire.css` | Three surface tiers (sm, md, lg) and the nested bezel pair (plate + leaf) |
 | `texture.css` | Mono labels, hairline borders, structural dividers — non-surface utility classes |
 | `forms.css` | Native form control styling (input, select, textarea) as quire-sm |
@@ -152,13 +152,13 @@ Each shadow is composed of a dark base layer (opacity-graded) plus a subtle indi
 |---|---|---|---|---|
 | `.text-caption` | Geist Mono | 10px | uppercase widest tracking | Labels, metadata |
 | `.text-meta` | Geist Mono | 12px | tabular | Timestamps, telemetry |
-| `.text-body` | Newsreader | 14px | opsz 14, wght 400 | Default body |
-| `.text-prose` | Newsreader | 16px | opsz 16, wght 400 | Long-form, max-width 65ch |
+| `.text-body` | Geist Sans | 14px | wght 400 | Default body |
+| `.text-prose` | Geist Sans | 16px | wght 400 | Long-form, max-width 65ch |
 | `.text-title` | Fraunces | 24px | opsz 24, wght 400 | Section titles |
 | `.text-display` | Fraunces | 40px | opsz 40, wght 350 | Page titles |
 | `.text-hero` | Fraunces | clamp(40-64px) | opsz 60, wght 320 | Hero moments |
 
-Italic variants available via `.italic` utility — Fraunces and Newsreader both support italic axes.
+Italic variants available via `.italic` utility — Fraunces and Geist Sans both support italic axes.
 
 ---
 
@@ -203,7 +203,7 @@ The nested bezel pair is the Quire signature — a folded-sheet metaphor replaci
 
 ## Anti-Patterns (Do Not Do)
 
-- **No `Inter` or `DM Sans`** — Quire body is Newsreader (serif)
+- **No `Inter` or `DM Sans`** — Quire body is Geist Sans (sans)
 - **No `h-screen`** — use `min-h-[100dvh]` for full-height
 - **No emojis** in code or copy
 - **No hex literals in component `<style>` blocks** — always `var(--*)` tokens

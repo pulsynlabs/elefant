@@ -31,6 +31,7 @@
 		"@tauri-apps/plugin-store": "^2",
 		"bits-ui": "^1",
 		"clsx": "^2",
+		"geist": "^1.7.0",
 		"shiki": "^1",
 		"tailwind-merge": "^2",
 		"tailwind-variants": "^0.3.0"
@@ -38,7 +39,6 @@
 	"devDependencies": {
 		"@fontsource-variable/fraunces": "^5",
 		"@fontsource-variable/geist-mono": "^5.2.7",
-		"@fontsource-variable/newsreader": "^5.2.10",
 		"@fontsource/geist-mono": "^5",
 		"@playwright/test": "^1.59.1",
 		"@sveltejs/vite-plugin-svelte": "^6",

@@ -20,7 +20,7 @@ const buttonVariants = tv({
 	base: [
 		// Layout
 		"inline-flex items-center justify-center gap-2 whitespace-nowrap",
-		// Type — Newsreader body, medium weight, snug tracking
+		// Type — Geist Sans body, medium weight, snug tracking
 		"font-medium",
 		// Motion — color/border transitions only; transforms are global
 		"transition-[background-color,border-color,color,box-shadow] duration-150 ease-out",

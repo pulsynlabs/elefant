@@ -6,9 +6,21 @@
 @import "@fontsource-variable/fraunces/index.css";
 @import "@fontsource-variable/fraunces/wght-italic.css";
 
-/* Newsreader Variable — body serif (opsz, wght, italic axes) */
-@import "@fontsource-variable/newsreader/index.css";
-@import "@fontsource-variable/newsreader/wght-italic.css";
+/* Geist Sans Variable — body (wght axis, 100-900 + italic) */
+@font-face {
+	font-family: 'Geist Sans';
+	src: url('/fonts/Geist-Variable.woff2') format('woff2');
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'Geist Sans';
+	src: url('/fonts/Geist-Italic[wght].woff2') format('woff2');
+	font-weight: 100 900;
+	font-style: italic;
+	font-display: swap;
+}
 
 /* Geist Mono Variable — telemetry (wght axis) */
 @import "@fontsource-variable/geist-mono/index.css";
