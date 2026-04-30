@@ -8,11 +8,23 @@
 	type Props = {
 		provider?: ProviderEntry;
 		template?: RegistryProvider;
+		/**
+		 * UI mode controlling which fields are exposed.
+		 * - 'quick-add': format is pre-known from the registry template; hide format select.
+		 * - 'manual': full manual entry — format select is shown.
+		 */
+		mode?: 'quick-add' | 'manual';
 		onSave: (provider: ProviderEntry) => void;
 		onCancel: () => void;
 	};
 
-	let { provider, template, onSave, onCancel }: Props = $props();
+	let {
+		provider,
+		template,
+		mode = 'manual',
+		onSave,
+		onCancel,
+	}: Props = $props();
 
 	const isEditing = $derived(!!provider);
 
@@ -88,14 +100,16 @@
 			{#if errors.name}<span class="error-text">{errors.name}</span>{/if}
 		</div>
 
-		<div class="form-group">
-			<label class="field-label" for="prov-format">Format</label>
-			<select id="prov-format" class="field-select" bind:value={format}>
-				<option value="openai">OpenAI-compatible</option>
-				<option value="anthropic">Anthropic</option>
-				<option value="anthropic-compatible">Anthropic-compatible</option>
-			</select>
-		</div>
+		{#if mode !== 'quick-add'}
+			<div class="form-group">
+				<label class="field-label" for="prov-format">Format</label>
+				<select id="prov-format" class="field-select" bind:value={format}>
+					<option value="openai">OpenAI-compatible</option>
+					<option value="anthropic">Anthropic</option>
+					<option value="anthropic-compatible">Anthropic-compatible</option>
+				</select>
+			</div>
+		{/if}
 
 		<div class="form-group">
 			<label class="field-label" for="prov-baseurl">Base URL</label>

@@ -148,6 +148,7 @@
 		<ProviderForm
 			provider={editingProvider}
 			template={editingProvider ? undefined : selectedTemplate}
+			mode={selectedTemplate && !editingProvider ? 'quick-add' : 'manual'}
 			onSave={handleSave}
 			onCancel={handleCancelForm}
 		/>
