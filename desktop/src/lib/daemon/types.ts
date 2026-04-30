@@ -176,3 +176,106 @@ export interface RegistryProvider {
 	docUrl: string;
 	models: RegistryModel[];
 }
+
+// ─── MCP (Model Context Protocol) ────────────────────────────────────────────
+//
+// MCP servers expose tools that Elefant agents can call. A server is reached
+// over one of three transports: a local stdio child process, or a remote
+// streamable-http / sse endpoint. These types mirror the daemon's
+// `mcpServerSchema` from `src/config/schema.ts`.
+
+export type McpTransport = 'stdio' | 'sse' | 'streamable-http';
+
+/**
+ * Persisted MCP server configuration. Mirrors the daemon-side schema in
+ * `src/config/schema.ts`. The transport-specific fields (`command`/`url`,
+ * `env`/`headers`) are validated server-side as a discriminated union;
+ * the desktop carries them all on a single shape for UI convenience.
+ */
+export interface McpServerConfig {
+	id: string;
+	name: string;
+	transport: McpTransport;
+	/** Required for stdio. argv-style: command[0] is the executable. */
+	command?: string[];
+	/** Required for sse / streamable-http. */
+	url?: string;
+	/** Extra environment variables for stdio child processes. */
+	env?: Record<string, string>;
+	/** Extra HTTP headers for remote transports. */
+	headers?: Record<string, string>;
+	enabled?: boolean;
+	/** Connection / call timeout in milliseconds. Default 30_000. */
+	timeout?: number;
+	/** Tool names that should always be loaded for this server. */
+	pinnedTools?: string[];
+}
+
+/**
+ * A configured server enriched with live runtime status from the daemon.
+ * Returned by `GET /api/mcp/servers`. The daemon attaches `status`, optional
+ * `error`, and `toolCount` on top of the persisted `McpServerConfig`.
+ */
+export interface McpServerWithStatus extends McpServerConfig {
+	status: 'connecting' | 'connected' | 'disabled' | 'failed';
+	error?: string;
+	toolCount?: number;
+}
+
+/**
+ * Tool metadata as exposed by `GET /api/mcp/servers/:id/tools`. The
+ * `inputSchema` is JSON Schema as returned by the upstream MCP server —
+ * structure varies, so we keep it `unknown` and let the form layer pick
+ * the bits it needs.
+ */
+export interface McpToolEntry {
+	name: string;
+	description: string;
+	inputSchema: unknown;
+	pinned: boolean;
+}
+
+/**
+ * A registry entry — one curated/community/bundled MCP server discoverable
+ * from the in-app registry browser.
+ */
+export interface RegistryEntry {
+	id: string;
+	source: 'anthropic' | 'smithery' | 'bundled';
+	name: string;
+	displayName: string;
+	description: string;
+	transport: McpTransport;
+	command?: string[];
+	url?: string;
+	iconUrl?: string;
+	useCases?: string[];
+	oneLiner?: string;
+}
+
+/**
+ * Response shape from `GET /api/mcp/registry`. Sectioned by source so the
+ * UI can render Curated / Community / Bundled tabs without re-grouping.
+ * Some daemons may flatten to `entries[]` for a single-source query —
+ * support both shapes.
+ */
+export interface McpRegistryResponse {
+	anthropic?: RegistryEntry[];
+	smithery?: RegistryEntry[];
+	bundled?: RegistryEntry[];
+	entries?: RegistryEntry[];
+	hasMore?: boolean;
+}
+
+/**
+ * SSE event payload pushed by the daemon when an MCP server's connection
+ * status changes (`mcp.status.changed`) or its tool list changes
+ * (`mcp.tools.changed`). The desktop UI re-fetches the affected server
+ * on receipt rather than mutating local state from the event payload.
+ */
+export interface McpStatusEvent {
+	type: 'mcp.status.changed' | 'mcp.tools.changed';
+	serverId: string;
+	status?: McpServerWithStatus['status'];
+	error?: string;
+}
