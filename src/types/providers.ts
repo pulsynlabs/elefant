@@ -1,6 +1,6 @@
 import type { ToolCall } from './tools.js';
 
-export type ProviderFormat = 'openai' | 'anthropic';
+export type ProviderFormat = 'openai' | 'anthropic' | 'anthropic-compatible';
 
 export interface ProviderConfig {
 	name: string;
