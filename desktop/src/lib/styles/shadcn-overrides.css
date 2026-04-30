@@ -1,19 +1,50 @@
 /* =========================================
-   shadcn-svelte TOKEN OVERRIDES
-   Maps shadcn's variable names to our token system.
-   Handles component-specific overrides and global polish.
+   QUIRE — shadcn-svelte OVERRIDES
+   Every shadcn primitive inherits Quire via tokens.css mapping.
+   This file overrides only the visual leftovers: focus ring,
+   scrollbar, selection, press feedback, and any default radii/shadows
+   that leaked through unmapped variables.
    ========================================= */
 
-/* Focus ring — indigo primary, accessible */
-:focus-visible {
-	outline: 2px solid var(--color-primary);
-	outline-offset: 2px;
+/* === FOCUS RING ============================
+   shadcn-svelte default: 2px ring at default --ring offset.
+   Quire: 1px hairline outline + 4px ambient indigo glow.
+   ========================================= */
+*:focus {
+	outline: none;
 }
 
-/* Scrollbar styling — ultra-minimal, barely-there */
+*:focus-visible {
+	outline: 1px solid var(--border-focus);
+	outline-offset: 2px;
+	box-shadow: var(--glow-focus);
+	border-radius: inherit;
+}
+
+/* shadcn primitives that style their own ring — defang and re-route */
+[data-state="open"]:focus-visible,
+[data-state="checked"]:focus-visible,
+[data-radix-collection-item]:focus-visible {
+	outline: 1px solid var(--border-focus);
+	outline-offset: 2px;
+	box-shadow: var(--glow-focus);
+}
+
+/* === SELECTION ============================
+   Default browser blue selection is banned.
+   ========================================= */
+::selection {
+	background: rgba(64, 73, 225, 0.22);
+	color: var(--text-prose);
+}
+
+/* === SCROLLBAR ============================
+   Webkit only — Tauri Chromium WebView covers it.
+   Thin, hairline-tinted, indigo-on-hover.
+   ========================================= */
 ::-webkit-scrollbar {
-	width: 4px;
-	height: 4px;
+	width: 8px;
+	height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -21,37 +52,115 @@
 }
 
 ::-webkit-scrollbar-thumb {
-	background: var(--color-border-strong);
+	background: var(--border-edge);
 	border-radius: var(--radius-full);
-	opacity: 0.6;
+	border: 2px solid transparent;
+	background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: var(--color-text-disabled);
+	background: var(--border-emphasis);
+	background-clip: padding-box;
 }
 
-/* Selection — indigo tint */
-::selection {
-	background: rgba(64, 73, 225, 0.22);
-	color: var(--color-text-primary);
+::-webkit-scrollbar-corner {
+	background: transparent;
 }
 
-/* Button press feedback — physical click simulation */
-button:active:not(:disabled) {
+/* Firefox */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-edge) transparent;
+}
+
+/* === BUTTON PRESS FEEDBACK ============================
+   Press = scale(0.98). Applied to every button-shaped element.
+   Honours reduced-motion.
+   ========================================= */
+button:active:not(:disabled),
+[role="button"]:active:not([aria-disabled="true"]) {
 	transform: scale(0.98);
-	transition:
-		transform var(--duration-micro) var(--ease-out-expo),
-		box-shadow var(--duration-micro) var(--ease-out-expo);
+	transition: transform var(--duration-micro) var(--ease-out-expo);
 }
 
-/* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
-	button:active:not(:disabled) {
+	button:active:not(:disabled),
+	[role="button"]:active:not([aria-disabled="true"]) {
 		transform: none;
 	}
 }
 
-/* Smooth scrolling for anchor links */
+/* === SMOOTH SCROLL ============================ */
 html {
 	scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+}
+
+/* === SHADCN RADIUS LEAK GUARD ============================
+   shadcn-svelte components use `--radius`. If something
+   slips through to default 0.5rem, this guard re-routes.
+   ========================================= */
+[data-slot="popover"],
+[data-slot="dialog"],
+[data-slot="dropdown-menu"],
+[data-slot="select"] {
+	border-radius: var(--radius-leaf);
+}
+
+[data-slot="card"] {
+	border-radius: var(--radius-plate);
+}
+
+/* === SHADCN POPOVER / DROPDOWN / DIALOG SURFACES ============================
+   Apply quire-lg directly via attribute selector so consumers don't have to.
+   ========================================= */
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dialog-content"],
+[data-slot="hover-card-content"],
+[role="tooltip"] {
+	background: var(--surface-overlay);
+	border: 1px solid var(--border-edge);
+	backdrop-filter: blur(14px) saturate(1.4) brightness(1.04);
+	-webkit-backdrop-filter: blur(14px) saturate(1.4) brightness(1.04);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.07),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+		var(--shadow-lg);
+}
+
+[data-theme="light"] [data-slot="popover-content"],
+[data-theme="light"] [data-slot="dropdown-menu-content"],
+[data-theme="light"] [data-slot="dialog-content"],
+[data-theme="light"] [data-slot="hover-card-content"],
+[data-theme="light"] [role="tooltip"] {
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.7),
+		inset 0 -1px 0 rgba(64, 73, 225, 0.08),
+		0 12px 28px rgba(64, 73, 225, 0.10);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+	[data-slot="popover-content"],
+	[data-slot="dropdown-menu-content"],
+	[data-slot="dialog-content"],
+	[data-slot="hover-card-content"],
+	[role="tooltip"] {
+		background: var(--surface-plate);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
+}
+
+/* === ICON STROKE HARMONISATION ============================
+   Hugeicons (and stray Lucide) — keep stroke widths consistent.
+   ========================================= */
+svg[data-icon],
+[data-icon] svg {
+	stroke-width: 1.5;
 }
