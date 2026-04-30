@@ -294,14 +294,19 @@ export function createMcpRoutes<TApp extends Elysia>(app: TApp, mcpManager: MCPM
     }
 
     if (source === 'anthropic') {
-      let entries = await fetchAnthropicRegistry();
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        entries = entries.filter(
-          (e) => e.name.toLowerCase().includes(q) || e.description.toLowerCase().includes(q),
-        );
+      try {
+        let entries = await fetchAnthropicRegistry();
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          entries = entries.filter(
+            (e) => e.name.toLowerCase().includes(q) || e.description.toLowerCase().includes(q),
+          );
+        }
+        return { ok: true, data: { entries, hasMore: false } };
+      } catch (err) {
+        console.warn('[elefant] Anthropic registry fetch failed:', err);
+        return { ok: true, data: { entries: [], hasMore: false, error: 'Registry unavailable' } };
       }
-      return { ok: true, data: { entries, hasMore: false } };
     }
 
     if (source === 'smithery') {

@@ -24,6 +24,7 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
 	return fetch(`${baseUrl()}${path}`, {
 		...init,
 		headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+		signal: init?.signal ?? AbortSignal.timeout(30_000),
 	});
 }
 
