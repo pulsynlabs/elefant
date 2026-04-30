@@ -105,17 +105,23 @@
 	function validate(): boolean {
 		const newErrors: Record<string, string> = {};
 		if (!name.trim()) newErrors.name = 'Name is required';
-		if (!baseURL.trim()) {
-			newErrors.baseURL = 'Base URL is required';
-		} else {
-			try {
-				new URL(baseURL);
-			} catch {
-				newErrors.baseURL = 'Must be a valid URL';
+		// Only validate base URL in manual mode — in quick-add it's pre-filled and hidden
+		if (mode !== 'quick-add') {
+			if (!baseURL.trim()) {
+				newErrors.baseURL = 'Base URL is required';
+			} else {
+				try {
+					new URL(baseURL);
+				} catch {
+					newErrors.baseURL = 'Must be a valid URL';
+				}
 			}
 		}
 		if (!apiKey.trim()) newErrors.apiKey = 'API key is required';
-		if (!model.trim()) newErrors.model = 'Model is required';
+		// Only require a manually-typed model if there's no select to pick from
+		if (!model.trim() && fetchedModels.length === 0 && (template?.models.length ?? 0) === 0) {
+			newErrors.model = 'Model is required';
+		}
 		errors = newErrors;
 		return Object.keys(newErrors).length === 0;
 	}
@@ -168,37 +174,43 @@
 			</div>
 		{/if}
 
-		<div class="form-group">
-			<label class="field-label" for="prov-baseurl">Base URL</label>
-			<input
-				id="prov-baseurl"
-				type="url"
-				class="field-input"
-				class:field-error={!!errors.baseURL}
-				bind:value={baseURL}
-				placeholder="https://api.openai.com"
-				aria-invalid={!!errors.baseURL}
-			/>
-			{#if errors.baseURL}<span class="error-text">{errors.baseURL}</span>{/if}
-		</div>
+		{#if mode !== 'quick-add'}
+			<div class="form-group">
+				<label class="field-label" for="prov-baseurl">Base URL</label>
+				<input
+					id="prov-baseurl"
+					type="url"
+					class="field-input"
+					class:field-error={!!errors.baseURL}
+					bind:value={baseURL}
+					placeholder="https://api.openai.com"
+					aria-invalid={!!errors.baseURL}
+				/>
+				{#if errors.baseURL}<span class="error-text">{errors.baseURL}</span>{/if}
+			</div>
+		{/if}
 
 		<div class="form-group">
-			<label class="field-label" for="prov-model">Model</label>
-			{#if fetchingModels}
-				<div class="model-loading" role="status" aria-live="polite">
-					<div class="spinner-small" aria-hidden="true"></div>
-					<span class="model-loading-text">Fetching models…</span>
-				</div>
-			{:else if fetchedModels.length > 0}
+			<label class="field-label" for="prov-model">
+				Model
+				{#if fetchingModels}
+					<span class="model-fetching-badge">
+						<span class="spinner-small" aria-hidden="true"></span>
+						fetching…
+					</span>
+				{/if}
+			</label>
+			{#if fetchedModels.length > 0 || (mode === 'quick-add' && template && template.models.length > 0)}
 				<select
 					id="prov-model"
 					class="field-select"
 					class:field-error={!!errors.model}
 					bind:value={model}
 					aria-invalid={!!errors.model}
+					disabled={fetchingModels}
 				>
-					{#each fetchedModels as m (m.id)}
-						<option value={m.id}>{m.name}</option>
+					{#each fetchedModels.length > 0 ? fetchedModels : template?.models ?? [] as m (m.id)}
+						<option value={m.id}>{m.name ?? m.id}</option>
 					{/each}
 				</select>
 			{:else}
@@ -213,10 +225,8 @@
 				/>
 			{/if}
 			{#if errors.model}<span class="error-text">{errors.model}</span>{/if}
-			{#if modelFetchError}
-				<span class="model-fetch-hint">
-					{modelFetchError} — enter model ID manually.
-				</span>
+			{#if modelFetchError && mode !== 'quick-add'}
+				<span class="model-fetch-hint">{modelFetchError} — enter model ID manually.</span>
 			{/if}
 		</div>
 
@@ -330,6 +340,17 @@
 	.error-text {
 		font-size: var(--font-size-xs);
 		color: var(--color-error);
+	}
+
+	.model-fetching-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		font-size: var(--font-size-xs);
+		color: var(--color-text-muted);
+		font-weight: var(--font-weight-normal);
+		margin-left: var(--space-2);
+		vertical-align: middle;
 	}
 
 	.model-loading {
