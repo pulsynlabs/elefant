@@ -1,25 +1,23 @@
 @import "tailwindcss";
 
-/* Fonts */
-/* DM Sans — UI body font */
-@import "@fontsource/dm-sans/300.css";
-@import "@fontsource/dm-sans/400.css";
-@import "@fontsource/dm-sans/500.css";
-@import "@fontsource/dm-sans/600.css";
-@import "@fontsource/dm-sans/700.css";
-/* Fraunces Variable — display/heading font */
-/* Variable font: supports opsz (optical size), wght, and italic axes */
+/* ===== FONTS — Variable axes only ===== */
+
+/* Fraunces Variable — display serif (opsz, wght, italic axes) */
 @import "@fontsource-variable/fraunces/index.css";
 @import "@fontsource-variable/fraunces/wght-italic.css";
-@import "@fontsource/geist-mono/400.css";
-@import "@fontsource/geist-mono/500.css";
-@import "@fontsource/geist-mono/600.css";
-@import "@fontsource/geist-mono/700.css";
 
-/* Design system */
+/* Newsreader Variable — body serif (opsz, wght, italic axes) */
+@import "@fontsource-variable/newsreader/index.css";
+@import "@fontsource-variable/newsreader/wght-italic.css";
+
+/* Geist Mono Variable — telemetry (wght axis) */
+@import "@fontsource-variable/geist-mono/index.css";
+
+/* ===== QUIRE DESIGN SYSTEM ===== */
 @import "./lib/styles/tokens.css";
 @import "./lib/styles/typography.css";
-@import "./lib/styles/glass.css";
+/* Quire surface primitives — created in Wave 3 */
+/* @import "./lib/styles/quire.css"; */
 @import "./lib/styles/texture.css";
 @import "./lib/styles/forms.css";
 @import "./lib/styles/shadcn-overrides.css";

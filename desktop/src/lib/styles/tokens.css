@@ -1,74 +1,82 @@
 /* =========================================
-   ELEFANT DESIGN TOKENS
-   Single source of truth for all visual properties.
-   Dark mode default, light mode via [data-theme="light"]
-   Primary: #4049e1 Electric Indigo
+   ELEFANT — QUIRE TOKENS
+   The Quire material: editorial sheets bound by hairline edges.
+   Light + dark themes designed in parallel.
+   Primary: #4049e1 Electric Indigo (preserved literally per MH3).
+
+   Architecture:
+     • Single source of truth for color, surface, border, text, motion, radius, spacing.
+     • Each shadcn-svelte CSS variable is routed through a Quire token —
+       no defaults leak through.
+     • backdrop-filter is NOT defined here; it is reserved for the
+       quire-lg surface tier in quire.css.
    ========================================= */
 
-/* --- DARK THEME (default) --- */
+/* === DARK THEME (default) === */
 :root,
 [data-theme="dark"] {
-	/* Primary — Electric Indigo */
+	/* === COLOR — Electric Indigo accent === */
 	--color-primary: #4049e1;
-	--color-primary-hover: #3540d4;
+	--color-primary-hover: #5660ed;
+	--color-primary-pressed: #3540d4;
 	--color-primary-muted: #2d38c0;
-	--color-primary-subtle: #1a1c3a;
+	--color-primary-subtle: rgba(64, 73, 225, 0.14);
 	--color-primary-foreground: #ffffff;
 
-	/* Backgrounds — OLED deep with indigo tint */
-	--color-bg: #09090e;
-	--color-surface: #0f0f14;
-	--color-surface-elevated: #161620;
-	--color-surface-hover: #1e1e2a;
+	/* === SURFACE TIERS — Quire substrate stack === */
+	/* substrate: the page itself (never pure black) */
+	--surface-substrate: #0a0a0e;
+	/* plate: outer bezel of nested cards, sidebar */
+	--surface-plate: #11111a;
+	/* leaf: inner page of nested cards, content well */
+	--surface-leaf: #16162a;
+	/* overlay: modals, popovers, command palette (composed with backdrop-filter in quire-lg) */
+	--surface-overlay: rgba(20, 20, 32, 0.86);
+	/* hover: subtle hover state on any surface */
+	--surface-hover: #1c1c2e;
 
-	/* Borders */
-	--color-border: #1e1e2a;
-	--color-border-strong: #2d2d3e;
-	--color-border-focus: #4049e1;
+	/* === BORDER TONES — hairlines tinted with primary === */
+	--border-hairline: rgba(255, 255, 255, 0.06);
+	--border-edge: rgba(255, 255, 255, 0.10);
+	--border-emphasis: rgba(64, 73, 225, 0.40);
+	--border-focus: #4049e1;
 
-	/* Text */
-	--color-text-primary: #f0f0ff;
-	--color-text-secondary: #9898b8;
-	--color-text-muted: #6868a0;
-	--color-text-disabled: #3d3d60;
-	--color-text-inverse: #09090e;
+	/* === TEXT LEVELS === */
+	--text-prose: #ededf3;
+	--text-meta: #a8a8c2;
+	--text-muted: #6f6f8e;
+	--text-disabled: #3d3d60;
+	--text-inverse: #0a0a0e;
 
-	/* Semantic */
+	/* === SEMANTIC === */
 	--color-success: #22c55e;
 	--color-warning: #f59e0b;
 	--color-error: #ef4444;
 	--color-info: #3b82f6;
 
-	/* Shadows — indigo-tinted */
-	--shadow-xs: 0 1px 1px rgba(0, 0, 10, 0.5);
-	--shadow-sm: 0 1px 3px rgba(0, 0, 10, 0.6), 0 0 1px rgba(64, 73, 225, 0.05);
-	--shadow-md: 0 4px 8px -1px rgba(0, 0, 10, 0.7), 0 0 2px rgba(64, 73, 225, 0.08);
-	--shadow-lg: 0 10px 20px -3px rgba(0, 0, 10, 0.75), 0 0 4px rgba(64, 73, 225, 0.1);
-	--shadow-xl: 0 20px 30px -5px rgba(0, 0, 10, 0.8), 0 0 8px rgba(64, 73, 225, 0.12);
-	--shadow-glow: 0 0 20px rgba(64, 73, 225, 0.25);
+	/* === SHADOWS — indigo-graded for the dark substrate === */
+	--shadow-xs: 0 1px 1px rgba(0, 0, 8, 0.6);
+	--shadow-sm: 0 1px 3px rgba(0, 0, 8, 0.7), 0 0 1px rgba(64, 73, 225, 0.06);
+	--shadow-md: 0 4px 10px -2px rgba(0, 0, 8, 0.75), 0 0 2px rgba(64, 73, 225, 0.10);
+	--shadow-lg: 0 12px 24px -4px rgba(0, 0, 8, 0.80), 0 0 4px rgba(64, 73, 225, 0.12);
+	--shadow-xl: 0 24px 36px -6px rgba(0, 0, 8, 0.85), 0 0 8px rgba(64, 73, 225, 0.14);
 
-	/* Glass */
-	--blur-sm: 6px;
-	--blur-md: 14px;
-	--blur-lg: 28px;
-	--glass-bg: rgba(15, 15, 20, 0.65);
-	--glass-bg-strong: rgba(15, 15, 20, 0.88);
-	--glass-border: rgba(255, 255, 255, 0.07);
-	--glass-border-strong: rgba(255, 255, 255, 0.13);
-	--glass-inner-glow: rgba(255, 255, 255, 0.04);
-
-	/* Glow — indigo */
-	--glow-primary: 0 0 20px rgba(64, 73, 225, 0.3);
-	--glow-primary-strong: 0 0 36px rgba(64, 73, 225, 0.5);
+	/* === GLOWS (sparingly) === */
+	--glow-primary: 0 0 20px rgba(64, 73, 225, 0.28);
+	--glow-primary-strong: 0 0 36px rgba(64, 73, 225, 0.45);
 	--glow-ambient: 0 0 90px rgba(64, 73, 225, 0.07);
-	--glow-focus: 0 0 0 2px rgba(64, 73, 225, 0.45);
+	--glow-focus: 0 0 0 4px rgba(64, 73, 225, 0.16);
 
-	/* Texture */
+	/* === INSET HIGHLIGHTS — for nested bezel composition === */
+	--highlight-edge-top: rgba(255, 255, 255, 0.05);
+	--highlight-edge-bottom: rgba(0, 0, 0, 0.40);
+
+	/* === TEXTURE === */
 	--texture-noise-opacity: 0.025;
 	--texture-grid-color: rgba(255, 255, 255, 0.025);
 	--texture-grid-size: 20px;
 
-	/* Elevation / Z-index */
+	/* === Z-INDEX === */
 	--z-base: 0;
 	--z-dropdown: 10;
 	--z-sticky: 20;
@@ -76,91 +84,115 @@
 	--z-toast: 40;
 	--z-tooltip: 50;
 
-	/* shadcn-svelte CSS variable mapping */
-	--background: var(--color-bg);
-	--foreground: var(--color-text-primary);
-	--card: var(--color-surface);
-	--card-foreground: var(--color-text-primary);
-	--popover: var(--color-surface-elevated);
-	--popover-foreground: var(--color-text-primary);
+	/* === shadcn-svelte mapping — every variable routes through Quire === */
+	--background: var(--surface-substrate);
+	--foreground: var(--text-prose);
+	--card: var(--surface-plate);
+	--card-foreground: var(--text-prose);
+	--popover: var(--surface-overlay);
+	--popover-foreground: var(--text-prose);
 	--primary: var(--color-primary);
 	--primary-foreground: var(--color-primary-foreground);
-	--secondary: var(--color-surface-elevated);
-	--secondary-foreground: var(--color-text-primary);
-	--muted: var(--color-surface-hover);
-	--muted-foreground: var(--color-text-muted);
-	--accent: var(--color-surface-hover);
-	--accent-foreground: var(--color-text-primary);
+	--secondary: var(--surface-leaf);
+	--secondary-foreground: var(--text-prose);
+	--muted: var(--surface-hover);
+	--muted-foreground: var(--text-muted);
+	--accent: var(--surface-hover);
+	--accent-foreground: var(--text-prose);
 	--destructive: var(--color-error);
-	--destructive-foreground: #fafafa;
-	--border: var(--color-border);
-	--input: var(--color-border-strong);
+	--destructive-foreground: #ffffff;
+	--border: var(--border-edge);
+	--input: var(--border-edge);
 	--ring: var(--color-primary);
+
+	/* === LEGACY ALIASES — keep existing components rendering through W3-W4
+	   Waves 5-6 will rebuild components against the new names; this alias
+	   block is removed in Wave 8 once the codemod sweep confirms all
+	   call-sites migrated. === */
+	--color-bg: var(--surface-substrate);
+	--color-surface: var(--surface-plate);
+	--color-surface-elevated: var(--surface-leaf);
+	--color-surface-hover: var(--surface-hover);
+	--color-border: var(--border-edge);
+	--color-border-strong: var(--border-emphasis);
+	--color-border-focus: var(--border-focus);
+	--color-text-primary: var(--text-prose);
+	--color-text-secondary: var(--text-meta);
+	--color-text-muted: var(--text-muted);
+	--color-text-disabled: var(--text-disabled);
+	--color-text-inverse: var(--text-inverse);
+	/* Glass aliases — preserved until Wave 3 introduces quire-* surfaces */
+	--glass-bg: var(--surface-plate);
+	--glass-bg-strong: var(--surface-leaf);
+	--glass-border: var(--border-hairline);
+	--glass-border-strong: var(--border-edge);
+	--glass-inner-glow: var(--highlight-edge-top);
+	--blur-sm: 6px;
+	--blur-md: 14px;
+	--blur-lg: 28px;
+	/* Glow aliases */
+	--shadow-glow: var(--glow-primary);
 }
 
-/* --- LIGHT THEME --- */
+/* === LIGHT THEME — equal craft, not an afterthought === */
 [data-theme="light"] {
-	/* Primary — Electric Indigo */
+	/* === COLOR — Electric Indigo accent === */
 	--color-primary: #4049e1;
 	--color-primary-hover: #3540d4;
-	--color-primary-muted: #2d38c0;
-	--color-primary-subtle: #eef0ff;
+	--color-primary-pressed: #2d38c0;
+	--color-primary-muted: #5660ed;
+	--color-primary-subtle: rgba(64, 73, 225, 0.10);
 	--color-primary-foreground: #ffffff;
 
-	/* Backgrounds — clean white with indigo-tinted elevated surfaces */
-	--color-bg: #ffffff;
-	--color-surface: #f9fafb;
-	--color-surface-elevated: #f2f4ff;
-	--color-surface-hover: #eef0ff;
+	/* === SURFACE TIERS — warm paper, never pure white === */
+	--surface-substrate: #fbfbfd;
+	--surface-plate: #f4f4f8;
+	--surface-leaf: #ffffff;
+	--surface-overlay: rgba(255, 255, 255, 0.92);
+	--surface-hover: #efeff5;
 
-	/* Borders — indigo-tinted for light mode */
-	--color-border: #e8eaf8;
-	--color-border-strong: #d0d4f0;
-	--color-border-focus: #4049e1;
+	/* === BORDER TONES — indigo-tinted hairlines === */
+	--border-hairline: rgba(64, 73, 225, 0.08);
+	--border-edge: rgba(64, 73, 225, 0.16);
+	--border-emphasis: rgba(64, 73, 225, 0.45);
+	--border-focus: #4049e1;
 
-	/* Text */
-	--color-text-primary: #09090e;
-	--color-text-secondary: #3d3d60;
-	--color-text-muted: #6868a0;
-	--color-text-disabled: #adadce;
-	--color-text-inverse: #f0f0ff;
+	/* === TEXT LEVELS === */
+	--text-prose: #16162a;
+	--text-meta: #4a4a6a;
+	--text-muted: #6f6f8e;
+	--text-disabled: #b4b4c8;
+	--text-inverse: #fbfbfd;
 
-	/* Semantic */
+	/* === SEMANTIC === */
 	--color-success: #16a34a;
 	--color-warning: #d97706;
 	--color-error: #dc2626;
 	--color-info: #2563eb;
 
-	/* Shadows — indigo-tinted, light */
+	/* === SHADOWS — indigo-graded for the light substrate === */
 	--shadow-xs: 0 1px 2px rgba(64, 73, 225, 0.05);
 	--shadow-sm: 0 1px 3px rgba(64, 73, 225, 0.08), 0 1px 2px rgba(64, 73, 225, 0.04);
-	--shadow-md: 0 4px 8px -1px rgba(64, 73, 225, 0.1), 0 2px 4px rgba(64, 73, 225, 0.05);
-	--shadow-lg: 0 10px 20px -3px rgba(64, 73, 225, 0.12), 0 4px 6px rgba(64, 73, 225, 0.06);
-	--shadow-xl: 0 20px 30px -5px rgba(64, 73, 225, 0.14), 0 8px 10px rgba(64, 73, 225, 0.06);
-	--shadow-glow: 0 0 20px rgba(64, 73, 225, 0.15);
+	--shadow-md: 0 4px 10px -2px rgba(64, 73, 225, 0.10), 0 2px 4px rgba(64, 73, 225, 0.05);
+	--shadow-lg: 0 12px 24px -4px rgba(64, 73, 225, 0.12), 0 4px 6px rgba(64, 73, 225, 0.06);
+	--shadow-xl: 0 24px 36px -6px rgba(64, 73, 225, 0.14), 0 8px 10px rgba(64, 73, 225, 0.06);
 
-	/* Glass */
-	--blur-sm: 6px;
-	--blur-md: 14px;
-	--blur-lg: 28px;
-	--glass-bg: rgba(255, 255, 255, 0.72);
-	--glass-bg-strong: rgba(255, 255, 255, 0.92);
-	--glass-border: rgba(64, 73, 225, 0.08);
-	--glass-border-strong: rgba(64, 73, 225, 0.15);
-	--glass-inner-glow: rgba(255, 255, 255, 0.6);
-
-	/* Glow */
+	/* === GLOWS === */
 	--glow-primary: 0 0 20px rgba(64, 73, 225, 0.18);
-	--glow-primary-strong: 0 0 36px rgba(64, 73, 225, 0.3);
+	--glow-primary-strong: 0 0 36px rgba(64, 73, 225, 0.30);
 	--glow-ambient: 0 0 90px rgba(64, 73, 225, 0.05);
-	--glow-focus: 0 0 0 2px rgba(64, 73, 225, 0.35);
+	--glow-focus: 0 0 0 4px rgba(64, 73, 225, 0.12);
 
-	/* Texture */
+	/* === INSET HIGHLIGHTS — paper-tinted === */
+	--highlight-edge-top: rgba(255, 255, 255, 0.85);
+	--highlight-edge-bottom: rgba(64, 73, 225, 0.06);
+
+	/* === TEXTURE === */
 	--texture-noise-opacity: 0.018;
-	--texture-grid-color: rgba(0, 0, 0, 0.025);
+	--texture-grid-color: rgba(64, 73, 225, 0.04);
 	--texture-grid-size: 20px;
 
-	/* Elevation / Z-index */
+	/* === Z-INDEX === */
 	--z-base: 0;
 	--z-dropdown: 10;
 	--z-sticky: 20;
@@ -168,30 +200,53 @@
 	--z-toast: 40;
 	--z-tooltip: 50;
 
-	/* shadcn-svelte CSS variable mapping */
-	--background: var(--color-bg);
-	--foreground: var(--color-text-primary);
-	--card: var(--color-surface);
-	--card-foreground: var(--color-text-primary);
-	--popover: var(--color-surface-elevated);
-	--popover-foreground: var(--color-text-primary);
+	/* === shadcn-svelte mapping === */
+	--background: var(--surface-substrate);
+	--foreground: var(--text-prose);
+	--card: var(--surface-plate);
+	--card-foreground: var(--text-prose);
+	--popover: var(--surface-overlay);
+	--popover-foreground: var(--text-prose);
 	--primary: var(--color-primary);
 	--primary-foreground: var(--color-primary-foreground);
-	--secondary: var(--color-surface-elevated);
-	--secondary-foreground: var(--color-text-primary);
-	--muted: var(--color-surface-hover);
-	--muted-foreground: var(--color-text-muted);
-	--accent: var(--color-surface-hover);
-	--accent-foreground: var(--color-text-primary);
+	--secondary: var(--surface-leaf);
+	--secondary-foreground: var(--text-prose);
+	--muted: var(--surface-hover);
+	--muted-foreground: var(--text-muted);
+	--accent: var(--surface-hover);
+	--accent-foreground: var(--text-prose);
 	--destructive: var(--color-error);
 	--destructive-foreground: #ffffff;
-	--border: var(--color-border);
-	--input: var(--color-border-strong);
+	--border: var(--border-edge);
+	--input: var(--border-edge);
 	--ring: var(--color-primary);
+
+	/* === LEGACY ALIASES (light) — see dark block for rationale === */
+	--color-bg: var(--surface-substrate);
+	--color-surface: var(--surface-plate);
+	--color-surface-elevated: var(--surface-leaf);
+	--color-surface-hover: var(--surface-hover);
+	--color-border: var(--border-edge);
+	--color-border-strong: var(--border-emphasis);
+	--color-border-focus: var(--border-focus);
+	--color-text-primary: var(--text-prose);
+	--color-text-secondary: var(--text-meta);
+	--color-text-muted: var(--text-muted);
+	--color-text-disabled: var(--text-disabled);
+	--color-text-inverse: var(--text-inverse);
+	--glass-bg: rgba(255, 255, 255, 0.72);
+	--glass-bg-strong: rgba(255, 255, 255, 0.92);
+	--glass-border: var(--border-hairline);
+	--glass-border-strong: var(--border-edge);
+	--glass-inner-glow: var(--highlight-edge-top);
+	--blur-sm: 6px;
+	--blur-md: 14px;
+	--blur-lg: 28px;
+	--shadow-glow: var(--glow-primary);
 }
 
 /* =========================================
-   SPACING SCALE (4px base unit)
+   SPACING SCALE (4px base unit) — preserved
    ========================================= */
 :root {
 	--space-1: 4px;
@@ -209,7 +264,10 @@
 }
 
 /* =========================================
-   BORDER RADIUS
+   BORDER RADIUS — Quire-tiered for nested bezels
+   --radius-leaf  → inner content (the page)
+   --radius-plate → outer bezel    (the binding)
+   --radius-fold  → large folded surfaces (overlays)
    ========================================= */
 :root {
 	--radius-none: 0px;
@@ -222,28 +280,34 @@
 	--radius-2xl: 16px;
 	--radius-full: 9999px;
 
+	/* Quire nested-bezel scale */
+	--radius-leaf: 6px;
+	--radius-plate: 10px;
+	--radius-fold: 14px;
+
 	/* shadcn-svelte radius variable */
 	--radius: 0.5rem;
 }
 
 /* =========================================
-   MOTION SYSTEM
+   MOTION SYSTEM — mechanical, not decorative
    ========================================= */
 :root {
-	/* Duration Scale */
+	/* Duration scale */
 	--duration-micro: 80ms;
 	--duration-instant: 50ms;
 	--duration-fast: 150ms;
 	--duration-base: 250ms;
 	--duration-slow: 400ms;
 
-	/* Easing Curves — premium cubic-beziers, no linear/ease-in-out */
+	/* Easing curves — premium cubic-beziers, no linear/ease-in-out */
 	--ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
 	--ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 	--ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+	--ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
 	--ease-linear-soft: cubic-bezier(0.4, 0, 0.2, 1);
 
-	/* Composed Transition Shorthands */
+	/* Composed transition shorthands */
 	--transition-micro: var(--duration-micro) var(--ease-out-expo);
 	--transition-instant: var(--duration-instant) var(--ease-linear-soft);
 	--transition-fast: var(--duration-fast) var(--ease-out-expo);
@@ -253,7 +317,7 @@
 }
 
 /* =========================================
-   LAYOUT DIMENSIONS
+   LAYOUT DIMENSIONS — preserved
    ========================================= */
 :root {
 	--sidebar-width: 240px;
@@ -263,7 +327,7 @@
 }
 
 /* =========================================
-   REDUCED MOTION
+   REDUCED MOTION — global guard
    ========================================= */
 @media (prefers-reduced-motion: reduce) {
 	*,
