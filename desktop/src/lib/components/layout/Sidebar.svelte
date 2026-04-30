@@ -236,12 +236,18 @@
 
 <nav class="sidebar-nav" class:collapsed aria-label="Main navigation">
 	<!-- Logo/Brand -->
-	<div class="sidebar-brand">
+	<button
+		type="button"
+		class="sidebar-brand"
+		onclick={() => navigationStore.goToProjectPicker()}
+		aria-label="Go to home"
+		title="Go to home"
+	>
 		<div class="brand-mark">E</div>
 		{#if !collapsed}
 			<span class="brand-name">Elefant</span>
 		{/if}
-	</div>
+	</button>
 
 	<!-- Top section: projects -->
 	<div class="sidebar-top">
@@ -372,6 +378,24 @@
 		gap: var(--space-3);
 		padding: var(--space-5) var(--space-4) var(--space-4);
 		flex-shrink: 0;
+		/* Button reset */
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		width: 100%;
+		text-align: left;
+		border-radius: var(--radius-md);
+		/* Smooth hover */
+		transition: background-color var(--duration-fast) var(--ease-out-expo);
+	}
+
+	.sidebar-brand:hover {
+		background-color: var(--color-primary-subtle);
+	}
+
+	.sidebar-brand:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-focus);
 	}
 
 	.brand-mark {
