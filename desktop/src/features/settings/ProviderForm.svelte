@@ -296,8 +296,7 @@
 		color: var(--color-text-secondary);
 	}
 
-	.field-input,
-	.field-select {
+	.field-input {
 		background-color: var(--color-surface);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
@@ -310,9 +309,17 @@
 		transition: border-color var(--transition-fast);
 	}
 
-	.field-input:focus,
-	.field-select:focus {
+	.field-input:focus {
 		border-color: var(--color-primary);
+	}
+
+	/*
+	 * .field-select inherits its visuals (background, border, padding, chevron,
+	 * etc.) from the global `select` rule in lib/styles/forms.css. Only the
+	 * form-level layout (full-width) is set here.
+	 */
+	.field-select {
+		width: 100%;
 	}
 
 	.field-input.field-error,
