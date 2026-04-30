@@ -36,6 +36,19 @@ describe("providerSchema", () => {
 		expect(result.success).toBe(true);
 	});
 
+	it("accepts anthropic-compatible format", () => {
+		const validProvider = {
+			name: "test-anthropic-compatible",
+			baseURL: "https://api.example.com",
+			apiKey: "test-key",
+			model: "test-model",
+			format: "anthropic-compatible" as const,
+		};
+
+		const result = providerSchema.safeParse(validProvider);
+		expect(result.success).toBe(true);
+	});
+
 	it("fails when apiKey is empty string", () => {
 		const invalidProvider = {
 			name: "openai",
@@ -68,13 +81,13 @@ describe("providerSchema", () => {
 		}
 	});
 
-	it("fails when format is not openai or anthropic", () => {
+	it("fails when format is invalid", () => {
 		const invalidProvider = {
-			name: "gemini",
-			baseURL: "https://api.gemini.com",
-			apiKey: "test123",
-			model: "gemini-pro",
-			format: "gemini" as const,
+			name: "test",
+			baseURL: "https://api.example.com",
+			apiKey: "test-key",
+			model: "test-model",
+			format: "invalid-format" as const,
 		};
 
 		const result = providerSchema.safeParse(invalidProvider);
