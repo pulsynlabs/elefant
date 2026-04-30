@@ -3,7 +3,7 @@
  * The desktop never touches the filesystem directly.
  */
 
-import type { ElefantConfig, ProviderEntry } from '$lib/daemon/types.js';
+import type { ElefantConfig, ProviderEntry, RegistryProvider } from '$lib/daemon/types.js';
 import { getDaemonClient } from '$lib/daemon/client.js';
 
 function baseUrl(): string {
@@ -81,10 +81,20 @@ export async function deleteProvider(name: string): Promise<void> {
 	}
 }
 
+/**
+ * Fetch the bundled provider registry from the daemon.
+ * Thin wrapper over the daemon client so callers can consume registry
+ * data through the same `configService` they already use for provider CRUD.
+ */
+export async function fetchProviderRegistry(): Promise<RegistryProvider[]> {
+	return getDaemonClient().fetchProviderRegistry();
+}
+
 export const configService = {
 	readConfig,
 	updateConfig,
 	addProvider,
 	updateProvider,
 	deleteProvider,
+	fetchProviderRegistry,
 };
