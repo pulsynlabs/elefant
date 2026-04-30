@@ -6,6 +6,7 @@
 	import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
 	import ThemeToggle from "$lib/components/ThemeToggle.svelte";
 	import ApprovalPanel from "$lib/components/ApprovalPanel.svelte";
+	import DesignSystemPage from "./routes/design-system/+page.svelte";
 	import { themeStore } from "$lib/stores/theme.svelte.js";
 	import { navigationStore } from "$lib/stores/navigation.svelte.js";
 	import { connectionStore } from "$lib/stores/connection.svelte.js";
@@ -37,6 +38,7 @@
 	const navigationRuntime = navigationStore as NavigationRuntime;
 
 	let sidebarCollapsed = $state(false);
+	let isDesignSystemRoute = $state(false);
 
 	// Whether the user has a real (non-placeholder) provider configured.
 	// null = still waiting for daemon to respond
@@ -81,6 +83,12 @@
 	onMount(() => {
 		// Initialize theme
 		themeStore.init();
+
+		function checkDesignSystemRoute(): void {
+			isDesignSystemRoute = window.location.hash === "#design-system";
+		}
+		checkDesignSystemRoute();
+		window.addEventListener("hashchange", checkDesignSystemRoute);
 
 		// Initialize settings (daemon URL, auto-start preference)
 		settingsStore.init();
@@ -160,80 +168,85 @@
 			connectionStore.stop();
 			window.removeEventListener("keydown", handleKeydown);
 			window.removeEventListener("resize", handleResize);
+			window.removeEventListener("hashchange", checkDesignSystemRoute);
 		};
 	});
 
 	const currentView = $derived(navigationStore.current);
 </script>
 
-<AppShell bind:sidebarCollapsed>
-	{#snippet sidebar()}
-		<Sidebar collapsed={sidebarCollapsed} />
-	{/snippet}
+{#if isDesignSystemRoute}
+	<DesignSystemPage />
+{:else}
+	<AppShell bind:sidebarCollapsed>
+		{#snippet sidebar()}
+			<Sidebar collapsed={sidebarCollapsed} />
+		{/snippet}
 
-	{#snippet topbar()}
-		<TopBar onToggleSidebar={toggleSidebar}>
-			<ConnectionStatus />
-			{#if chatStore.selectedProvider ?? chatStore.defaultProvider}
-				<span class="topbar-provider">
-					{chatStore.selectedProvider ?? chatStore.defaultProvider}
-				</span>
-			{/if}
-			<ThemeToggle />
-		</TopBar>
-	{/snippet}
+		{#snippet topbar()}
+			<TopBar onToggleSidebar={toggleSidebar}>
+				<ConnectionStatus />
+				{#if chatStore.selectedProvider ?? chatStore.defaultProvider}
+					<span class="topbar-provider">
+						{chatStore.selectedProvider ?? chatStore.defaultProvider}
+					</span>
+				{/if}
+				<ThemeToggle />
+			</TopBar>
+		{/snippet}
 
-	<!-- Onboarding gate: show setup flow until a real provider is configured -->
-	{#if hasConfig === null}
-		<!-- Still loading config — blank to avoid flash -->
-	{:else if hasConfig === false}
-		<OnboardingView onComplete={async () => {
-			const config = await configService.readConfig();
-			if (config) {
-				const realProviders = config.providers.filter((p) => p.apiKey !== '');
-				if (realProviders.length > 0) {
-					chatStore.setAvailableProviders(
-						realProviders.map((p) => p.name),
-						config.defaultProvider || realProviders[0].name,
-					);
-					await projectsStore.loadProjects();
-					hasConfig = true;
+		<!-- Onboarding gate: show setup flow until a real provider is configured -->
+		{#if hasConfig === null}
+			<!-- Still loading config — blank to avoid flash -->
+		{:else if hasConfig === false}
+			<OnboardingView onComplete={async () => {
+				const config = await configService.readConfig();
+				if (config) {
+					const realProviders = config.providers.filter((p) => p.apiKey !== '');
+					if (realProviders.length > 0) {
+						chatStore.setAvailableProviders(
+							realProviders.map((p) => p.name),
+							config.defaultProvider || realProviders[0].name,
+						);
+						await projectsStore.loadProjects();
+						hasConfig = true;
+					}
 				}
-			}
-		}} />
-	{:else if projectsStore.activeProjectId === null}
-		<ProjectPickerView onProjectSelected={() => {
-			navigationStore.navigate("chat");
-		}} />
-	{:else if currentView === "projects"}
-		<ProjectPickerView />
-	{:else if currentView === "chat"}
-		<ChatView />
-	{:else if currentView === "settings"}
-		<SettingsView />
-	{:else if currentView === "models"}
-		<ModelsView />
-	{:else if currentView === "about"}
-		<AboutView />
-	{:else if currentView === "agent-config"}
-		<AgentProfilesView />
-	{:else if currentView === "agent-runs"}
-		<AgentRunTabs />
-	{:else if currentView === "worktrees"}
-		<WorktreeListPanel />
-	{:else if currentView === "spec-mode"}
-		<SpecModeView />
-	{:else if currentView === "child-run" && navigationStore.currentChildRunId !== null}
-		<ChildRunView runId={navigationStore.currentChildRunId} />
-	{:else}
-		<div class="unknown-view">
-			Unknown view: {currentView}
-		</div>
-	{/if}
-</AppShell>
+			}} />
+		{:else if projectsStore.activeProjectId === null}
+			<ProjectPickerView onProjectSelected={() => {
+				navigationStore.navigate("chat");
+			}} />
+		{:else if currentView === "projects"}
+			<ProjectPickerView />
+		{:else if currentView === "chat"}
+			<ChatView />
+		{:else if currentView === "settings"}
+			<SettingsView />
+		{:else if currentView === "models"}
+			<ModelsView />
+		{:else if currentView === "about"}
+			<AboutView />
+		{:else if currentView === "agent-config"}
+			<AgentProfilesView />
+		{:else if currentView === "agent-runs"}
+			<AgentRunTabs />
+		{:else if currentView === "worktrees"}
+			<WorktreeListPanel />
+		{:else if currentView === "spec-mode"}
+			<SpecModeView />
+		{:else if currentView === "child-run" && navigationStore.currentChildRunId !== null}
+			<ChildRunView runId={navigationStore.currentChildRunId} />
+		{:else}
+			<div class="unknown-view">
+				Unknown view: {currentView}
+			</div>
+		{/if}
+	</AppShell>
 
-<!-- Floating tool-call approval overlay (shown when daemon requests user decision) -->
-<ApprovalPanel />
+	<!-- Floating tool-call approval overlay (shown when daemon requests user decision) -->
+	<ApprovalPanel />
+{/if}
 
 <style>
 	.topbar-provider {
