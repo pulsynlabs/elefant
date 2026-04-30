@@ -446,6 +446,11 @@ export function createConfigRoutes<TApp extends Elysia>(
 			...baseProfile,
 			...patchParse.data,
 			id: params.agentId,
+			permissions: {
+				read: patchParse.data.permissions?.read ?? baseProfile.permissions.read,
+				write: patchParse.data.permissions?.write ?? baseProfile.permissions.write,
+				execute: patchParse.data.permissions?.execute ?? baseProfile.permissions.execute,
+			},
 			behavior: {
 				...baseProfile.behavior,
 				...(patchParse.data.behavior ?? {}),

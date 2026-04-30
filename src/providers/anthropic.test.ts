@@ -299,12 +299,12 @@ describe('AnthropicAdapter', () => {
 	})
 
 	it('sends x-api-key for both anthropic and anthropic-compatible formats', async () => {
-		const headersForFormat: { format: ProviderConfig['format']; apiKey: string }[] = []
+		const headersForFormat: { apiKey: string }[] = []
 
 		globalThis.fetch = withMockPreconnect(
 			async (_url, init) => {
 				const h = (init?.headers as Record<string, string>) ?? {}
-				headersForFormat.push({ format: 'captured', apiKey: h['x-api-key'] ?? '' })
+				headersForFormat.push({ apiKey: h['x-api-key'] ?? '' })
 				return createSseResponse(['event: message_stop\ndata: {}\n\n'])
 			},
 			originalFetch,
