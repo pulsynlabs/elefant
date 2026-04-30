@@ -16,6 +16,8 @@ import { RunRegistry } from '../runs/registry.ts'
 import { mountAgentRunRoutes } from '../runs/routes.ts'
 import { mountWorktreeRoutes } from '../worktree/routes.ts'
 import { createConfigRoutes } from './config-routes.ts'
+import { createMcpRoutes } from './mcp-routes.ts'
+import type { MCPManager } from '../mcp/manager.ts'
 import { gracefulShutdown } from '../daemon/shutdown.ts'
 import type { StateManager } from '../state/manager.ts'
 import { mountSpecRoutes } from './routes-spec.ts'
@@ -28,6 +30,7 @@ export function createApp(
 	ws?: ElefantWsServer,
 	sse?: SseManager,
 	stateManager?: StateManager,
+	mcpManager?: MCPManager,
 ) {
 	const CORS_HEADERS = {
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -147,6 +150,14 @@ export function createApp(
 
 	if (stateManager) {
 		mountSpecRoutes(baseApp, { db, stateManager, hookRegistry })
+	}
+
+	// MCP routes — requires a fully initialised MCPManager (created during daemon startup).
+	// SSE wiring for status/tool-change events is a T7.8 TODO: when sse is available,
+	// pass an onStatusChange callback to MCPManager that calls sse.publish() for
+	// each active project's SSE channel, or introduce a global broadcast mechanism.
+	if (mcpManager) {
+		createMcpRoutes(baseApp, mcpManager)
 	}
 
 	return baseApp
