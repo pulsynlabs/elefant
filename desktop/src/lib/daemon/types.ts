@@ -152,6 +152,17 @@ export interface RegistryModel {
 }
 
 /**
+ * A model returned by the daemon's runtime model-list endpoint
+ * (`POST /api/providers/models`). The daemon resolves the call against
+ * the live provider, so the shape is identical to `RegistryModel` but
+ * comes from the provider rather than the bundled registry.
+ */
+export interface FetchedModel {
+	id: string;
+	name: string;
+}
+
+/**
  * A provider entry from the bundled provider registry.
  * Mirrors the daemon's `RegistryProvider` type.
  */
