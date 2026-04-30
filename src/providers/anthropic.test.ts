@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
-import { AnthropicAdapter } from './anthropic.ts'
+import { AnthropicCompatibleAdapter } from './anthropic.ts'
 import type { ProviderConfig } from '../types/providers.ts'
 import type { ToolDefinition } from '../types/tools.ts'
 import type { StreamEvent } from './types.ts'
@@ -53,7 +53,7 @@ function createSseResponse(chunks: string[], status = 200): Response {
 	})
 }
 
-async function collectEvents(adapter: AnthropicAdapter): Promise<StreamEvent[]> {
+async function collectEvents(adapter: AnthropicCompatibleAdapter): Promise<StreamEvent[]> {
 	const events: StreamEvent[] = []
 	for await (const event of adapter.sendMessage([{ role: 'user', content: 'hello' }], TEST_TOOLS)) {
 		events.push(event)
@@ -88,7 +88,7 @@ describe('AnthropicAdapter', () => {
 			originalFetch,
 		)
 
-		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const adapter = new AnthropicCompatibleAdapter(ANTHROPIC_CONFIG)
 		const events = await collectEvents(adapter)
 
 		expect(events).toEqual([
@@ -110,7 +110,7 @@ describe('AnthropicAdapter', () => {
 			originalFetch,
 		)
 
-		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const adapter = new AnthropicCompatibleAdapter(ANTHROPIC_CONFIG)
 		const events = await collectEvents(adapter)
 
 		expect(events[0]).toEqual({ type: 'tool_call_start', toolCall: { id: 'tool_1', name: 'get_weather' } })
@@ -137,7 +137,7 @@ describe('AnthropicAdapter', () => {
 			originalFetch,
 		)
 
-		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const adapter = new AnthropicCompatibleAdapter(ANTHROPIC_CONFIG)
 		for await (const _event of adapter.sendMessage(
 			[
 				{ role: 'system', content: 'Follow the style guide' },
@@ -173,7 +173,7 @@ describe('AnthropicAdapter', () => {
 			originalFetch,
 		)
 
-		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const adapter = new AnthropicCompatibleAdapter(ANTHROPIC_CONFIG)
 		const events = await collectEvents(adapter)
 
 		expect(events).toHaveLength(1)
@@ -195,7 +195,7 @@ describe('AnthropicAdapter', () => {
 			originalFetch,
 		)
 
-		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const adapter = new AnthropicCompatibleAdapter(ANTHROPIC_CONFIG)
 		const events = await collectEvents(adapter)
 
 		// Find the usage event
@@ -224,7 +224,7 @@ describe('AnthropicAdapter', () => {
 			originalFetch,
 		)
 
-		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const adapter = new AnthropicCompatibleAdapter(ANTHROPIC_CONFIG)
 		const events = await collectEvents(adapter)
 
 		const usageEvent = events.find((e): e is StreamEvent & { type: 'usage' } => e.type === 'usage')
@@ -246,11 +246,119 @@ describe('AnthropicAdapter', () => {
 			originalFetch,
 		)
 
-		const adapter = new AnthropicAdapter(ANTHROPIC_CONFIG)
+		const adapter = new AnthropicCompatibleAdapter(ANTHROPIC_CONFIG)
 		const events = await collectEvents(adapter)
 
 		// Should have error event but no usage event
 		expect(events.some((e) => e.type === 'error')).toBe(true)
 		expect(events.some((e) => e.type === 'usage')).toBe(false)
+	})
+
+	it('sends anthropic-version header for canonical Anthropic format', async () => {
+		let capturedHeaders: Record<string, string> = {}
+
+		globalThis.fetch = withMockPreconnect(
+			async (_url, init) => {
+				capturedHeaders = (init?.headers as Record<string, string>) ?? {}
+				return createSseResponse(['event: message_stop\ndata: {}\n\n'])
+			},
+			originalFetch,
+		)
+
+		const adapter = new AnthropicCompatibleAdapter(ANTHROPIC_CONFIG)
+		await collectEvents(adapter)
+
+		expect(capturedHeaders['anthropic-version']).toBe('2023-06-01')
+		expect(capturedHeaders['x-api-key']).toBe('sk-ant-test')
+	})
+
+	it('does not send anthropic-version for anthropic-compatible format', async () => {
+		let capturedHeaders: Record<string, string> = {}
+
+		globalThis.fetch = withMockPreconnect(
+			async (_url, init) => {
+				capturedHeaders = (init?.headers as Record<string, string>) ?? {}
+				return createSseResponse(['event: message_stop\ndata: {}\n\n'])
+			},
+			originalFetch,
+		)
+
+		const config: ProviderConfig = {
+			name: 'anthropic-compat',
+			baseURL: 'https://api.anthropic.com',
+			apiKey: 'sk-ant-test',
+			model: 'claude-3-7-sonnet-latest',
+			format: 'anthropic-compatible',
+		}
+
+		const adapter = new AnthropicCompatibleAdapter(config)
+		await collectEvents(adapter)
+
+		expect(capturedHeaders['anthropic-version']).toBeUndefined()
+		expect(capturedHeaders['x-api-key']).toBe('sk-ant-test')
+	})
+
+	it('sends x-api-key for both anthropic and anthropic-compatible formats', async () => {
+		const headersForFormat: { format: ProviderConfig['format']; apiKey: string }[] = []
+
+		globalThis.fetch = withMockPreconnect(
+			async (_url, init) => {
+				const h = (init?.headers as Record<string, string>) ?? {}
+				headersForFormat.push({ format: 'captured', apiKey: h['x-api-key'] ?? '' })
+				return createSseResponse(['event: message_stop\ndata: {}\n\n'])
+			},
+			originalFetch,
+		)
+
+		// Test canonical Anthropic
+		const canonicalConfig: ProviderConfig = {
+			name: 'canonical',
+			baseURL: 'https://api.anthropic.com',
+			apiKey: 'sk-canonical',
+			model: 'claude-3-7-sonnet-latest',
+			format: 'anthropic',
+		}
+		const canonicalAdapter = new AnthropicCompatibleAdapter(canonicalConfig)
+		await collectEvents(canonicalAdapter)
+
+		// Test anthropic-compatible
+		const compatConfig: ProviderConfig = {
+			name: 'compat',
+			baseURL: 'https://api.anthropic.com',
+			apiKey: 'sk-compat',
+			model: 'claude-3-7-sonnet-latest',
+			format: 'anthropic-compatible',
+		}
+		const compatAdapter = new AnthropicCompatibleAdapter(compatConfig)
+		await collectEvents(compatAdapter)
+
+		expect(headersForFormat).toHaveLength(2)
+		expect(headersForFormat[0].apiKey).toBe('sk-canonical')
+		expect(headersForFormat[1].apiKey).toBe('sk-compat')
+	})
+
+	it('honours custom baseURL for anthropic-compatible format', async () => {
+		let capturedUrl = ''
+
+		globalThis.fetch = withMockPreconnect(
+			async (url, _init) => {
+				capturedUrl = typeof url === 'string' ? url : url.toString()
+				return createSseResponse(['event: message_stop\ndata: {}\n\n'])
+			},
+			originalFetch,
+		)
+
+		const config: ProviderConfig = {
+			name: 'custom-anthropic',
+			baseURL: 'https://api.example.com/anthropic',
+			apiKey: 'sk-test',
+			model: 'claude-3-5-haiku-latest',
+			format: 'anthropic-compatible',
+		}
+
+		const adapter = new AnthropicCompatibleAdapter(config)
+		await collectEvents(adapter)
+
+		expect(capturedUrl).toBe('https://api.example.com/anthropic/v1/messages')
 	})
 })
