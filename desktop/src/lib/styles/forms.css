@@ -1,52 +1,148 @@
 /* =========================================
-   GLOBAL FORM ELEMENT STYLING
-   Theme-aware defaults for native form controls.
-   Native <select> elements ignore CSS background-color
-   in some browsers when the OS dark mode is off, so we
-   reset the appearance and paint everything ourselves.
+   QUIRE — NATIVE FORM CONTROLS
+   Native <select>, <input>, <textarea> styled as quire-sm.
+   Solid tinted plate fill, edge hairline, leaf radius, indigo focus.
+   Custom chevron via inline SVG so CSP can't block it; chevron color
+   is hex-matched to --text-muted per theme (current-color is
+   unreliable in inline data URIs).
    ========================================= */
+
+/* ─── SELECT ───────────────────────────────────────────────────────── */
 
 select {
 	appearance: none;
 	-webkit-appearance: none;
-	background-color: var(--color-surface);
-	color: var(--color-text-primary);
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-md);
-	padding: var(--space-2) var(--space-3);
-	padding-right: 36px;
-	font-family: var(--font-sans);
-	font-size: var(--font-size-md);
+	background-color: var(--surface-plate);
+	color: var(--text-prose);
+	border: 1px solid var(--border-edge);
+	border-radius: var(--radius-leaf);
+	padding: 8px 32px 8px 12px;
+	font-family: var(--font-body);
+	font-size: var(--font-size-base);
 	cursor: pointer;
-	transition: border-color var(--transition-fast);
+	transition:
+		border-color var(--transition-fast),
+		box-shadow var(--transition-fast);
 
-	/* Custom chevron — inlined SVG so it can't be blocked by CSP. */
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239898b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+	/* Custom chevron — hex matches dark-theme --text-meta (#a8a8c2) */
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a8a8c2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 	background-repeat: no-repeat;
 	background-position: right 12px center;
 }
 
+select:hover:not(:disabled) {
+	border-color: var(--border-emphasis);
+}
+
 select:focus {
 	outline: none;
-	border-color: var(--color-primary);
+	border-color: var(--border-focus);
 }
 
 select:focus-visible {
-	outline: 2px solid var(--color-primary);
+	outline: 1px solid var(--border-focus);
 	outline-offset: 2px;
+	box-shadow: var(--glow-focus);
 }
 
 select:disabled {
-	color: var(--color-text-disabled);
+	color: var(--text-disabled);
 	cursor: not-allowed;
 	opacity: 0.6;
 }
 
-/*
- * Native <option> rendering is largely controlled by the OS, but most
- * Chromium and Gecko builds will honour these on the popup list.
- */
+/* Native option list — OS-controlled in many builds, but most
+   Chromium/Gecko engines honour these on the popup. */
 select option {
-	background-color: var(--color-surface-elevated);
-	color: var(--color-text-primary);
+	background-color: var(--surface-leaf);
+	color: var(--text-prose);
+}
+
+/* Light-theme chevron — hex matches light --text-muted (#6f6f8e) */
+[data-theme="light"] select {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236f6f8e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+/* ─── INPUT (text-like) + TEXTAREA ─────────────────────────────────── */
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+textarea {
+	appearance: none;
+	-webkit-appearance: none;
+	background-color: var(--surface-plate);
+	color: var(--text-prose);
+	border: 1px solid var(--border-edge);
+	border-radius: var(--radius-leaf);
+	padding: 8px 12px;
+	font-family: var(--font-body);
+	font-size: var(--font-size-base);
+	transition:
+		border-color var(--transition-fast),
+		box-shadow var(--transition-fast);
+}
+
+textarea {
+	font-family: var(--font-body);
+	line-height: 1.55;
+	resize: vertical;
+}
+
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder,
+input[type="search"]::placeholder,
+input[type="number"]::placeholder,
+input[type="tel"]::placeholder,
+input[type="url"]::placeholder,
+textarea::placeholder {
+	color: var(--text-muted);
+}
+
+input[type="text"]:hover:not(:disabled),
+input[type="email"]:hover:not(:disabled),
+input[type="password"]:hover:not(:disabled),
+input[type="search"]:hover:not(:disabled),
+input[type="number"]:hover:not(:disabled),
+input[type="tel"]:hover:not(:disabled),
+input[type="url"]:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+	border-color: var(--border-emphasis);
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="number"]:focus,
+input[type="tel"]:focus,
+input[type="url"]:focus,
+textarea:focus {
+	outline: none;
+	border-color: var(--border-focus);
+}
+
+input[type="text"]:focus-visible,
+input[type="email"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="search"]:focus-visible,
+input[type="number"]:focus-visible,
+input[type="tel"]:focus-visible,
+input[type="url"]:focus-visible,
+textarea:focus-visible {
+	outline: 1px solid var(--border-focus);
+	outline-offset: 2px;
+	box-shadow: var(--glow-focus);
+}
+
+input:disabled,
+textarea:disabled {
+	color: var(--text-disabled);
+	cursor: not-allowed;
+	opacity: 0.6;
 }

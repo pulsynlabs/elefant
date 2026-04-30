@@ -1,10 +1,11 @@
 /* =========================================
-   INDUSTRIAL TEXTURE SYSTEM
-   Noise, grain, and structural utilities
-   Recalibrated for indigo-primary design system
+   QUIRE — TEXTURE & STRUCTURAL UTILITIES
+   Noise grain, dot grid, mono labels, hairlines, dividers.
+   Tuned for the Quire material — indigo-tinted, editorial.
+   Utility class names preserved so existing call-sites resolve.
    ========================================= */
 
-/* --- Noise/Grain Overlay --- */
+/* --- Noise / grain overlay --- */
 .texture-noise {
 	position: relative;
 }
@@ -21,7 +22,7 @@
 	z-index: 1;
 }
 
-/* --- Structural Dot Grid --- */
+/* --- Structural dot grid --- */
 .texture-grid {
 	background-image: radial-gradient(
 		circle,
@@ -31,48 +32,52 @@
 	background-size: var(--texture-grid-size) var(--texture-grid-size);
 }
 
-/* --- Industrial Typography Utilities --- */
-
-/* Monospace label: for metadata, timestamps, paths, code references */
+/* --- Mono label —
+   For metadata, timestamps, paths, code references, telemetry.
+   Geist Mono at meta size with mild tracking — reads as quiet
+   technical detail, never shouts. */
 .mono-label {
 	font-family: var(--font-mono);
-	font-size: var(--font-size-xs, 11px);
-	font-weight: var(--font-weight-medium, 500);
-	letter-spacing: 0.04em;
-	color: var(--color-text-muted);
+	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-medium);
+	letter-spacing: var(--tracking-wider);
+	color: var(--text-muted);
 }
 
-/* Uppercase mono label: for section headers, badges, status indicators */
+/* --- Industrial caps —
+   Section headers, badges, status indicators. Uppercase mono with
+   widest tracking. The signature monolabel of the Quire telemetry
+   tier. */
 .industrial-caps {
 	font-family: var(--font-mono);
-	font-size: var(--font-size-xs, 11px);
-	font-weight: var(--font-weight-semibold, 600);
+	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--tracking-widest);
 	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	color: var(--color-text-secondary);
+	color: var(--text-meta);
 }
 
-/* --- Structural Border Utilities --- */
-
+/* --- Hairline borders —
+   The Quire dividing edge. 1px tinted at 6-14% opacity per theme. */
 .hairline-border {
-	border: 1px solid var(--color-border);
+	border: 1px solid var(--border-hairline);
 }
 
 .hairline-border-strong {
-	border: 1px solid var(--color-border-strong);
+	border: 1px solid var(--border-edge);
 }
 
-/* --- Structural Dividers --- */
+/* --- Structural dividers --- */
 
 .structural-divider {
 	height: 1px;
-	background: var(--color-border);
+	background: var(--border-hairline);
 	margin: var(--space-4) 0;
 }
 
 .structural-divider-strong {
 	height: 1px;
-	background: var(--color-border-strong);
+	background: var(--border-edge);
 	margin: var(--space-4) 0;
 }
 
@@ -88,5 +93,5 @@
 	content: '';
 	flex: 1;
 	height: 1px;
-	background: var(--color-border);
+	background: var(--border-hairline);
 }

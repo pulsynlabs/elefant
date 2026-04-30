@@ -1,0 +1,200 @@
+/* =========================================
+   QUIRE — SURFACE PRIMITIVES
+   Bound editorial sheets, not glass.
+
+   Architecture (four-layer model adapted for Tauri/Chromium):
+     Layer 0 — substrate (page beneath)
+     Layer 1 — tinted fill (the sheet itself)
+     Layer 2 — hairline edge + inset highlight (the fold catching light)
+     Layer 3 — content (children, z-index above)
+
+   Three surface tiers:
+     .quire-sm  — chips, pills, topbar, status indicators
+     .quire-md  — sidebar, cards, panels
+     .quire-lg  — modals, popovers, command palette (overlays only)
+
+   Blur discipline:
+     Backdrop blur is RESERVED for .quire-lg ONLY. Ambient surfaces
+     use solid tinted fills with hairline edges and inset highlights —
+     Quire's non-glass signature and Tauri performance guardrail.
+
+   IMPORTANT: do NOT place quire surfaces inside a parent with
+   opacity < 1 — backdrop sampling on .quire-lg breaks.
+   ========================================= */
+
+/* ─── SHARED FOUNDATION ─────────────────────────────────────────────── */
+
+.quire-sm,
+.quire-md,
+.quire-lg {
+	position: relative;
+	isolation: isolate;
+	border-radius: var(--radius-plate);
+}
+
+/* ─── TIER: SM — TopBar, chips, pills, status indicators ─────────────
+   Solid tinted fill. Two inset edges suggest a folded sheet catching
+   light at the top and resting on substrate at the bottom. No blur. */
+.quire-sm {
+	background: var(--surface-plate);
+	border: 1px solid var(--border-hairline);
+	border-radius: var(--radius-leaf);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.04),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.16),
+		var(--shadow-xs);
+}
+
+/* ─── TIER: MD — Sidebar, cards, panels ──────────────────────────────
+   Solid tinted fill with a subtle linear-gradient simulating the
+   slight tonal shift of a folded sheet. No blur. */
+.quire-md {
+	background:
+		linear-gradient(
+			180deg,
+			var(--surface-plate) 0%,
+			color-mix(in oklch, var(--surface-plate) 95%, var(--surface-leaf)) 100%
+		);
+	border: 1px solid var(--border-edge);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.05),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+		var(--shadow-md);
+}
+
+/* ─── TIER: LG — Modals, popovers, command palette ───────────────────
+   The ONLY tier permitted backdrop blur. Restrained values: a
+   measured blur with mild saturation + brightness lift, never
+   over-cooked. Strong hairline + indigo-graded outer shadow. */
+.quire-lg {
+	background: var(--surface-overlay);
+	border: 1px solid var(--border-edge);
+	backdrop-filter: blur(14px) saturate(1.4) brightness(1.04);
+	-webkit-backdrop-filter: blur(14px) saturate(1.4) brightness(1.04);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.07),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+		var(--shadow-lg);
+}
+
+/* ─── LIGHT THEME OVERRIDES ─────────────────────────────────────────── */
+
+[data-theme="light"] .quire-sm {
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.7),
+		inset 0 -1px 0 rgba(64, 73, 225, 0.05),
+		0 1px 2px rgba(64, 73, 225, 0.05);
+}
+
+[data-theme="light"] .quire-md {
+	background:
+		linear-gradient(
+			180deg,
+			var(--surface-plate) 0%,
+			color-mix(in oklch, var(--surface-plate) 92%, var(--surface-substrate)) 100%
+		);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.7),
+		inset 0 -1px 0 rgba(64, 73, 225, 0.06),
+		0 4px 12px rgba(64, 73, 225, 0.06);
+}
+
+[data-theme="light"] .quire-lg {
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.7),
+		inset 0 -1px 0 rgba(64, 73, 225, 0.08),
+		0 12px 28px rgba(64, 73, 225, 0.10);
+}
+
+/* ─── INTERACTIVE VARIANT ───────────────────────────────────────────── */
+
+.quire-interactive {
+	cursor: pointer;
+	transition:
+		background-color var(--transition-fast),
+		border-color var(--transition-fast),
+		transform var(--transition-fast),
+		box-shadow var(--transition-fast);
+}
+
+.quire-interactive:hover {
+	border-color: var(--border-emphasis);
+	transform: translateY(-1px);
+}
+
+.quire-interactive:active {
+	transform: translateY(0);
+}
+
+.quire-interactive:focus-visible {
+	outline: 1px solid var(--border-focus);
+	outline-offset: 2px;
+	box-shadow: var(--glow-focus);
+}
+
+/* ─── FALLBACK: no backdrop blur support ────────────────────────────── */
+
+@supports not (backdrop-filter: blur(1px)) {
+	.quire-lg {
+		background: var(--surface-plate);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
+}
+
+/* ─── REDUCED MOTION ────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+	.quire-interactive:hover {
+		transform: none;
+	}
+}
+
+/* =========================================
+   QUIRE — NESTED BEZEL (plate + leaf)
+   The signature double-bezel surface.
+
+   Outer plate holds the inner leaf with mathematically concentric
+   radii: leaf-radius = plate-radius - 2px (matches the 2px padding
+   of the plate so the inner curve sits flush with the binding).
+
+   Replaces the retired double-bezel pair from the prior surface
+   system. Used as the default surface for QuireCard.
+   ========================================= */
+
+.quire-plate {
+	background: color-mix(in oklch, var(--surface-plate) 80%, transparent);
+	border: 1px solid var(--border-hairline);
+	border-radius: var(--radius-plate);
+	padding: 2px;
+	isolation: isolate;
+}
+
+.quire-leaf {
+	position: relative;
+	background: var(--surface-leaf);
+	border: 1px solid var(--border-edge);
+	border-radius: calc(var(--radius-plate) - 2px);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.05),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+		inset 1px 0 0 rgba(255, 255, 255, 0.02);
+	overflow: clip;
+	isolation: isolate;
+}
+
+[data-theme="light"] .quire-plate {
+	background: color-mix(in oklch, var(--surface-plate) 60%, transparent);
+}
+
+[data-theme="light"] .quire-leaf {
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.8),
+		inset 0 -1px 0 rgba(64, 73, 225, 0.06),
+		inset 1px 0 0 rgba(255, 255, 255, 0.4);
+}
+
+.quire-leaf > * {
+	position: relative;
+	z-index: 1;
+}

@@ -16,8 +16,8 @@
 /* ===== QUIRE DESIGN SYSTEM ===== */
 @import "./lib/styles/tokens.css";
 @import "./lib/styles/typography.css";
-/* Quire surface primitives — created in Wave 3 */
-/* @import "./lib/styles/quire.css"; */
+/* Quire surface primitives — three tiers (sm/md/lg) + nested bezel (plate/leaf) */
+@import "./lib/styles/quire.css";
 @import "./lib/styles/texture.css";
 @import "./lib/styles/forms.css";
 @import "./lib/styles/shadcn-overrides.css";
