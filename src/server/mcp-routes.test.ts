@@ -137,6 +137,81 @@ describe('MCP routes', () => {
     });
   });
 
+  describe('GET /api/mcp/servers/:id', () => {
+    it('returns correct server data for a known id', async () => {
+      const serverId = crypto.randomUUID();
+      const config = {
+        mcp: [
+          {
+            id: serverId,
+            name: 'single-server',
+            transport: 'stdio',
+            command: ['echo', 'hello'],
+            enabled: true,
+            pinnedTools: ['tool-a'],
+          },
+        ],
+      };
+
+      const app = setupApp(config, {
+        getStatus: () => 'connected' as MCPServerStatus,
+        listAllTools: () => [
+          { serverId, tool: { name: 'tool-a' } },
+          { serverId, tool: { name: 'tool-b' } },
+          { serverId, tool: { name: 'tool-c' } },
+        ] as ToolWithMeta[],
+      });
+
+      const response = await app.handle(
+        new Request(`http://localhost/api/mcp/servers/${serverId}`),
+      );
+      const body = await response.json() as {
+        ok: boolean;
+        data: {
+          id: string;
+          name: string;
+          transport: string;
+          enabled: boolean;
+          status: string;
+          toolCount: number;
+          pinnedTools: string[];
+        };
+      };
+
+      expect(response.status).toBe(200);
+      expect(body.ok).toBe(true);
+      expect(body.data.id).toBe(serverId);
+      expect(body.data.name).toBe('single-server');
+      expect(body.data.transport).toBe('stdio');
+      expect(body.data.enabled).toBe(true);
+      expect(body.data.status).toBe('connected');
+      expect(body.data.toolCount).toBe(3);
+      expect(body.data.pinnedTools).toEqual(['tool-a']);
+    });
+
+    it('returns 404 for an unknown id', async () => {
+      const app = setupApp({
+        mcp: [
+          {
+            id: crypto.randomUUID(),
+            name: 'known-server',
+            transport: 'stdio',
+            command: ['echo', 'known'],
+          },
+        ],
+      });
+
+      const response = await app.handle(
+        new Request('http://localhost/api/mcp/servers/missing-server'),
+      );
+      const body = await response.json() as { ok: boolean; error: string };
+
+      expect(response.status).toBe(404);
+      expect(body.ok).toBe(false);
+      expect(body.error).toBe('Server not found');
+    });
+  });
+
   describe('GET /api/mcp/registry', () => {
     it('source=bundled returns at least 30 entries', async () => {
       const app = setupApp();

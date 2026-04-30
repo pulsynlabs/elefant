@@ -97,6 +97,35 @@ export function createMcpRoutes<TApp extends Elysia>(app: TApp, mcpManager: MCPM
     return { ok: true, data: servers };
   });
 
+  app.get('/api/mcp/servers/:id', async ({ params, set }) => {
+    const config = await readConfigFile(configPath);
+    if (!config) {
+      set.status = 404;
+      return { ok: false, error: 'Server not found' };
+    }
+
+    const serverConfig = config.mcp.find((s) => s.id === params.id);
+    if (!serverConfig) {
+      set.status = 404;
+      return { ok: false, error: 'Server not found' };
+    }
+
+    const status = mcpManager.getStatus(serverConfig.id);
+    const allTools = mcpManager.listAllTools();
+    const toolCount = allTools.filter((t) => t.serverId === serverConfig.id).length;
+
+    return {
+      ok: true,
+      data: serverSummary(
+        serverConfig,
+        status,
+        undefined,
+        toolCount,
+        serverConfig.pinnedTools ?? [],
+      ),
+    };
+  });
+
   app.post('/api/mcp/servers', async ({ body, set }) => {
     const parsed = mcpServerSchema.safeParse(body);
     if (!parsed.success) {
