@@ -11,6 +11,9 @@ import {
 import { emit, HookRegistry } from '../hooks/index.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { ProviderAdapter, StreamEvent } from '../providers/types.ts'
+import type { MCPManager } from '../mcp/manager.ts'
+import type { ToolWithMeta } from '../mcp/types.ts'
+import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import type { Message } from '../types/providers.ts'
 import type { ToolDefinition } from '../types/tools.ts'
 import { runAgentLoop, type ToolExecutor } from './agent-loop.ts'
@@ -23,6 +26,48 @@ function createRouter(adapter: ProviderAdapter): ProviderRouter {
 }
 
 const EMPTY_TOOLS: ToolDefinition[] = []
+
+function baseTool(name = 'base_tool'): ToolDefinition {
+	return {
+		name,
+		description: 'Base test tool',
+		parameters: {},
+		execute: async () => ({ ok: true, data: 'ok' }),
+	}
+}
+
+function mcpTool(name: string, description = 'MCP test tool'): Tool {
+	return {
+		name,
+		description,
+		inputSchema: { type: 'object', properties: {} },
+	}
+}
+
+function mcpManagerWithTools(tools: ToolWithMeta[]): MCPManager {
+	return {
+		listAllTools: () => tools,
+		getPinnedTools: () => [],
+		getTimeout: () => 30_000,
+		callTool: async () => ({ content: [{ type: 'text', text: 'mcp ok' }] }),
+		searchTools: (query: string) => {
+			if (query.startsWith('select:')) {
+				const names = query.slice('select:'.length).split(',').map((name) => name.trim())
+				return tools.filter((entry) => names.includes(entry.tool.name))
+			}
+
+			return tools
+		},
+	} as unknown as MCPManager
+}
+
+function mcpEntry(serverName: string, toolName: string, description?: string): ToolWithMeta {
+	return {
+		serverId: `${serverName}-id`,
+		serverName,
+		tool: mcpTool(toolName, description),
+	}
+}
 
 async function collectEvents(generator: AsyncGenerator<StreamEvent>): Promise<StreamEvent[]> {
 	const events: StreamEvent[] = []
@@ -931,5 +976,166 @@ describe('runAgentLoop', () => {
 
 		// The cached spec block render should read from disk only once for identical mtime.
 		expect(__getFileReadCountForTests(specPath)).toBe(1)
+	})
+
+	it('leaves tools unchanged when no mcpManager is provided', async () => {
+		const capturedTools: string[][] = []
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: [baseTool('native')],
+				hookRegistry: new HookRegistry(),
+				runContext: createRunContext('conv-mcp-no-manager'),
+			}),
+		)
+
+		expect(capturedTools).toEqual([['native']])
+	})
+
+	it('leaves tools unchanged when mcpManager has no tools', async () => {
+		const capturedTools: string[][] = []
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: [baseTool('native')],
+				hookRegistry: new HookRegistry(),
+				runContext: createRunContext('conv-mcp-empty'),
+				mcpManager: mcpManagerWithTools([]),
+			}),
+		)
+
+		expect(capturedTools).toEqual([['native']])
+	})
+
+	it('injects all MCP tools inline when under the selective threshold', async () => {
+		const capturedTools: string[][] = []
+		const capturedMessages: Message[][] = []
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(messages, tools): AsyncGenerator<StreamEvent> {
+				capturedMessages.push(messages)
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: [baseTool('native')],
+				hookRegistry: new HookRegistry(),
+				runContext: createRunContext('conv-mcp-inline'),
+				mcpManager: mcpManagerWithTools([
+					mcpEntry('filesystem', 'read_file'),
+					mcpEntry('filesystem', 'write_file'),
+				]),
+				mcpTokenBudgetPercent: 100,
+			}),
+		)
+
+		expect(capturedTools).toEqual([['native', 'mcp__filesystem__read_file', 'mcp__filesystem__write_file']])
+		expect(capturedMessages[0]?.some((message) => message.content.includes('<mcp_available_tools>'))).toBe(false)
+	})
+
+	it('uses meta-tool and manifest when MCP tools exceed the selective threshold', async () => {
+		const capturedTools: string[][] = []
+		const capturedMessages: Message[][] = []
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(messages, tools): AsyncGenerator<StreamEvent> {
+				capturedMessages.push(messages)
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: EMPTY_TOOLS,
+				hookRegistry: new HookRegistry(),
+				runContext: createRunContext('conv-mcp-selective'),
+				mcpManager: mcpManagerWithTools([
+					mcpEntry('filesystem', 'read_file', 'a'.repeat(1_000)),
+					mcpEntry('filesystem', 'write_file', 'b'.repeat(1_000)),
+				]),
+				mcpTokenBudgetPercent: 0,
+			}),
+		)
+
+		expect(capturedTools).toEqual([['mcp_search_tools']])
+		expect(capturedMessages[0]?.[0]).toEqual(expect.objectContaining({
+			role: 'system',
+			content: expect.stringContaining('<mcp_available_tools>'),
+		}))
+	})
+
+	it('adds discovered MCP tools on the next iteration', async () => {
+		const capturedTools: string[][] = []
+		let turn = 0
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				turn += 1
+				if (turn === 1) {
+					yield {
+						type: 'tool_call_complete',
+						toolCall: { id: 'search-1', name: 'mcp_search_tools', arguments: { query: 'select:read_file' } },
+					}
+					yield { type: 'done', finishReason: 'tool_calls' }
+					return
+				}
+
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+		const runContext = createRunContext('conv-mcp-discovered')
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async (_name, args) => {
+					const payload = typeof args === 'object' && args !== null ? args as Record<string, unknown> : {}
+					if (payload.query === 'select:read_file') {
+						runContext.discoveredMcpTools.add('read_file')
+					}
+					return { ok: true, data: '{"tools":[{"name":"read_file"}]}' }
+				},
+			}, {
+				messages: [{ role: 'user', content: 'find a tool' }],
+				tools: EMPTY_TOOLS,
+				hookRegistry: new HookRegistry(),
+				runContext,
+				mcpManager: mcpManagerWithTools([mcpEntry('filesystem', 'read_file', 'a'.repeat(1_000))]),
+				mcpTokenBudgetPercent: 0,
+			}),
+		)
+
+		expect(capturedTools[0]).toEqual(['mcp_search_tools'])
+		expect(capturedTools[1]).toEqual(['mcp_search_tools', 'mcp__filesystem__read_file'])
 	})
 })

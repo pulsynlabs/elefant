@@ -1,5 +1,15 @@
 import { emit, type HookRegistry } from '../hooks/index.ts'
 import type { CompactionManager } from '../compaction/manager.ts'
+import {
+	createMcpToolDefinitions,
+	isAlwaysLoadTool,
+	isMcpToolDefinition,
+} from '../mcp/adapter.ts'
+import { shouldUseSelectiveLoading } from '../mcp/budget.ts'
+import { buildMcpManifest } from '../mcp/manifest.ts'
+import { createMcpSearchToolsTool } from '../mcp/meta-tools.ts'
+import type { MCPManager } from '../mcp/manager.ts'
+import type { ToolWithMeta } from '../mcp/types.ts'
 import type { PermissionGate } from '../permissions/gate.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { StreamEvent, UsageEvent } from '../providers/types.ts'
@@ -38,6 +48,14 @@ export interface AgentLoopOptions {
 	metadataEmitter?: MetadataEmitter
 	sseManager?: SseManager
 	commandsDir?: string
+	mcpManager?: MCPManager
+	mcpTokenBudgetPercent?: number
+}
+
+interface EffectiveMcpTools {
+	tools: ToolDefinition[]
+	manifest: string
+	selective: boolean
 }
 
 function createToolResult(toolCallId: string, content: string, isError: boolean): ToolResult {
@@ -53,6 +71,102 @@ function cloneMessages(messages: Message[]): Message[] {
 		...message,
 		toolCalls: message.toolCalls ? [...message.toolCalls] : undefined,
 	}))
+}
+
+function appendManifestToMessages(messages: Message[], manifest: string): Message[] {
+	if (manifest.length === 0) {
+		return messages
+	}
+
+	const cloned = cloneMessages(messages)
+	const firstSystemIndex = cloned.findIndex((message) => message.role === 'system')
+	if (firstSystemIndex >= 0) {
+		const firstSystem = cloned[firstSystemIndex]
+		cloned[firstSystemIndex] = {
+			...firstSystem,
+			content: `${firstSystem.content}\n\n${manifest}`,
+		}
+		return cloned
+	}
+
+	return [{ role: 'system', content: manifest }, ...cloned]
+}
+
+function buildMcpManifestServers(manager: MCPManager, tools: ToolWithMeta[]): Array<{ name: string; tools: ToolWithMeta['tool'][]; alwaysLoad?: string[] }> {
+	const grouped = new Map<string, { name: string; tools: ToolWithMeta['tool'][]; alwaysLoad: Set<string> }>()
+
+	for (const entry of tools) {
+		const server = grouped.get(entry.serverId) ?? {
+			name: entry.serverName,
+			tools: [],
+			alwaysLoad: new Set<string>(manager.getPinnedTools(entry.serverId)),
+		}
+		server.tools.push(entry.tool)
+		if (isAlwaysLoadTool(entry.tool)) {
+			server.alwaysLoad.add(entry.tool.name)
+		}
+		grouped.set(entry.serverId, server)
+	}
+
+	return Array.from(grouped.values()).map((server) => ({
+		name: server.name,
+		tools: server.tools,
+		alwaysLoad: Array.from(server.alwaysLoad),
+	}))
+}
+
+function createEffectiveMcpTools(options: AgentLoopOptions): EffectiveMcpTools {
+	const baseTools = options.tools.filter((tool) => !isMcpToolDefinition(tool))
+	if (!options.mcpManager) {
+		return { tools: options.tools, manifest: '', selective: false }
+	}
+
+	const mcpToolsWithMeta = options.mcpManager.listAllTools()
+	if (mcpToolsWithMeta.length === 0) {
+		return { tools: baseTools, manifest: '', selective: false }
+	}
+
+	const mcpDefinitions = createMcpToolDefinitions(options.mcpManager, options.runContext)
+	const definitionByRawName = new Map<string, ToolDefinition>()
+	mcpToolsWithMeta.forEach((entry, index) => {
+		const definition = mcpDefinitions[index]
+		if (definition) {
+			definitionByRawName.set(entry.tool.name, definition)
+		}
+	})
+
+	const selective = shouldUseSelectiveLoading(mcpToolsWithMeta, {
+		contextWindow: options.contextWindowTokens ?? 200_000,
+		tokenBudgetPercent: options.mcpTokenBudgetPercent,
+	})
+
+	if (!selective) {
+		return { tools: [...baseTools, ...mcpDefinitions], manifest: '', selective: false }
+	}
+
+	const selectedRawNames = new Set<string>(options.runContext.discoveredMcpTools)
+	for (const entry of mcpToolsWithMeta) {
+		if (isAlwaysLoadTool(entry.tool) || options.mcpManager.getPinnedTools(entry.serverId).includes(entry.tool.name)) {
+			selectedRawNames.add(entry.tool.name)
+		}
+	}
+
+	const selectedMcpTools = Array.from(selectedRawNames)
+		.map((name) => definitionByRawName.get(name))
+		.filter((tool): tool is ToolDefinition => tool !== undefined)
+
+	return {
+		tools: [
+			...baseTools,
+			createMcpSearchToolsTool({
+				manager: options.mcpManager,
+				getRunContext: () => options.runContext,
+			}) as ToolDefinition<unknown, string>,
+			...selectedMcpTools,
+		],
+		manifest: buildMcpManifest(buildMcpManifestServers(options.mcpManager, mcpToolsWithMeta)),
+		selective: true,
+	}
 }
 
 function toToolArguments(
@@ -168,6 +282,8 @@ export async function* runAgentLoop(
 			return
 		}
 
+		const effectiveMcpTools = createEffectiveMcpTools(options)
+
 		const pendingToolCalls: ToolCall[] = []
 		let finishReason: 'stop' | 'tool_calls' | 'length' | 'error' = 'stop'
 		let assistantText = ''
@@ -186,12 +302,15 @@ export async function* runAgentLoop(
 				tokens: Math.max(0, contextWindow - tokenCount),
 			},
 		})
-		const outgoingMessages =
+		const transformedMessages =
 			Array.isArray(transformedContext.messages) && transformedContext.messages.length > 0
 				? transformedContext.messages
 				: outgoingMessagesBase
+		const outgoingMessages = effectiveMcpTools.selective
+			? appendManifestToMessages(transformedMessages, effectiveMcpTools.manifest)
+			: transformedMessages
 
-		for await (const event of adapterResult.data.sendMessage(outgoingMessages, options.tools, {
+		for await (const event of adapterResult.data.sendMessage(outgoingMessages, effectiveMcpTools.tools, {
 			signal: options.runContext.signal,
 			provider: options.provider,
 			maxTokens: options.maxTokens,

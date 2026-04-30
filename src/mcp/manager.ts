@@ -169,6 +169,14 @@ export class MCPManager {
 		return this.servers.get(id)?.status;
 	}
 
+	public getTimeout(id: string): number {
+		return this.servers.get(id)?.config.timeout ?? 30_000;
+	}
+
+	public getPinnedTools(id: string): string[] {
+		return this.servers.get(id)?.config.pinnedTools ?? [];
+	}
+
 	public async listTools(id: string): Promise<Tool[]> {
 		const state = this.servers.get(id);
 		if (!state) {

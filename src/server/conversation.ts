@@ -17,6 +17,8 @@ import type { Database } from '../db/database.ts'
 import type { RunRegistry } from '../runs/registry.ts'
 import type { SseManager } from '../transport/sse-manager.ts'
 import type { ConfigManager } from '../config/loader.ts'
+import type { MCPManager } from '../mcp/manager.ts'
+import { createMcpToolDefinitions } from '../mcp/adapter.ts'
 
 const toolCallSchema = z.object({
 	id: z.string().min(1),
@@ -220,6 +222,25 @@ function createSSEStream(
 						conversationId: runContext.runId,
 					})
 
+					const loopRunContext: RunContext = {
+						...runContext,
+						signal,
+					}
+					const mcpManager = runDeps?.mcpManager
+					if (mcpManager) {
+						for (const tool of createMcpToolDefinitions(mcpManager, loopRunContext)) {
+							activeRegistry.register(tool)
+						}
+					}
+
+					let mcpTokenBudgetPercent: number | undefined
+					if (runDeps?.configManager) {
+						const config = await runDeps.configManager.getConfig()
+						if (config.ok) {
+							mcpTokenBudgetPercent = config.data.tokenBudgetPercent
+						}
+					}
+
 					const agentLoop = runAgentLoop(providerRouter, activeRegistry, {
 						messages: toMessageArray(request.messages),
 						tools: activeRegistry.getAll(),
@@ -230,12 +251,11 @@ function createSSEStream(
 						topP: request.topP,
 						timeoutMs: request.timeoutMs,
 						hookRegistry,
-						runContext: {
-							...runContext,
-							signal,
-						},
+						runContext: loopRunContext,
 						questionEmitter,
 						metadataEmitter,
+						mcpManager,
+						mcpTokenBudgetPercent,
 					})
 
 					for await (const streamEvent of agentLoop) {
@@ -287,6 +307,7 @@ export interface ConversationRouteDeps {
 	runRegistry: RunRegistry
 	sseManager: SseManager | undefined
 	configManager: ConfigManager
+	mcpManager?: MCPManager
 }
 
 export function createConversationRoute<TApp extends Elysia>(

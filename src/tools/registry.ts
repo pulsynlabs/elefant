@@ -189,6 +189,7 @@ export class ToolRegistry {
 			name: tool.name,
 			description: tool.description,
 			parameters: tool.parameters,
+			inputJSONSchema: tool.inputJSONSchema,
 			execute: async (params): Promise<Result<string, ElefantError>> => {
 				const result = await tool.execute(params as TParams)
 				if (!result.ok) {
