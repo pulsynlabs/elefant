@@ -18,6 +18,7 @@ import { mountWorktreeRoutes } from '../worktree/routes.ts'
 import { createConfigRoutes } from './config-routes.ts'
 import { createMcpRoutes } from './mcp-routes.ts'
 import type { MCPManager } from '../mcp/manager.ts'
+import { prefetchAnthropicRegistry } from '../mcp/registry/anthropic.ts'
 import { gracefulShutdown } from '../daemon/shutdown.ts'
 import type { StateManager } from '../state/manager.ts'
 import { mountSpecRoutes } from './routes-spec.ts'
@@ -109,6 +110,12 @@ export function createApp(
 	// and /api/projects/.../agent-runs share the same registry + config.
 	const runRegistry = new RunRegistry()
 	const configManager = new ConfigManager()
+	if (mcpManager) {
+		void mcpManager.init().catch((error) => {
+			console.warn(`[elefant] MCP startup init failed: ${error instanceof Error ? error.message : String(error)}`)
+		})
+		prefetchAnthropicRegistry()
+	}
 
 	const baseApp = registerServerRoutes(
 		app as unknown as Elysia,
@@ -121,6 +128,7 @@ export function createApp(
 			runRegistry,
 			sseManager: sse,
 			configManager,
+			mcpManager,
 		},
 	)
 
@@ -140,6 +148,7 @@ export function createApp(
 		runRegistry,
 		sseManager: sse,
 		configManager,
+		mcpManager,
 	})
 
 	// Mount worktree management routes (MH5)
@@ -152,12 +161,8 @@ export function createApp(
 		mountSpecRoutes(baseApp, { db, stateManager, hookRegistry })
 	}
 
-	// MCP routes — requires a fully initialised MCPManager (created during daemon startup).
-	// SSE wiring for status/tool-change events is a T7.8 TODO: when sse is available,
-	// pass an onStatusChange callback to MCPManager that calls sse.publish() for
-	// each active project's SSE channel, or introduce a global broadcast mechanism.
 	if (mcpManager) {
-		createMcpRoutes(baseApp, mcpManager)
+		createMcpRoutes(baseApp, mcpManager, { sseManager: sse })
 	}
 
 	return baseApp

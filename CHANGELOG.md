@@ -4,6 +4,12 @@
 
 ### Added
 
+#### MCP Tool Support
+
+- Added daemon-side MCP tool support for stdio, SSE, and StreamableHTTP servers.
+- Added MCP server management routes, registry browsing, and a desktop Settings tab for configuring servers and pinned tools.
+- Added selective MCP tool loading with a searchable meta-tool to keep first-turn tool schemas compact for large server sets.
+
 #### Daemon & Desktop QoL Sprint (6 Must-Haves)
 
 **MH1: Permission Hook Veto Semantics**
@@ -62,5 +68,4 @@
 
 - Fixed route parameter naming conflict in worktree routes (`:projectId` → `:id`)
 - Added config routes mounting in `src/server/app.ts`
-
 

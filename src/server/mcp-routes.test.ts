@@ -21,7 +21,7 @@ function createMockMCPManager(overrides?: Partial<MCPManager>): MCPManager {
   const toolsMap = new Map<string, MockTool[]>();
 
   return {
-    getStatus: (id: string) => statusMap.get(id) ?? 'disconnected' as MCPServerStatus,
+    getStatus: (id: string) => statusMap.get(id),
     getPinnedTools: (_id: string) => [],
     connect: async (id: string) => { statusMap.set(id, 'connected'); },
     disconnect: async (id: string) => { statusMap.set(id, 'disabled'); },
@@ -297,6 +297,96 @@ describe('MCP routes', () => {
     });
   });
 
+  describe('PUT /api/mcp/servers/:id', () => {
+    it('updates an existing server and reconnects it', async () => {
+      const serverId = crypto.randomUUID();
+      let reconnectedId: string | undefined;
+      const app = setupApp({
+        mcp: [
+          {
+            id: serverId,
+            name: 'old-server',
+            transport: 'stdio',
+            command: ['echo', 'old'],
+          },
+        ],
+      }, {
+        reconnect: async (id: string) => { reconnectedId = id; },
+      });
+
+      const response = await app.handle(
+        new Request(`http://localhost/api/mcp/servers/${serverId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: serverId,
+            name: 'new-server',
+            transport: 'stdio',
+            command: ['echo', 'new'],
+          }),
+        }),
+      );
+      const body = await response.json() as { ok: boolean; data: { name: string; status: string } };
+
+      expect(response.status).toBe(200);
+      expect(body.ok).toBe(true);
+      expect(body.data.name).toBe('new-server');
+      expect(body.data.status).toBe('connecting');
+      expect(reconnectedId).toBe(serverId);
+    });
+  });
+
+  describe('DELETE /api/mcp/servers/:id', () => {
+    it('deletes a configured server and disconnects it', async () => {
+      const serverId = crypto.randomUUID();
+      let disconnectedId: string | undefined;
+      const app = setupApp({
+        mcp: [
+          {
+            id: serverId,
+            name: 'delete-server',
+            transport: 'stdio',
+            command: ['echo', 'delete'],
+          },
+        ],
+      }, {
+        disconnect: async (id: string) => { disconnectedId = id; },
+      });
+
+      const response = await app.handle(
+        new Request(`http://localhost/api/mcp/servers/${serverId}`, { method: 'DELETE' }),
+      );
+      const body = await response.json() as { ok: boolean; data: { deleted: string } };
+
+      expect(response.status).toBe(200);
+      expect(body.ok).toBe(true);
+      expect(body.data.deleted).toBe(serverId);
+      expect(disconnectedId).toBe(serverId);
+    });
+
+    it('returns 404 for an unknown id', async () => {
+      const app = setupApp({
+        mcp: [
+          {
+            id: crypto.randomUUID(),
+            name: 'known-server',
+            transport: 'stdio',
+            command: ['echo', 'known'],
+          },
+        ],
+      });
+
+      const response = await app.handle(
+        new Request('http://localhost/api/mcp/servers/missing-server', { method: 'DELETE' }),
+      );
+      const body = await response.json() as { ok: boolean; error: string };
+
+      expect(response.status).toBe(404);
+      expect(body.ok).toBe(false);
+      expect(body.error).toContain('not found');
+    });
+  });
+
   describe('POST /api/mcp/servers/:id/connect', () => {
     it('calls reconnect on MCP manager', async () => {
       let reconnectedId: string | undefined;
@@ -314,6 +404,25 @@ describe('MCP routes', () => {
       expect(body.ok).toBe(true);
       expect(reconnectedId).toBe('srv-1');
       expect(body.data.status).toBe('connected');
+    });
+  });
+
+  describe('POST /api/mcp/servers/:id/disconnect', () => {
+    it('calls disconnect on MCP manager', async () => {
+      let disconnectedId: string | undefined;
+      const app = setupApp({}, {
+        disconnect: async (id: string) => { disconnectedId = id; },
+      });
+
+      const response = await app.handle(
+        new Request('http://localhost/api/mcp/servers/srv-1/disconnect', { method: 'POST' }),
+      );
+      const body = await response.json() as { ok: boolean; data: { id: string; status: string } };
+
+      expect(response.status).toBe(200);
+      expect(body.ok).toBe(true);
+      expect(disconnectedId).toBe('srv-1');
+      expect(body.data.status).toBe('disabled');
     });
   });
 
@@ -336,6 +445,59 @@ describe('MCP routes', () => {
       expect(response.status).toBe(200);
       expect(body.ok).toBe(true);
       expect(body.data).toEqual(mockTools);
+    });
+  });
+
+  describe('POST /api/mcp/servers/:id/pin', () => {
+    it('pins and unpins a tool in persisted config', async () => {
+      const serverId = crypto.randomUUID();
+      const app = setupApp({
+        mcp: [
+          {
+            id: serverId,
+            name: 'pin-server',
+            transport: 'stdio',
+            command: ['echo', 'pin'],
+            pinnedTools: [],
+          },
+        ],
+      });
+
+      const pinResponse = await app.handle(
+        new Request(`http://localhost/api/mcp/servers/${serverId}/pin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ toolName: 'list_directory', pinned: true }),
+        }),
+      );
+      const pinBody = await pinResponse.json() as { ok: boolean; data: { pinnedTools: string[] } };
+      expect(pinResponse.status).toBe(200);
+      expect(pinBody.data.pinnedTools).toEqual(['list_directory']);
+
+      const unpinResponse = await app.handle(
+        new Request(`http://localhost/api/mcp/servers/${serverId}/pin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ toolName: 'list_directory', pinned: false }),
+        }),
+      );
+      const unpinBody = await unpinResponse.json() as { ok: boolean; data: { pinnedTools: string[] } };
+      expect(unpinResponse.status).toBe(200);
+      expect(unpinBody.data.pinnedTools).toEqual([]);
+    });
+
+    it('rejects invalid pin payloads', async () => {
+      const app = setupApp();
+
+      const response = await app.handle(
+        new Request('http://localhost/api/mcp/servers/srv-1/pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ toolName: '', pinned: true }),
+        }),
+      );
+
+      expect(response.status).toBe(400);
     });
   });
 });

@@ -216,10 +216,19 @@ export class MCPManager {
 		name: string,
 		args: Record<string, unknown>,
 	): Promise<CallToolResult> {
-		void id;
-		void name;
-		void args;
-		throw new Error('not implemented');
+		const state = this.servers.get(id);
+		if (!state || !state.client || state.status !== 'connected') {
+			throw new Error(`MCP server ${id} is not connected`);
+		}
+
+		return state.client.callTool(
+			{ name, arguments: args },
+			undefined,
+			{
+				timeout: state.config.timeout ?? 30_000,
+				resetTimeoutOnProgress: true,
+			},
+		) as Promise<CallToolResult>;
 	}
 
 	public searchTools(

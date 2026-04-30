@@ -4,6 +4,8 @@ import { emit, type HookRegistry } from '../hooks/index.ts';
 import type { ProviderRouter } from '../providers/router.ts';
 import type { RunRegistry } from '../runs/registry.ts';
 import type { RunContext } from '../runs/types.ts';
+import type { MCPManager } from '../mcp/manager.ts';
+import { createMcpSearchToolsTool } from '../mcp/meta-tools.ts';
 import type { ElefantError } from '../types/errors.ts';
 import { err, ok, type Result } from '../types/result.ts';
 import type { ParameterDefinition, ToolDefinition, ToolResult } from '../types/tools.ts';
@@ -360,10 +362,11 @@ export interface ToolRegistryRunDeps {
 	hookRegistry: HookRegistry
 	database: Database
 	runRegistry: RunRegistry
-	sseManager: SseManager
+	sseManager?: SseManager
 	providerRouter: ProviderRouter
 	configManager: ConfigManager
 	currentRun: RunContext
+	mcpManager?: MCPManager
 	metadataEmitter?: MetadataEmitter
 }
 
@@ -386,19 +389,21 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	registry.register(skillTool)
 	registry.register(lspTool)
 
-	// Register task tool (needs per-run deps)
-	const taskToolDeps: TaskToolDeps = {
-		database: deps.database,
-		runRegistry: deps.runRegistry,
-		sseManager: deps.sseManager,
-		providerRouter: deps.providerRouter,
-		hookRegistry: deps.hookRegistry,
-		configManager: deps.configManager,
-		toolRegistry: registry,
-		currentRun: deps.currentRun,
-		metadataEmitter: deps.metadataEmitter,
+	if (deps.sseManager) {
+		// Register task tool (needs per-run deps)
+		const taskToolDeps: TaskToolDeps = {
+			database: deps.database,
+			runRegistry: deps.runRegistry,
+			sseManager: deps.sseManager,
+			providerRouter: deps.providerRouter,
+			hookRegistry: deps.hookRegistry,
+			configManager: deps.configManager,
+			toolRegistry: registry,
+			currentRun: deps.currentRun,
+			metadataEmitter: deps.metadataEmitter,
+		}
+		registry.register(createTaskTool(taskToolDeps))
 	}
-	registry.register(createTaskTool(taskToolDeps))
 
 	// Register agent_session_search tool (needs per-run deps)
 	const agentSessionSearchDeps: AgentSessionSearchDeps = {
@@ -415,6 +420,13 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	})
 	for (const tool of createSpecTools(specCtx)) {
 		registry.register(tool)
+	}
+
+	if (deps.mcpManager) {
+		registry.register(createMcpSearchToolsTool({
+			manager: deps.mcpManager,
+			getRunContext: () => deps.currentRun,
+		}))
 	}
 
 	// tool_list MUST be last (reflects full set)

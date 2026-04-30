@@ -116,7 +116,7 @@ function buildMcpManifestServers(manager: MCPManager, tools: ToolWithMeta[]): Ar
 }
 
 function createEffectiveMcpTools(options: AgentLoopOptions): EffectiveMcpTools {
-	const baseTools = options.tools.filter((tool) => !isMcpToolDefinition(tool))
+	const baseTools = options.tools.filter((tool) => !isMcpToolDefinition(tool) && tool.name !== 'mcp_search_tools')
 	if (!options.mcpManager) {
 		return { tools: options.tools, manifest: '', selective: false }
 	}

@@ -9,8 +9,10 @@ import type { MCPServerStatus } from '../mcp/types.ts';
 import { fetchAnthropicRegistry, invalidateAnthropicCache, prefetchAnthropicRegistry } from '../mcp/registry/anthropic.ts';
 import { fetchSmitheryRegistry } from '../mcp/registry/smithery.ts';
 import { getBundledRegistry } from '../mcp/registry/bundled.ts';
+import type { SseManager } from '../transport/sse-manager.ts';
 
 const DEFAULT_CONFIG_PATH = join(homedir(), '.config', 'elefant', 'elefant.config.json');
+export const MCP_EVENTS_PROJECT_ID = '__global_mcp__';
 
 const PinToolSchema = z.object({
   toolName: z.string().min(1),
@@ -21,6 +23,7 @@ const RegistrySourceSchema = z.enum(['anthropic', 'smithery', 'bundled', 'all'])
 
 interface McpRoutesOptions {
   configPath?: string;
+  sseManager?: SseManager;
 }
 
 async function readConfigFile(configPath: string): Promise<ElefantConfig | null> {
@@ -65,6 +68,10 @@ function serverSummary(
 
 export function createMcpRoutes<TApp extends Elysia>(app: TApp, mcpManager: MCPManager, options: McpRoutesOptions = {}): TApp {
   const configPath = options.configPath ?? DEFAULT_CONFIG_PATH;
+  if (options.sseManager) {
+    app.get('/api/mcp/events', () => options.sseManager!.subscribe(MCP_EVENTS_PROJECT_ID));
+  }
+
   // --- Server CRUD ---
 
   app.get('/api/mcp/servers', async () => {

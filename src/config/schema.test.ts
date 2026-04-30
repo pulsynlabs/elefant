@@ -1,4 +1,7 @@
-import { describe, it, expect } from "bun:test";
+import { afterEach, describe, it, expect } from "bun:test";
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
 	configSchema,
 	providerSchema,
@@ -11,6 +14,21 @@ import {
 	mcpStdioConfigSchema,
 	mcpRemoteConfigSchema,
 } from "./schema.ts";
+import { ConfigManager } from './loader.ts';
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+	for (const dir of tempDirs.splice(0)) {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+function tempConfigPath(): string {
+	const dir = mkdtempSync(join(tmpdir(), 'elefant-config-schema-'));
+	tempDirs.push(dir);
+	return join(dir, 'elefant.config.json');
+}
 
 describe("providerSchema", () => {
 	it("accepts valid provider config", () => {
@@ -751,6 +769,93 @@ describe('configSchema with MCP fields', () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.tokenBudgetPercent).toBe(10);
+		}
+	});
+
+	it('round-trips a full MCP server config through ConfigManager disk loading', async () => {
+		const configPath = tempConfigPath();
+		const fullConfig = configSchema.parse({
+			port: 1444,
+			providers: [
+				{
+					name: 'openai-compatible',
+					baseURL: 'https://api.example.com/v1',
+					apiKey: 'test-key',
+					model: 'test-model',
+					format: 'openai',
+				},
+			],
+			defaultProvider: 'openai-compatible',
+			logLevel: 'debug',
+			projectPath: '/tmp/elefant-project',
+			mcp: [
+				{
+					id: '00000000-0000-4000-8000-000000000731',
+					name: 'filesystem-test',
+					transport: 'stdio',
+					command: ['bunx', '@modelcontextprotocol/server-filesystem', '/tmp'],
+					env: { MCP_ENV: 'test' },
+					enabled: true,
+					timeout: 45_000,
+					pinnedTools: ['list_directory'],
+				},
+				{
+					id: '00000000-0000-4000-8000-000000000732',
+					name: 'remote-test',
+					transport: 'streamable-http',
+					url: 'https://mcp.example.com/mcp',
+					headers: { Authorization: 'Bearer test-token' },
+					enabled: false,
+					timeout: 60_000,
+					pinnedTools: ['search'],
+				},
+			],
+			tokenBudgetPercent: 15,
+		});
+
+		await Bun.write(configPath, `${JSON.stringify(fullConfig, null, 2)}\n`);
+		const manager = new ConfigManager({ globalConfigPath: configPath });
+		const loaded = await manager.getConfig();
+
+		expect(loaded.ok).toBe(true);
+		if (loaded.ok) {
+			expect(loaded.data.mcp).toEqual(fullConfig.mcp);
+			expect(loaded.data.tokenBudgetPercent).toBe(15);
+			expect(loaded.data.port).toBe(1444);
+			expect(loaded.data.defaultProvider).toBe('openai-compatible');
+		}
+	});
+
+	it('ConfigManager defaults mcp to [] when the field is absent', async () => {
+		const configPath = tempConfigPath();
+		await Bun.write(configPath, JSON.stringify({ providers: [], defaultProvider: '' }));
+
+		const manager = new ConfigManager({ globalConfigPath: configPath });
+		const loaded = await manager.getConfig();
+
+		expect(loaded.ok).toBe(true);
+		if (loaded.ok) {
+			expect(loaded.data.mcp).toEqual([]);
+		}
+	});
+
+	it('ConfigManager loads old configs without mcp or tokenBudgetPercent', async () => {
+		const configPath = tempConfigPath();
+		await Bun.write(configPath, JSON.stringify({
+			port: 1555,
+			providers: [],
+			defaultProvider: '',
+			logLevel: 'warn',
+		}));
+
+		const manager = new ConfigManager({ globalConfigPath: configPath });
+		const loaded = await manager.getConfig();
+
+		expect(loaded.ok).toBe(true);
+		if (loaded.ok) {
+			expect(loaded.data.mcp).toEqual([]);
+			expect(loaded.data.tokenBudgetPercent).toBe(10);
+			expect(loaded.data.port).toBe(1555);
 		}
 	});
 });

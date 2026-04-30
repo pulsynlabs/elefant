@@ -15,6 +15,7 @@ import { buildInitialMessages, createRunContext } from './context.ts'
 import { publishRunEvent, publishStatusChange } from './events.ts'
 import type { RunRegistry } from './registry.ts'
 import type { RunContext } from './types.ts'
+import type { MCPManager } from '../mcp/manager.ts'
 
 const SpawnRunBodySchema = z.object({
 	agentType: z.string().min(1),
@@ -45,6 +46,7 @@ export function mountAgentRunRoutes(
 		runRegistry: RunRegistry
 		sseManager?: SseManager
 		configManager: ConfigManager
+		mcpManager?: MCPManager
 	},
 ): Elysia {
 	app.post('/api/projects/:id/sessions/:sessionId/agent-runs', ({ params, body, set }) => {
@@ -153,6 +155,7 @@ export function mountAgentRunRoutes(
 			providerRouter: deps.providerRouter,
 			configManager: deps.configManager,
 			currentRun: runContext,
+			mcpManager: deps.mcpManager,
 		})
 
 		void (async () => {
@@ -163,6 +166,7 @@ export function mountAgentRunRoutes(
 					hookRegistry: deps.hookRegistry,
 					runContext,
 					sseManager: deps.sseManager,
+					mcpManager: deps.mcpManager,
 				})) {
 					// intentionally drained to execute background loop
 				}
