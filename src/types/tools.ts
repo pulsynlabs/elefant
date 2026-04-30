@@ -9,6 +9,7 @@ export interface ToolDefinition<TParams = unknown, TResult = string> {
   name: string;
   description: string;
   parameters: Record<string, ParameterDefinition>;
+  inputJSONSchema?: unknown;
   execute: (params: TParams) => Promise<Result<TResult, ElefantError>>;
 }
 

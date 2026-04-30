@@ -58,6 +58,7 @@ describe('task tool integration', () => {
 			sessionId,
 			projectId,
 			signal: new AbortController().signal,
+			discoveredMcpTools: new Set<string>(),
 		}
 
 		// Seed parent run in database

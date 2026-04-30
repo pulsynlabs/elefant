@@ -1,4 +1,4 @@
-import type { ElefantConfig } from '../config/index.ts'
+import { ConfigManager, type ElefantConfig } from '../config/index.ts'
 import { CompactionManager } from '../compaction/manager.ts'
 import { Database } from '../db/database.ts'
 import { HookRegistry } from '../hooks/index.ts'
@@ -18,6 +18,8 @@ import { sessionManager } from '../tools/shell/index.js'
 import { ElefantWsServer } from '../transport/ws-server.ts'
 import { SseManager } from '../transport/sse-manager.ts'
 import { registerSpecModeEventPublisher } from '../transport/spec-mode-events.ts'
+import { MCPManager } from '../mcp/manager.ts'
+import { MCP_EVENTS_PROJECT_ID } from '../server/mcp-routes.ts'
 import type { ElefantError } from '../types/errors.ts'
 import { err, ok, type Result } from '../types/result.ts'
 import type { DaemonContext } from './context.ts'
@@ -106,6 +108,11 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 	context.sse = sse
 	registerSpecModeEventPublisher(hookRegistry, sse, ws)
 
+	const mcpConfigManager = new ConfigManager()
+	const mcpManager = new MCPManager(mcpConfigManager, (event) => {
+		sse.publishVolatile(MCP_EVENTS_PROJECT_ID, event.type, event)
+	})
+
 	// Permission gate for tool-call approval
 	const permissions = new PermissionGate(context, ws)
 	context.permissions = permissions
@@ -114,11 +121,12 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 	const compaction = new CompactionManager(context)
 	context.compaction = compaction
 
-	const app = createApp(providerRouter, toolRegistry, hookRegistry, db, ws, sse, stateManager)
+	const app = createApp(providerRouter, toolRegistry, hookRegistry, db, ws, sse, stateManager, mcpManager)
 
 	ws.startHeartbeat()
 
 	hookRegistry.register('shutdown', async () => {
+		await mcpManager.shutdown()
 		await sessionManager.closeAll()
 		await pluginLoader.unloadAll()
 		ws.stopHeartbeat()
@@ -134,6 +142,7 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 			console.error(`[elefant] Daemon listening on port ${config.port}`)
 		},
 		stop: async () => {
+			await mcpManager.shutdown()
 			await pluginLoader.unloadAll()
 			ws.stopHeartbeat()
 			sse.destroy()

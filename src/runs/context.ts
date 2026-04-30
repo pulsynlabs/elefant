@@ -1,5 +1,5 @@
 import type { Message } from '../types/providers.ts'
-import type { AgentRunContextMode } from './types.ts'
+import type { AgentRunContextMode, RunContext } from './types.ts'
 
 export interface SessionMessagesReader {
 	getSessionMessages(sessionId: string): Message[]
@@ -14,6 +14,17 @@ export interface BuildInitialMessagesContext {
 export interface InitialMessagesSource {
 	contextMode: AgentRunContextMode
 	getMessages: () => Message[]
+}
+
+export type CreateRunContextInput = Omit<RunContext, 'discoveredMcpTools'> & {
+	discoveredMcpTools?: Set<string>
+}
+
+export function createRunContext(input: CreateRunContextInput): RunContext {
+	return {
+		...input,
+		discoveredMcpTools: input.discoveredMcpTools ?? new Set<string>(),
+	}
 }
 
 function cloneMessages(messages: Message[]): Message[] {

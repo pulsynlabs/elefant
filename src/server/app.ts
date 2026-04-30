@@ -16,6 +16,9 @@ import { RunRegistry } from '../runs/registry.ts'
 import { mountAgentRunRoutes } from '../runs/routes.ts'
 import { mountWorktreeRoutes } from '../worktree/routes.ts'
 import { createConfigRoutes } from './config-routes.ts'
+import { createMcpRoutes } from './mcp-routes.ts'
+import type { MCPManager } from '../mcp/manager.ts'
+import { prefetchAnthropicRegistry } from '../mcp/registry/anthropic.ts'
 import { gracefulShutdown } from '../daemon/shutdown.ts'
 import type { StateManager } from '../state/manager.ts'
 import { mountSpecRoutes } from './routes-spec.ts'
@@ -28,6 +31,7 @@ export function createApp(
 	ws?: ElefantWsServer,
 	sse?: SseManager,
 	stateManager?: StateManager,
+	mcpManager?: MCPManager,
 ) {
 	const CORS_HEADERS = {
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -106,6 +110,12 @@ export function createApp(
 	// and /api/projects/.../agent-runs share the same registry + config.
 	const runRegistry = new RunRegistry()
 	const configManager = new ConfigManager()
+	if (mcpManager) {
+		void mcpManager.init().catch((error) => {
+			console.warn(`[elefant] MCP startup init failed: ${error instanceof Error ? error.message : String(error)}`)
+		})
+		prefetchAnthropicRegistry()
+	}
 
 	const baseApp = registerServerRoutes(
 		app as unknown as Elysia,
@@ -118,6 +128,7 @@ export function createApp(
 			runRegistry,
 			sseManager: sse,
 			configManager,
+			mcpManager,
 		},
 	)
 
@@ -137,6 +148,7 @@ export function createApp(
 		runRegistry,
 		sseManager: sse,
 		configManager,
+		mcpManager,
 	})
 
 	// Mount worktree management routes (MH5)
@@ -147,6 +159,10 @@ export function createApp(
 
 	if (stateManager) {
 		mountSpecRoutes(baseApp, { db, stateManager, hookRegistry })
+	}
+
+	if (mcpManager) {
+		createMcpRoutes(baseApp, mcpManager, { sseManager: sse })
 	}
 
 	return baseApp

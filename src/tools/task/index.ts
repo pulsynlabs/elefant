@@ -4,7 +4,7 @@ import { isAbsolute, resolve, sep } from 'node:path'
 import type { Database } from '../../db/database.js'
 import type { HookRegistry } from '../../hooks/index.js'
 import type { ProviderRouter } from '../../providers/router.js'
-import { buildInitialMessages } from '../../runs/context.js'
+import { buildInitialMessages, createRunContext } from '../../runs/context.js'
 import { createRun, markRunEnded } from '../../runs/dal.js'
 import { publishRunEvent, publishStatusChange, publishToolCallMetadata } from '../../runs/events.js'
 import { insertMessage } from '../../runs/messages.js'
@@ -208,16 +208,16 @@ Use agent_session_search to query the child's full message history by runId.`,
 			const cleanupParentAbort = wireParentAbortToChild(currentRun.signal, childController)
 
 			try {
-			const childCtx: RunContext = {
-				runId: childRunId,
-				parentRunId: currentRun.runId,
-				agentType: agentType,
-				title: params.description,
-				sessionId: currentRun.sessionId,
-				projectId: currentRun.projectId,
-				signal: childController.signal,
-				depth: (currentRun.depth ?? 0) + 1,
-			}
+				const childCtx: RunContext = createRunContext({
+					runId: childRunId,
+					parentRunId: currentRun.runId,
+					agentType: agentType,
+					title: params.description,
+					sessionId: currentRun.sessionId,
+					projectId: currentRun.projectId,
+					signal: childController.signal,
+					depth: (currentRun.depth ?? 0) + 1,
+				})
 
 			const contextMode = params.context_mode ?? resolvedConfig?.contextMode ?? 'none'
 			const resolvedPrompt = await resolveAgentPrompt(agentType, configManager, currentRun.projectId)

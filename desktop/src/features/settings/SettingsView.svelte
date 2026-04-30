@@ -3,8 +3,9 @@
 	import ProviderSettings from './ProviderSettings.svelte';
 	import DaemonControlSection from './DaemonControlSection.svelte';
 	import ProjectSettings from './ProjectSettings.svelte';
+	import MCPSettings from './MCPSettings.svelte';
 
-	type Section = 'general' | 'providers' | 'daemon' | 'project';
+	type Section = 'general' | 'providers' | 'mcp' | 'daemon' | 'project';
 
 	let activeSection = $state<Section>('general');
 
@@ -12,6 +13,7 @@
 		{ id: 'general', label: 'General' },
 		{ id: 'project', label: 'Project' },
 		{ id: 'providers', label: 'Providers' },
+		{ id: 'mcp', label: 'MCP' },
 		{ id: 'daemon', label: 'Daemon' },
 	];
 </script>
@@ -42,6 +44,8 @@
 				<ProjectSettings />
 			{:else if activeSection === 'providers'}
 				<ProviderSettings />
+			{:else if activeSection === 'mcp'}
+				<MCPSettings />
 			{:else if activeSection === 'daemon'}
 				<DaemonControlSection />
 			{/if}

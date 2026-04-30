@@ -21,6 +21,8 @@ function createTestRouter(): ProviderRouter {
 				format: 'openai',
 			},
 		],
+		mcp: [],
+		tokenBudgetPercent: 10,
 	}
 
 	return new ProviderRouter(config)

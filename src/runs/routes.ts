@@ -11,10 +11,11 @@ import { createToolRegistryForRun, type ToolRegistry } from '../tools/registry.t
 import type { SseManager } from '../transport/sse-manager.ts'
 import { createRun, getRun, listChildRunsByParent, listRunsBySession, markRunEnded } from './dal.ts'
 import { listMessages } from './messages.js'
-import { buildInitialMessages } from './context.ts'
+import { buildInitialMessages, createRunContext } from './context.ts'
 import { publishRunEvent, publishStatusChange } from './events.ts'
 import type { RunRegistry } from './registry.ts'
 import type { RunContext } from './types.ts'
+import type { MCPManager } from '../mcp/manager.ts'
 
 const SpawnRunBodySchema = z.object({
 	agentType: z.string().min(1),
@@ -45,6 +46,7 @@ export function mountAgentRunRoutes(
 		runRegistry: RunRegistry
 		sseManager?: SseManager
 		configManager: ConfigManager
+		mcpManager?: MCPManager
 	},
 ): Elysia {
 	app.post('/api/projects/:id/sessions/:sessionId/agent-runs', ({ params, body, set }) => {
@@ -97,7 +99,7 @@ export function mountAgentRunRoutes(
 		}
 
 		const controller = new AbortController()
-		const runContext: RunContext = {
+		const runContext: RunContext = createRunContext({
 			runId,
 			parentRunId: parsedBody.data.parentRunId,
 			depth: 0,
@@ -106,7 +108,7 @@ export function mountAgentRunRoutes(
 			sessionId: params.sessionId,
 			projectId: params.id,
 			signal: controller.signal,
-		}
+		})
 
 		deps.runRegistry.registerRun(runId, {
 			controller,
@@ -153,6 +155,7 @@ export function mountAgentRunRoutes(
 			providerRouter: deps.providerRouter,
 			configManager: deps.configManager,
 			currentRun: runContext,
+			mcpManager: deps.mcpManager,
 		})
 
 		void (async () => {
@@ -163,6 +166,7 @@ export function mountAgentRunRoutes(
 					hookRegistry: deps.hookRegistry,
 					runContext,
 					sseManager: deps.sseManager,
+					mcpManager: deps.mcpManager,
 				})) {
 					// intentionally drained to execute background loop
 				}
@@ -368,7 +372,7 @@ export function mountAgentRunRoutes(
 		}
 
 		if (deps.sseManager) {
-			const runContextForCancel = {
+			const runContextForCancel = createRunContext({
 				runId: cancelled.data.run_id,
 				parentRunId: cancelled.data.parent_run_id ?? undefined,
 				agentType: cancelled.data.agent_type,
@@ -377,7 +381,7 @@ export function mountAgentRunRoutes(
 				projectId: cancelled.data.project_id,
 				signal: new AbortController().signal,
 				depth: 0,
-			}
+			})
 
 			publishRunEvent(
 				runContextForCancel,

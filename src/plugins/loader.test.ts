@@ -30,6 +30,8 @@ function createConfig(projectPath: string): ElefantConfig {
 		defaultProvider: '',
 		logLevel: 'info',
 		projectPath,
+		mcp: [],
+		tokenBudgetPercent: 10,
 	};
 }
 

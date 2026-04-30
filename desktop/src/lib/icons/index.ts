@@ -62,3 +62,14 @@ export { default as AiBrain01Icon } from '@hugeicons/core-free-icons/AiBrain01Ic
 export { default as RunsIcon } from '@hugeicons/core-free-icons/PlayIcon';
 export { default as WorktreesIcon } from '@hugeicons/core-free-icons/FolderTreeIcon';
 export { default as SpecModeIcon } from '@hugeicons/core-free-icons/CheckListIcon';
+
+// MCP (Model Context Protocol)
+export { default as McpServerIcon } from '@hugeicons/core-free-icons/McpServerIcon';
+export { default as PlugIcon } from '@hugeicons/core-free-icons/Plug01Icon';
+export { default as PackageIcon } from '@hugeicons/core-free-icons/PackageIcon';
+export { default as CubeIcon } from '@hugeicons/core-free-icons/CubeIcon';
+export { default as LinkIcon } from '@hugeicons/core-free-icons/Link01Icon';
+export { default as ConnectIcon } from '@hugeicons/core-free-icons/ConnectIcon';
+export { default as RefreshIcon } from '@hugeicons/core-free-icons/RefreshIcon';
+export { default as PinIcon } from '@hugeicons/core-free-icons/PinIcon';
+export { default as PinOffIcon } from '@hugeicons/core-free-icons/PinOffIcon';

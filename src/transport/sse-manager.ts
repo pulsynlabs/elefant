@@ -118,6 +118,22 @@ export class SseManager {
 		})
 	}
 
+	publishVolatile(projectId: string, eventType: string, data: unknown): void {
+		void this.withLock(projectId, () => {
+			const id = crypto.randomUUID()
+			const payload = formatSseEvent(id, eventType, data)
+			const projectConnections = this.connections.get(projectId)
+			if (!projectConnections) return
+
+			for (const connection of projectConnections) {
+				connection.counter += 1
+				this.enqueue(connection.controller, payload)
+			}
+		}).catch((error) => {
+			console.error('[elefant] Failed to publish volatile SSE event:', error)
+		})
+	}
+
 	getConnectionCount(projectId: string): number {
 		return this.connections.get(projectId)?.size ?? 0
 	}

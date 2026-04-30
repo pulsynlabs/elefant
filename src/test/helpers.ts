@@ -30,5 +30,7 @@ export function createMockConfig(): ElefantConfig {
 				format: 'openai',
 			},
 		],
+		mcp: [],
+		tokenBudgetPercent: 10,
 	}
 }

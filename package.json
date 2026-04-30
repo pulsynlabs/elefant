@@ -17,6 +17,7 @@
     "test:spec": "bun test src/tools/spec/ src/db/repo/spec/ src/hooks/spec* src/permissions/orchestrator*"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@vscode/ripgrep": "^1.17.1",
     "elysia": "^1.4.28",

@@ -26,6 +26,8 @@ const TEST_CONFIG: ElefantConfig = {
 			format: 'anthropic',
 		},
 	],
+	mcp: [],
+	tokenBudgetPercent: 10,
 }
 
 describe('ProviderRouter', () => {
@@ -64,6 +66,8 @@ describe('ProviderRouter', () => {
 			port: 1337,
 			logLevel: 'info',
 			projectPath: '/tmp',
+			mcp: [],
+			tokenBudgetPercent: 10,
 		})
 		const result = router.getAdapter('test-anthropic-compat')
 
@@ -86,6 +90,8 @@ describe('ProviderRouter', () => {
 			port: 1337,
 			logLevel: 'info',
 			projectPath: '/tmp',
+			mcp: [],
+			tokenBudgetPercent: 10,
 		})
 		const result = router.getAdapter('test-anthropic')
 
@@ -111,6 +117,8 @@ describe('ProviderRouter', () => {
 			defaultProvider: '',
 			logLevel: 'info' as const,
 			projectPath: '/tmp',
+			mcp: [],
+			tokenBudgetPercent: 10,
 		}
 		const router = new ProviderRouter(emptyConfig)
 		const result = router.getAdapter('any-provider')

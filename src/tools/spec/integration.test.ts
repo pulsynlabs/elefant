@@ -26,7 +26,7 @@ describe('spec tool registry integration', () => {
 			sseManager: {} as never,
 			providerRouter: {} as never,
 			configManager: {} as never,
-			currentRun: { runId: 'run-1', depth: 0, agentType: 'orchestrator', title: 'Run', sessionId: 'session-1', projectId: 'project-1', signal: new AbortController().signal },
+			currentRun: { runId: 'run-1', depth: 0, agentType: 'orchestrator', title: 'Run', sessionId: 'session-1', projectId: 'project-1', signal: new AbortController().signal, discoveredMcpTools: new Set<string>() },
 		});
 		const names = registry.getAll().map((tool) => tool.name).filter((name) => name.startsWith('spec_')).sort();
 		expect(names).toEqual([

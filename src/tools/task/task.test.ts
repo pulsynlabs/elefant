@@ -62,6 +62,7 @@ function buildDeps(options?: {
 		sessionId,
 		projectId,
 		signal: parentController.signal,
+		discoveredMcpTools: new Set<string>(),
 	}
 
 	const createdParent = createRun(database, {
@@ -856,6 +857,7 @@ describe('createTaskTool', () => {
 			sessionId,
 			projectId,
 			signal: parentController.signal,
+			discoveredMcpTools: new Set<string>(),
 		}
 
 		const deps: TaskToolDeps = {
