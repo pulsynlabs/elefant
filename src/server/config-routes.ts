@@ -14,6 +14,7 @@ import {
 	type ResolvedAgentConfig,
 } from '../config/index.ts';
 import type { ProviderRouter } from '../providers/router.ts';
+import { getProviderRegistry } from '../providers/registry/index.ts';
 
 const CONFIG_PATH = join(homedir(), '.config', 'elefant', 'elefant.config.json');
 
@@ -268,6 +269,11 @@ export function createConfigRoutes<TApp extends Elysia>(
 		await writeConfigFile(config);
 		providerRouter.reload(config);
 		return { ok: true };
+	});
+
+	app.get('/api/providers/registry', () => {
+		const providers = getProviderRegistry();
+		return { providers };
 	});
 
 	app.get('/api/config/agents', async ({ query, set }) => {
