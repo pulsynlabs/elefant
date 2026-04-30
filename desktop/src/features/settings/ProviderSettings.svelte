@@ -1,16 +1,35 @@
 <script lang="ts">
 	import { configService } from '$lib/services/config-service.js';
-	import type { ProviderEntry } from '$lib/daemon/types.js';
+	import type { ProviderEntry, RegistryProvider } from '$lib/daemon/types.js';
 	import ProviderForm from './ProviderForm.svelte';
+	import ProviderQuickAdd from './ProviderQuickAdd.svelte';
 	import { onMount } from 'svelte';
 
 	let providers = $state<ProviderEntry[]>([]);
 	let showForm = $state(false);
+	let showQuickAdd = $state(false);
 	let editingProvider = $state<ProviderEntry | undefined>(undefined);
+	let selectedTemplate = $state<RegistryProvider | undefined>(undefined);
+	let registryMap = $state<Map<string, RegistryProvider>>(new Map());
 	let status = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+
+	/**
+	 * Generic fallback icon used when a registry lookup fails.
+	 * Bundled inline (NOT user input) — safe to render via {@html}.
+	 */
+	const FALLBACK_SVG =
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>';
 
 	onMount(async () => {
 		await loadProviders();
+		// Load registry for icon lookup; non-critical — fail silently if it errors
+		// so the rest of the UI keeps working without icons.
+		try {
+			const registry = await configService.fetchProviderRegistry();
+			registryMap = new Map(registry.map((p) => [p.id.toLowerCase(), p]));
+		} catch {
+			// Icons won't show but provider CRUD still works.
+		}
 	});
 
 	async function loadProviders(): Promise<void> {
@@ -30,6 +49,7 @@
 			await loadProviders();
 			showForm = false;
 			editingProvider = undefined;
+			selectedTemplate = undefined;
 		} catch (error) {
 			status = {
 				type: 'error',
@@ -59,27 +79,56 @@
 
 	function handleEdit(provider: ProviderEntry): void {
 		editingProvider = provider;
+		selectedTemplate = undefined;
+		showQuickAdd = false;
 		showForm = true;
 	}
 
 	function handleCancelForm(): void {
 		showForm = false;
 		editingProvider = undefined;
+		selectedTemplate = undefined;
+	}
+
+	function handleQuickAddToggle(): void {
+		showQuickAdd = !showQuickAdd;
+		showForm = false;
+		editingProvider = undefined;
+		selectedTemplate = undefined;
+	}
+
+	function handleManualAddToggle(): void {
+		// Toggle manual form; clear quick-add and template state.
+		const willShow = !(showForm && !editingProvider);
+		showForm = willShow;
+		showQuickAdd = false;
+		editingProvider = undefined;
+		selectedTemplate = undefined;
+	}
+
+	function handleQuickAddSelect(provider: RegistryProvider): void {
+		selectedTemplate = provider;
+		showQuickAdd = false;
+		editingProvider = undefined;
+		showForm = true;
+	}
+
+	function lookupIcon(providerName: string): string {
+		return registryMap.get(providerName.toLowerCase())?.iconSvg || '';
 	}
 </script>
 
 <div class="provider-settings">
 	<div class="section-header">
 		<h3 class="section-heading">Providers</h3>
-		<button
-			class="btn-add"
-			onclick={() => {
-				editingProvider = undefined;
-				showForm = !showForm;
-			}}
-		>
-			{showForm && !editingProvider ? 'Cancel' : '+ Add Provider'}
-		</button>
+		<div class="header-actions">
+			<button class="btn-quick-add" type="button" onclick={handleQuickAddToggle}>
+				{showQuickAdd ? 'Cancel' : '✦ From Registry'}
+			</button>
+			<button class="btn-add" type="button" onclick={handleManualAddToggle}>
+				{showForm && !editingProvider && !selectedTemplate ? 'Cancel' : '+ Add Provider'}
+			</button>
+		</div>
 	</div>
 
 	{#if status}
@@ -88,31 +137,52 @@
 		</div>
 	{/if}
 
+	{#if showQuickAdd}
+		<ProviderQuickAdd
+			onSelect={handleQuickAddSelect}
+			onCancel={handleQuickAddToggle}
+		/>
+	{/if}
+
 	{#if showForm}
 		<ProviderForm
 			provider={editingProvider}
+			template={editingProvider ? undefined : selectedTemplate}
 			onSave={handleSave}
 			onCancel={handleCancelForm}
 		/>
 	{/if}
 
-	{#if providers.length === 0 && !showForm}
+	{#if providers.length === 0 && !showForm && !showQuickAdd}
 		<div class="empty-providers">
 			<p class="empty-text">No providers configured.</p>
 			<p class="empty-hint">Add an OpenAI-compatible or Anthropic provider to get started.</p>
 		</div>
-	{:else}
+	{:else if providers.length > 0}
 		<ul class="provider-list" role="list">
-			{#each providers as provider}
+			{#each providers as provider (provider.name)}
+				{@const iconSvg = lookupIcon(provider.name)}
 				<li class="provider-item">
 					<div class="provider-info">
+						<span
+							class="provider-icon"
+							class:provider-icon-fallback={!iconSvg}
+							aria-hidden="true"
+						>
+							{@html iconSvg || FALLBACK_SVG}
+						</span>
 						<span class="provider-name">{provider.name}</span>
 						<span
 							class="provider-badge"
 							class:openai={provider.format === 'openai'}
 							class:anthropic={provider.format === 'anthropic'}
+							class:anthropic-compatible={provider.format === 'anthropic-compatible'}
 						>
-							{provider.format === 'openai' ? 'OpenAI' : 'Anthropic'}
+							{provider.format === 'openai'
+								? 'OpenAI'
+								: provider.format === 'anthropic'
+									? 'Anthropic'
+									: 'Anthropic-compat'}
 						</span>
 					</div>
 					<div class="provider-details">
@@ -153,12 +223,19 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		gap: var(--space-3);
 	}
 
 	.section-heading {
 		font-size: var(--font-size-lg);
 		font-weight: var(--font-weight-semibold);
 		color: var(--color-text-primary);
+	}
+
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
 	}
 
 	.btn-add {
@@ -176,6 +253,31 @@
 
 	.btn-add:hover {
 		background-color: var(--color-primary-hover);
+	}
+
+	.btn-quick-add {
+		background-color: transparent;
+		color: var(--color-text-secondary);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		padding: var(--space-2) var(--space-4);
+		font-family: var(--font-sans);
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
+		cursor: pointer;
+		transition:
+			color var(--transition-fast),
+			border-color var(--transition-fast);
+	}
+
+	.btn-quick-add:hover {
+		color: var(--color-text-primary);
+		border-color: var(--color-border-strong);
+	}
+
+	.btn-quick-add:focus-visible {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 2px;
 	}
 
 	.status-message {
@@ -237,7 +339,27 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-2);
-		min-width: 180px;
+		min-width: 200px;
+	}
+
+	.provider-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		flex-shrink: 0;
+		color: var(--color-text-primary);
+	}
+
+	.provider-icon :global(svg) {
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+
+	.provider-icon-fallback {
+		color: var(--color-text-muted);
 	}
 
 	.provider-name {
@@ -251,6 +373,7 @@
 		padding: 2px 6px;
 		border-radius: var(--radius-full);
 		font-weight: var(--font-weight-medium);
+		white-space: nowrap;
 	}
 
 	.provider-badge.openai {
@@ -263,6 +386,12 @@
 		background-color: color-mix(in oklch, var(--color-warning) 12%, transparent);
 		color: var(--color-warning);
 		border: 1px solid color-mix(in oklch, var(--color-warning) 25%, transparent);
+	}
+
+	.provider-badge.anthropic-compatible {
+		background-color: color-mix(in oklch, var(--color-primary) 12%, transparent);
+		color: var(--color-primary);
+		border: 1px solid color-mix(in oklch, var(--color-primary) 25%, transparent);
 	}
 
 	.provider-details {
