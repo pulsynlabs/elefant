@@ -124,7 +124,7 @@
 		color: var(--color-primary);
 		background-color: var(--color-primary-subtle);
 		font-weight: var(--font-weight-medium);
-		box-shadow: inset 2px 0 0 var(--color-primary), var(--glow-primary);
+		box-shadow: inset 2px 0 0 var(--color-primary);
 		transform: translateX(2px);
 	}
 

@@ -107,9 +107,7 @@
 		align-items: center;
 		justify-content: center;
 		padding: var(--space-4);
-		background-color: color-mix(in srgb, var(--color-bg) 70%, transparent);
-		backdrop-filter: blur(4px);
-		-webkit-backdrop-filter: blur(4px);
+		background-color: color-mix(in srgb, var(--color-bg) 75%, transparent);
 		animation: fade-in var(--transition-fast) ease-out;
 	}
 

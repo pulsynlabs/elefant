@@ -12,5 +12,5 @@ export * from "./spinner/index.js";
 export * from "./progress-bar/index.js";
 export * from "./tooltip/index.js";
 export * from "./panel/index.js";
-export * from "./glass-card/index.js";
+export * from "./quire-card/index.js";
 export * from "./empty-state/index.js";

@@ -1,15 +1,31 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	type Variant = 'default' | 'primary' | 'success' | 'warning' | 'error';
+
+	type Tone = 'neutral' | 'primary' | 'success' | 'warning' | 'error';
+	/** Legacy alias kept for backward compatibility with existing consumers. */
+	type LegacyVariant = 'default' | 'primary' | 'success' | 'warning' | 'error';
+
 	type Props = {
-		variant?: Variant;
+		tone?: Tone;
+		/** Backwards-compat alias; `default` maps to `neutral`. */
+		variant?: LegacyVariant;
 		class?: string;
 		children?: Snippet;
 	};
-	let { variant = 'default', class: className = '', children }: Props = $props();
+
+	let {
+		tone,
+		variant,
+		class: className = '',
+		children,
+	}: Props = $props();
+
+	const resolvedTone: Tone = $derived(
+		(tone ?? (variant === 'default' ? 'neutral' : (variant as Tone)) ?? 'neutral') as Tone
+	);
 </script>
 
-<span class="tag tag-{variant} industrial-caps {className}">
+<span class="tag tag-{resolvedTone} {className}">
 	{@render children?.()}
 </span>
 
@@ -18,45 +34,46 @@
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-1);
-		padding: 1px var(--space-2);
-		border-radius: var(--radius-xs);
-		border: 1px solid;
-		font-family: var(--font-mono);
-		font-size: var(--font-size-xs);
-		font-weight: var(--font-weight-semibold);
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-widest);
+		padding: 2px 10px;
+		border-radius: var(--radius-full);
+		border: 1px solid var(--border-hairline);
+		font-family: var(--font-body);
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-regular);
+		font-style: italic;
+		line-height: 1.45;
 		white-space: nowrap;
-		line-height: 1.5;
+		font-variation-settings: 'opsz' 14, 'wght' 420;
+		/* Default subtle plate fill (overridden per-tone below). */
+		background: color-mix(in oklch, var(--surface-plate) 70%, transparent);
+		color: var(--text-meta);
 	}
 
-	.tag-default {
-		color: var(--color-text-secondary);
-		background: var(--color-surface-elevated);
-		border-color: var(--color-border);
+	.tag-neutral {
+		color: var(--text-meta);
 	}
 
 	.tag-primary {
 		color: var(--color-primary);
-		background: var(--color-primary-subtle);
-		border-color: var(--color-primary-muted);
+		background: color-mix(in oklch, var(--color-primary) 10%, transparent);
+		border-color: color-mix(in oklch, var(--color-primary) 28%, transparent);
 	}
 
 	.tag-success {
 		color: var(--color-success);
-		background: rgba(34, 197, 94, 0.1);
-		border-color: rgba(34, 197, 94, 0.3);
+		background: color-mix(in oklch, var(--color-success) 10%, transparent);
+		border-color: color-mix(in oklch, var(--color-success) 28%, transparent);
 	}
 
 	.tag-warning {
 		color: var(--color-warning);
-		background: rgba(245, 158, 11, 0.1);
-		border-color: rgba(245, 158, 11, 0.3);
+		background: color-mix(in oklch, var(--color-warning) 10%, transparent);
+		border-color: color-mix(in oklch, var(--color-warning) 28%, transparent);
 	}
 
 	.tag-error {
 		color: var(--color-error);
-		background: rgba(239, 68, 68, 0.1);
-		border-color: rgba(239, 68, 68, 0.3);
+		background: color-mix(in oklch, var(--color-error) 10%, transparent);
+		border-color: color-mix(in oklch, var(--color-error) 28%, transparent);
 	}
 </style>

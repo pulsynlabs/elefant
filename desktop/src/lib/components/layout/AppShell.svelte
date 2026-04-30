@@ -17,14 +17,14 @@
 </script>
 
 <div class="app-shell" class:sidebar-collapsed={sidebarCollapsed}>
-	<!-- Sidebar with glass material -->
-	<aside class="sidebar glass-md" aria-label="Navigation sidebar">
+	<!-- Sidebar — Quire md surface (bound editorial sheet, no blur) -->
+	<aside class="sidebar quire-md" aria-label="Navigation sidebar">
 		{@render sidebar?.()}
 	</aside>
 
 	<!-- Main area: topbar + content -->
 	<div class="main-area">
-		<header class="topbar glass-sm" aria-label="Application toolbar">
+		<header class="topbar quire-sm" aria-label="Application toolbar">
 			{@render topbar?.()}
 		</header>
 		<main class="content texture-noise">
@@ -41,40 +41,39 @@
 		height: 100vh;
 		width: 100vw;
 		overflow: hidden;
-		background-color: var(--color-bg);
-		color: var(--color-text-primary);
+		background-color: var(--surface-substrate);
+		color: var(--text-prose);
 		transition: grid-template-columns var(--transition-spring);
 		position: relative;
 	}
 
-	/* Aurora light field — gives glass surfaces rich tonal variation to refract */
+	/* Single indigo ambient field — Quire Rule 4: accent metal is restrained.
+	   One primary glow per view; no competing teal/purple secondaries.
+	   Derived entirely from --color-primary via color-mix so it tracks both
+	   themes without literal rgba authoring.
+	   No blur filter — soft edges come from generous gradient fade zones. */
 	.app-shell::before {
 		content: '';
 		position: absolute;
-		inset: -20%;
-		pointer-events: none;
-		z-index: 0;
-		/* Primary indigo orb — left-centre (behind sidebar) */
-		background:
-			radial-gradient(circle at 12% 45%, rgba(64, 73, 225, 0.28) 0%, transparent 48%),
-			radial-gradient(circle at 8%  80%, rgba(48, 56, 200, 0.14) 0%, transparent 40%),
-			radial-gradient(circle at 55% 10%, rgba(80, 90, 240, 0.10) 0%, transparent 42%),
-			radial-gradient(circle at 90% 60%, rgba(40, 50, 180, 0.08) 0%, transparent 38%);
-		filter: blur(40px);
-	}
-
-	/* Secondary teal accent orb — top right, very subtle */
-	.app-shell::after {
-		content: '';
-		position: absolute;
-		inset: -20%;
+		inset: -40%;
 		pointer-events: none;
 		z-index: 0;
 		background:
-			radial-gradient(circle at 78% 15%, rgba(80, 200, 255, 0.07) 0%, transparent 38%),
-			radial-gradient(circle at 25% 95%, rgba(100, 80, 255, 0.09) 0%, transparent 35%);
-		filter: blur(60px);
-		mix-blend-mode: screen;
+			radial-gradient(
+				ellipse 70% 60% at 15% 50%,
+				color-mix(in oklch, var(--color-primary) 18%, transparent) 0%,
+				transparent 55%
+			),
+			radial-gradient(
+				ellipse 50% 50% at 5% 85%,
+				color-mix(in oklch, var(--color-primary) 9%, transparent) 0%,
+				transparent 50%
+			),
+			radial-gradient(
+				ellipse 60% 40% at 60% 8%,
+				color-mix(in oklch, var(--color-primary) 6%, transparent) 0%,
+				transparent 48%
+			);
 	}
 
 	.app-shell.sidebar-collapsed {
@@ -86,8 +85,6 @@
 		grid-column: 1 / 2;
 		display: flex;
 		flex-direction: column;
-		/* `clip` (vs hidden) preserves mix-blend-mode rendering for the
-		   .glass-md ::after specular sheen layer. */
 		overflow: clip;
 		height: 100vh;
 		position: relative;
@@ -95,30 +92,24 @@
 		transition: width var(--transition-spring);
 	}
 
-	/* Sidebar solid-surface override — cancels glass-md blur on the sidebar
-	   panel so the navigation rail reads as a confident, slightly elevated
-	   solid surface rather than a transparent blur rectangle. The glass-md
-	   ::before/::after layers live in global glass.css, so we reach them
-	   with :global(). */
-	:global(.sidebar.glass-md::before) {
-		backdrop-filter: none;
-		-webkit-backdrop-filter: none;
-		/* Use surface-elevated so the sidebar reads distinctly lighter than
-		   the page background (#09090e) — creates the separation that makes
-		   the nav panel feel like a physical object, not a merged dark wall. */
-		background: var(--color-surface-elevated);
-		opacity: 1;
+	/* Sidebar override — the navigation rail reads as a confident, lifted
+	   editorial sheet bound by a single hairline on its trailing edge.
+	   We keep the .quire-md tinted fill and inset highlights from quire.css
+	   but neutralise the outer shadow and border-radius so the sidebar
+	   meets the screen edge cleanly. */
+	:global(.sidebar.quire-md) {
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.05),
+			inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 		border: none;
+		border-right: 1px solid var(--border-edge);
+		border-radius: 0;
 	}
 
-	:global(.sidebar.glass-md) {
-		box-shadow: none;
-		border: none;
-		border-right: 1px solid var(--color-border);
-	}
-
-	:global(.sidebar.glass-md::after) {
-		display: none;
+	:global([data-theme="light"] .sidebar.quire-md) {
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.7),
+			inset 0 -1px 0 rgba(64, 73, 225, 0.04);
 	}
 
 	.main-area {
@@ -141,8 +132,8 @@
 		position: sticky;
 		top: 0;
 		z-index: var(--z-sticky);
-		/* Reset the border shorthand from .glass-sm so the topbar reads as a
-		   floating glass shelf with only a hairline at its bottom edge. */
+		/* Reset the border shorthand from .quire-sm so the topbar reads as a
+		   bound editorial shelf with only a hairline at its bottom edge. */
 		border-top: none;
 		border-left: none;
 		border-right: none;
@@ -153,12 +144,12 @@
 		grid-row: 2 / 3;
 		overflow-y: auto;
 		overflow-x: hidden;
-		/* Subtle indigo vignette in the upper-left of the content area —
-		   lets the aurora bleed through visually without painting it. */
+		/* Subtle indigo vignette upper-left — lets the ambient field bleed
+		   through visually without painting it. Tokenised via color-mix. */
 		background: radial-gradient(
 			ellipse at 30% 20%,
-			rgba(64, 73, 225, 0.04) 0%,
-			var(--color-bg) 60%
+			color-mix(in oklch, var(--color-primary) 4%, transparent) 0%,
+			var(--surface-substrate) 60%
 		);
 		position: relative;
 	}

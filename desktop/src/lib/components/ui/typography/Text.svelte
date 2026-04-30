@@ -7,48 +7,83 @@
 	type FontWeight = 'light' | 'regular' | 'medium' | 'semibold' | 'bold';
 	type TextColor = 'primary' | 'secondary' | 'muted' | 'disabled' | 'inherit';
 	type TextElement = 'p' | 'span' | 'div' | 'label';
+	type Tier = 'caption' | 'meta' | 'body' | 'prose';
+	type Tone = 'prose' | 'meta' | 'muted' | 'disabled';
 
 	type Props = {
-		variant?: TextVariant;
-		size?: TextSize;
-		weight?: FontWeight;
-		color?: TextColor;
+		/** Render tag. Preferred new prop. */
+		tag?: TextElement;
+		/** Legacy alias for tag. */
 		as?: TextElement;
+		/** Quire type tier. */
+		tier?: Tier;
+		/** Quire tone. */
+		tone?: Tone;
+		/** Italic body variant (Geist Sans italic). */
+		italic?: boolean;
+		/** Legacy variant — maps to tier. */
+		variant?: TextVariant;
+		/** Legacy explicit size override. */
+		size?: TextSize;
+		/** Legacy explicit weight override. */
+		weight?: FontWeight;
+		/** Legacy color — mapped to tone. */
+		color?: TextColor;
 		class?: string;
 		children?: Snippet;
 	};
 
 	let {
-		variant = 'body',
+		tag,
+		as,
+		tier,
+		tone,
+		italic = false,
+		variant,
 		size,
 		weight,
 		color,
-		as: element = 'span',
 		class: className = '',
 		children,
 	}: Props = $props();
 
-	const variantDefaults: Record<TextVariant, { size: TextSize; weight: FontWeight; color: TextColor }> = {
-		body: { size: 'base', weight: 'regular', color: 'primary' },
-		caption: { size: 'xs', weight: 'regular', color: 'muted' },
-		label: { size: 'sm', weight: 'medium', color: 'secondary' },
-		mono: { size: 'sm', weight: 'regular', color: 'secondary' },
-		code: { size: 'sm', weight: 'regular', color: 'primary' },
+	const element = $derived<TextElement>(tag ?? as ?? 'span');
+
+	// Map legacy variant → tier
+	const variantToTier: Record<TextVariant, Tier> = {
+		body: 'body',
+		caption: 'caption',
+		label: 'meta',
+		mono: 'meta',
+		code: 'meta',
 	};
 
-	const defaults = $derived(variantDefaults[variant]);
-	const resolvedSize = $derived(size ?? defaults.size);
-	const resolvedWeight = $derived(weight ?? defaults.weight);
-	const resolvedColor = $derived(color ?? defaults.color);
+	const resolvedTier = $derived<Tier>(
+		tier ?? (variant ? variantToTier[variant] : 'body')
+	);
+
+	// Map legacy color → tone
+	const colorToTone: Record<TextColor, Tone | null> = {
+		primary: 'prose',
+		secondary: 'meta',
+		muted: 'muted',
+		disabled: 'disabled',
+		inherit: null,
+	};
+	const resolvedTone = $derived<Tone | null>(
+		tone ?? (color ? colorToTone[color] : null)
+	);
 
 	const isMono = $derived(variant === 'mono' || variant === 'code');
 
 	const classes = $derived(
 		clsx(
-			`text-${resolvedSize}`,
-			`font-${resolvedWeight}`,
+			`text-${resolvedTier}`,
+			italic && 'italic',
 			isMono && 'font-mono',
-			resolvedColor !== 'inherit' && `text-color-${resolvedColor}`,
+			resolvedTone && `tone-${resolvedTone}`,
+			size && `text-${size}`,
+			weight && `font-${weight}`,
 			className
 		)
 	);
@@ -63,7 +98,3 @@
 {:else}
 	<span class={classes}>{@render children?.()}</span>
 {/if}
-
-<style>
-	:global(.font-mono) { font-family: var(--font-mono); }
-</style>
