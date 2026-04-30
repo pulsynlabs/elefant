@@ -160,9 +160,13 @@ body {
 	letter-spacing: var(--tracking-normal);
 	color: var(--text-prose);
 	background-color: var(--surface-substrate);
-	-webkit-font-smoothing: antialiased;
+	/* Default font-smoothing (subpixel on standard LCDs, antialiased on HiDPI).
+	   Avoid -webkit-font-smoothing: antialiased globally — it causes brightness
+	   flicker during typing in Chromium/Tauri WebKit on Linux. */
 	-moz-osx-font-smoothing: grayscale;
-	text-rendering: optimizeLegibility;
+	/* text-rendering: optimizeLegibility removed — it triggers expensive
+	   glyph recalculation on every keystroke causing visible flicker in
+	   WebKit/Chromium compositors (Tauri, Electron, etc.). */
 }
 
 h1,
