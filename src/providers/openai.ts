@@ -144,6 +144,13 @@ function createErrorEvent(message: string, details?: unknown): StreamEvent {
 	}
 }
 
+/**
+ * Adapter for any OpenAI-compatible API.
+ * Works with OpenAI, Groq, Together AI, Fireworks, Perplexity, and any other
+ * provider implementing the OpenAI chat completions API format.
+ *
+ * @see https://platform.openai.com/docs/api-reference/chat
+ */
 export class OpenAIAdapter implements ProviderAdapter {
 	public readonly name: string
 	private readonly config: ProviderConfig
