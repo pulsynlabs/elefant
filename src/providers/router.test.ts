@@ -2,13 +2,14 @@ import { describe, expect, it } from 'bun:test'
 
 import type { ElefantConfig } from '../config/schema.ts'
 import { ProviderRouter } from './router.ts'
-import { AnthropicAdapter } from './anthropic.ts'
+import { AnthropicCompatibleAdapter } from './anthropic.ts'
 import { OpenAIAdapter } from './openai.ts'
 
 const TEST_CONFIG: ElefantConfig = {
 	port: 1337,
 	logLevel: 'info',
 	defaultProvider: 'openai-primary',
+	projectPath: '/tmp',
 	providers: [
 		{
 			name: 'openai-primary',
@@ -45,8 +46,52 @@ describe('ProviderRouter', () => {
 
 		expect(result.ok).toBe(true)
 		if (result.ok) {
-			expect(result.data).toBeInstanceOf(AnthropicAdapter)
+			expect(result.data).toBeInstanceOf(AnthropicCompatibleAdapter)
 			expect(result.data.name).toBe('anthropic-fallback')
+		}
+	})
+
+	it('routes anthropic-compatible format to AnthropicCompatibleAdapter', () => {
+		const router = new ProviderRouter({
+			providers: [{
+				name: 'test-anthropic-compat',
+				baseURL: 'https://api.example.com',
+				apiKey: 'test-key',
+				model: 'test-model',
+				format: 'anthropic-compatible',
+			}],
+			defaultProvider: 'test-anthropic-compat',
+			port: 1337,
+			logLevel: 'info',
+			projectPath: '/tmp',
+		})
+		const result = router.getAdapter('test-anthropic-compat')
+
+		expect(result.ok).toBe(true)
+		if (result.ok) {
+			expect(result.data).toBeInstanceOf(AnthropicCompatibleAdapter)
+		}
+	})
+
+	it('routes anthropic format to AnthropicCompatibleAdapter', () => {
+		const router = new ProviderRouter({
+			providers: [{
+				name: 'test-anthropic',
+				baseURL: 'https://api.anthropic.com',
+				apiKey: 'test-key',
+				model: 'claude-opus-4-7',
+				format: 'anthropic',
+			}],
+			defaultProvider: 'test-anthropic',
+			port: 1337,
+			logLevel: 'info',
+			projectPath: '/tmp',
+		})
+		const result = router.getAdapter('test-anthropic')
+
+		expect(result.ok).toBe(true)
+		if (result.ok) {
+			expect(result.data).toBeInstanceOf(AnthropicCompatibleAdapter)
 		}
 	})
 
@@ -65,6 +110,7 @@ describe('ProviderRouter', () => {
 			providers: [],
 			defaultProvider: '',
 			logLevel: 'info' as const,
+			projectPath: '/tmp',
 		}
 		const router = new ProviderRouter(emptyConfig)
 		const result = router.getAdapter('any-provider')

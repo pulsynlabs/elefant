@@ -3,7 +3,7 @@ import type { ElefantError } from '../types/errors.ts'
 import type { Result } from '../types/result.ts'
 import { err, ok } from '../types/result.ts'
 import type { ProviderAdapter } from './types.ts'
-import { AnthropicAdapter } from './anthropic.ts'
+import { AnthropicCompatibleAdapter } from './anthropic.ts'
 import { OpenAIAdapter } from './openai.ts'
 
 export class ProviderRouter {
@@ -24,12 +24,12 @@ export class ProviderRouter {
 				continue
 			}
 
-			if (provider.format === 'anthropic') {
-				this.adapters.set(provider.name, new AnthropicAdapter(provider))
+			if (provider.format === 'anthropic' || provider.format === 'anthropic-compatible') {
+				this.adapters.set(provider.name, new AnthropicCompatibleAdapter(provider))
 				continue
 			}
 
-			throw new Error(`Unsupported provider format: ${provider.format}`)
+			throw new Error(`Unsupported provider format: ${(provider as { format: string }).format}`)
 		}
 
 		// No providers configured yet — that's fine, user will add via the desktop UI
@@ -40,9 +40,15 @@ export class ProviderRouter {
 		for (const provider of config.providers) {
 			if (provider.format === 'openai') {
 				this.adapters.set(provider.name, new OpenAIAdapter(provider))
-			} else if (provider.format === 'anthropic') {
-				this.adapters.set(provider.name, new AnthropicAdapter(provider))
+				continue
 			}
+
+			if (provider.format === 'anthropic' || provider.format === 'anthropic-compatible') {
+				this.adapters.set(provider.name, new AnthropicCompatibleAdapter(provider))
+				continue
+			}
+
+			throw new Error(`Unsupported provider format: ${(provider as { format: string }).format}`)
 		}
 		this.defaultProvider = config.defaultProvider
 	}
