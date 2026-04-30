@@ -52,9 +52,6 @@ Output: Decision summary showing verifier default `contextMode: none`, rationale
 **DON'T:** Save low-value noise to memory.
 
 ### Elefant Operating Notes
-- Runtime: Bun daemon on localhost with SQLite persistence.
-- Desktop: Tauri v2 with Svelte 5 runes and Tailwind v4.
-- Icons: Hugeicons only when UI work is in scope.
 - Spec tools are authoritative for workflow state and documents.
 - Hook events enforce behavior; prompts are guidance, hooks are law.
 - Agent config changes must take effect on the next dispatch.
