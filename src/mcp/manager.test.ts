@@ -306,4 +306,70 @@ describe('MCPManager', () => {
 		expect(mock.calls.close).toBe(1);
 	});
 
+	it('init() connects enabled servers and marks disabled ones without spawning real processes', async () => {
+		const enabled1Id = '00000000-0000-4000-8000-000000000201';
+		const enabled2Id = '00000000-0000-4000-8000-000000000202';
+		const disabledId = '00000000-0000-4000-8000-000000000203';
+
+		const mock = createMockClient(async () => undefined);
+		const statusEvents: Array<{ serverId: string; status: MCPServerStatus }> = [];
+
+		const manager = new MCPManager(
+			createConfigManager({
+				mcp: [
+					{
+						id: enabled1Id,
+						name: 'server-one',
+						transport: 'stdio',
+						command: ['echo', 'hello'],
+					},
+					{
+						id: enabled2Id,
+						name: 'server-two',
+						transport: 'stdio',
+						command: ['echo', 'world'],
+					},
+					{
+						id: disabledId,
+						name: 'server-three',
+						transport: 'stdio',
+						command: ['echo', 'disabled'],
+						enabled: false,
+					},
+				],
+			}),
+			(event) => {
+				if (event.type === 'mcp.status.changed') {
+					statusEvents.push({ serverId: event.serverId, status: event.status });
+				}
+			},
+			{
+				clientFactory: () => mock.client,
+				createStdioTransport: () => createMockTransport(),
+			},
+		);
+
+		await manager.init();
+
+		expect(manager.getStatus(enabled1Id)).toBe('connected');
+		expect(manager.getStatus(enabled2Id)).toBe('connected');
+		expect(manager.getStatus(disabledId)).toBe('disabled');
+
+		// Disabled server is present in state — not missing
+		const disabledState = getState(manager, disabledId);
+		expect(disabledState).toBeDefined();
+		expect(disabledState?.status).toBe('disabled');
+		expect(disabledState?.config.enabled).toBe(false);
+
+		// Both enabled servers have populated state with tools cached
+		expect(getState(manager, enabled1Id)?.tools).toEqual([]);
+		expect(getState(manager, enabled2Id)?.tools).toEqual([]);
+
+		// Status change events were emitted for all three servers
+		const disabledEvent = statusEvents.find((e) => e.serverId === disabledId);
+		expect(disabledEvent?.status).toBe('disabled');
+
+		const connectedEvents = statusEvents.filter((e) => e.status === 'connected');
+		expect(connectedEvents.length).toBe(2);
+	});
 });
