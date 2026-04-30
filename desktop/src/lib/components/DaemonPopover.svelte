@@ -232,9 +232,7 @@
 		flex-direction: column;
 		gap: var(--space-3);
 		padding: var(--space-3);
-		/* Subtle glass surface */
-		backdrop-filter: blur(8px);
-		-webkit-backdrop-filter: blur(8px);
+		/* Solid surface — no blur. Depth from color + shadow. */
 	}
 
 	/* ── Header ─────────────────────────────────────────────────────── */

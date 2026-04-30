@@ -8,8 +8,8 @@
      • Single source of truth for color, surface, border, text, motion, radius, spacing.
      • Each shadcn-svelte CSS variable is routed through a Quire token —
        no defaults leak through.
-     • backdrop-filter is NOT defined here; it is reserved for the
-       quire-lg surface tier in quire.css.
+     • No blur tokens — Quire uses solid surfaces with hairline edges
+       and inset highlights. Depth comes from color, border, and shadow.
    ========================================= */
 
 /* === DARK THEME (default) === */
@@ -127,9 +127,6 @@
 	--glass-border: var(--border-hairline);
 	--glass-border-strong: var(--border-edge);
 	--glass-inner-glow: var(--highlight-edge-top);
-	--blur-sm: 6px;
-	--blur-md: 14px;
-	--blur-lg: 28px;
 	/* Glow aliases */
 	--shadow-glow: var(--glow-primary);
 }
@@ -239,9 +236,6 @@
 	--glass-border: var(--border-hairline);
 	--glass-border-strong: var(--border-edge);
 	--glass-inner-glow: var(--highlight-edge-top);
-	--blur-sm: 6px;
-	--blur-md: 14px;
-	--blur-lg: 28px;
 	--shadow-glow: var(--glow-primary);
 }
 

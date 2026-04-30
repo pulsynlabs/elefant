@@ -50,30 +50,30 @@
 	/* Single indigo ambient field — Quire Rule 4: accent metal is restrained.
 	   One primary glow per view; no competing teal/purple secondaries.
 	   Derived entirely from --color-primary via color-mix so it tracks both
-	   themes without literal rgba authoring. */
+	   themes without literal rgba authoring.
+	   No blur filter — soft edges come from generous gradient fade zones. */
 	.app-shell::before {
 		content: '';
 		position: absolute;
-		inset: -20%;
+		inset: -40%;
 		pointer-events: none;
 		z-index: 0;
 		background:
 			radial-gradient(
-				circle at 12% 45%,
-				color-mix(in oklch, var(--color-primary) 22%, transparent) 0%,
+				ellipse 70% 60% at 15% 50%,
+				color-mix(in oklch, var(--color-primary) 18%, transparent) 0%,
+				transparent 55%
+			),
+			radial-gradient(
+				ellipse 50% 50% at 5% 85%,
+				color-mix(in oklch, var(--color-primary) 9%, transparent) 0%,
+				transparent 50%
+			),
+			radial-gradient(
+				ellipse 60% 40% at 60% 8%,
+				color-mix(in oklch, var(--color-primary) 6%, transparent) 0%,
 				transparent 48%
-			),
-			radial-gradient(
-				circle at 8% 80%,
-				color-mix(in oklch, var(--color-primary) 11%, transparent) 0%,
-				transparent 40%
-			),
-			radial-gradient(
-				circle at 55% 10%,
-				color-mix(in oklch, var(--color-primary) 8%, transparent) 0%,
-				transparent 42%
 			);
-		filter: blur(40px);
 	}
 
 	.app-shell.sidebar-collapsed {

@@ -207,8 +207,8 @@
 			<span class="text-caption ds-section-eyebrow">03 · Surfaces</span>
 			<Heading level={2} tier="title">Surfaces</Heading>
 			<Text tag="p" tier="body" tone="meta">
-				Three tiers of bound material. Backdrop blur is reserved for
-				<InlineCode>quire-lg</InlineCode> overlays only.
+				Three tiers of bound material. No blur — depth comes from color,
+				border, and shadow.
 			</Text>
 		</div>
 
@@ -234,8 +234,8 @@
 					<span class="text-caption ds-surface-tier">lg</span>
 					<Heading level={3} tier="title">Modals &amp; popovers</Heading>
 					<Text tag="p" tier="body" tone="meta">
-						The only tier permitted backdrop blur — measured 14px with a
-						mild saturation lift.
+						Solid overlay with strong border and shadow — depth without
+						blur.
 					</Text>
 				</div>
 			</div>
