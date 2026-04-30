@@ -61,6 +61,33 @@ const agentProfileSchema = z.object({
 	maxChildren: z.number().int().min(1).optional(),
 }).strict();
 
+const mcpStdioConfigSchema = z.object({
+	id: z.string().uuid(),
+	name: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+	transport: z.literal("stdio"),
+	command: z.array(z.string()).min(1),
+	env: z.record(z.string(), z.string()).optional().default({}),
+	enabled: z.boolean().optional().default(true),
+	timeout: z.number().positive().optional().default(30000),
+	pinnedTools: z.array(z.string()).optional().default([]),
+}).strict();
+
+const mcpRemoteConfigSchema = z.object({
+	id: z.string().uuid(),
+	name: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+	transport: z.enum(["sse", "streamable-http"]),
+	url: z.string().url(),
+	headers: z.record(z.string(), z.string()).optional().default({}),
+	enabled: z.boolean().optional().default(true),
+	timeout: z.number().positive().optional().default(30000),
+	pinnedTools: z.array(z.string()).optional().default([]),
+}).strict();
+
+const mcpServerSchema = z.discriminatedUnion("transport", [
+	mcpStdioConfigSchema,
+	mcpRemoteConfigSchema,
+]);
+
 const configSchema = z.object({
 	port: z.number().int().min(1).max(65535).default(1337),
 	providers: z.array(providerSchema).default([]),
@@ -68,6 +95,8 @@ const configSchema = z.object({
 	logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
 	projectPath: z.string().default(() => process.cwd()),
 	agents: z.record(z.string(), agentProfileSchema).optional(),
+	mcp: z.array(mcpServerSchema).optional().default([]),
+	tokenBudgetPercent: z.number().min(0).max(100).optional().default(10),
 }).strict();
 
 type AgentProfileInput = z.input<typeof agentProfileSchema>;
@@ -116,6 +145,9 @@ export {
 	agentContextModeSchema,
 	agentProfileSchema,
 	defaultAgentProfiles,
+	mcpServerSchema,
+	mcpStdioConfigSchema,
+	mcpRemoteConfigSchema,
 };
 export type ElefantConfig = z.infer<typeof configSchema>;
 export type ProviderEntry = z.infer<typeof providerSchema>;
@@ -125,3 +157,6 @@ export type AgentBehaviorConfig = z.infer<typeof agentBehaviorConfigSchema>;
 export type AgentPermissions = z.infer<typeof agentPermissionsSchema>;
 export type AgentContextMode = z.infer<typeof agentContextModeSchema>;
 export type AgentProfile = z.infer<typeof agentProfileSchema>;
+export type McpServerConfig = z.infer<typeof mcpServerSchema>;
+export type McpStdioConfig = z.infer<typeof mcpStdioConfigSchema>;
+export type McpRemoteConfig = z.infer<typeof mcpRemoteConfigSchema>;

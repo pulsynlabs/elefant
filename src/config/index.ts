@@ -8,6 +8,9 @@ export {
 	agentContextModeSchema,
 	agentProfileSchema,
 	defaultAgentProfiles,
+	mcpServerSchema,
+	mcpStdioConfigSchema,
+	mcpRemoteConfigSchema,
 } from './schema.ts';
 export type {
 	ElefantConfig,
@@ -18,6 +21,9 @@ export type {
 	AgentPermissions,
 	AgentContextMode,
 	AgentProfile,
+	McpServerConfig,
+	McpStdioConfig,
+	McpRemoteConfig,
 } from './schema.ts';
 export {
 	ConfigManager,
