@@ -21,9 +21,14 @@ export interface ToolWithMeta {
 	tool: Tool;
 }
 
-export type MCPStatusEvent = {
-	type: 'mcp.status.changed';
-	serverId: string;
-	status: MCPServerStatus;
-	error?: string;
-};
+export type MCPStatusEvent =
+	| {
+		type: 'mcp.status.changed';
+		serverId: string;
+		status: MCPServerStatus;
+		error?: string;
+	}
+	| {
+		type: 'mcp.tools.changed';
+		serverId: string;
+	};

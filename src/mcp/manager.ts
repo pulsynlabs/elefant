@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+import { ToolListChangedNotificationSchema, type CallToolResult, type Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import type { ConfigManager } from '../config/loader.ts';
 import type { McpServerConfig } from '../config/schema.ts';
@@ -11,6 +11,7 @@ import {
 	type MCPRemoteTransport,
 	type MCPTransport,
 } from './transports.ts';
+import { searchMcpTools } from './search.ts';
 import type {
 	MCPServerState,
 	MCPServerStatus,
@@ -19,6 +20,7 @@ import type {
 } from './types.ts';
 
 const DEFAULT_INIT_CONCURRENCY = 8;
+export const MAX_MCP_DESCRIPTION_LENGTH = 2048;
 
 type MCPClient = Client;
 
@@ -109,11 +111,31 @@ export class MCPManager {
 			const connected = serverConfig.transport === 'stdio'
 				? await this.connectStdio(serverConfig)
 				: await this.connectRemote(serverConfig);
+			const listedTools = await connected.client.listTools();
+			const tools = truncateToolDescriptions(listedTools.tools);
+			const lastToolsAt = Date.now();
+
+			connected.client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
+				const fresh = await connected.client.listTools();
+				const existing = this.servers.get(id);
+				if (!existing) {
+					return;
+				}
+
+				this.servers.set(id, {
+					...existing,
+					tools: truncateToolDescriptions(fresh.tools),
+					lastToolsAt: Date.now(),
+				});
+				this.onStatusChange?.({ type: 'mcp.tools.changed', serverId: id });
+			});
 
 			this.setState(id, {
 				config: serverConfig,
 				client: connected.client,
 				status: 'connected',
+				tools,
+				lastToolsAt,
 				transport: connected.transport,
 			});
 		} catch (error) {
@@ -146,24 +168,37 @@ export class MCPManager {
 	}
 
 	public async listTools(id: string): Promise<Tool[]> {
-		void id;
-		throw new Error('not implemented');
+		const state = this.servers.get(id);
+		if (!state) {
+			return [];
+		}
+
+		if (state.tools) {
+			return state.tools;
+		}
+
+		if (!state.client || state.status !== 'connected') {
+			return [];
+		}
+
+		const fresh = await state.client.listTools();
+		const tools = truncateToolDescriptions(fresh.tools);
+		this.servers.set(id, {
+			...state,
+			tools,
+			lastToolsAt: Date.now(),
+		});
+		return tools;
 	}
 
 	public listAllTools(): ToolWithMeta[] {
-		const tools: ToolWithMeta[] = [];
-
-		for (const [serverId, state] of this.servers) {
-			for (const tool of state.tools ?? []) {
-				tools.push({
-					serverId,
-					serverName: state.config.name,
-					tool,
-				});
-			}
-		}
-
-		return tools;
+		return Array.from(this.servers.values())
+			.filter((state) => state.status === 'connected' && state.tools)
+			.flatMap((state) => state.tools!.map((tool) => ({
+				serverId: state.config.id,
+				serverName: state.config.name,
+				tool,
+			})));
 	}
 
 	public async callTool(
@@ -181,40 +216,14 @@ export class MCPManager {
 		query: string,
 		options: { server?: string; maxResults?: number } = {},
 	): ToolWithMeta[] {
-		const normalizedQuery = query.trim().toLowerCase();
-		const maxResults = options.maxResults ?? 5;
-		const candidates = this.listAllTools().filter((entry) => (
-			options.server === undefined
-			|| entry.serverId === options.server
-			|| entry.serverName === options.server
-		));
-
-		if (normalizedQuery.startsWith('select:')) {
-			const selectedNames = new Set(
-				normalizedQuery
-					.slice('select:'.length)
-					.split(',')
-					.map((name) => name.trim())
-					.filter((name) => name.length > 0),
-			);
-
-			return candidates
-				.filter((entry) => selectedNames.has(entry.tool.name.toLowerCase()))
-				.slice(0, maxResults);
-		}
-
-		if (normalizedQuery.length === 0) {
-			return candidates.slice(0, maxResults);
-		}
-
-		return candidates
-			.filter((entry) => this.toolMatchesQuery(entry, normalizedQuery))
-			.slice(0, maxResults);
+		return searchMcpTools(this.listAllTools(), query, options);
 	}
 
 	public getServerForTool(toolName: string): string | undefined {
+		const normalizedToolName = stripMcpToolPrefix(toolName);
+
 		for (const [serverId, state] of this.servers) {
-			if ((state.tools ?? []).some((tool) => tool.name === toolName)) {
+			if ((state.tools ?? []).some((tool) => tool.name === normalizedToolName)) {
 				return serverId;
 			}
 		}
@@ -335,12 +344,6 @@ export class MCPManager {
 		});
 	}
 
-	private toolMatchesQuery(entry: ToolWithMeta, normalizedQuery: string): boolean {
-		return entry.tool.name.toLowerCase().includes(normalizedQuery)
-			|| entry.serverName.toLowerCase().includes(normalizedQuery)
-			|| (entry.tool.description?.toLowerCase().includes(normalizedQuery) ?? false);
-	}
-
 	private async runWithConcurrency<T>(
 		items: T[],
 		concurrency: number,
@@ -359,4 +362,20 @@ export class MCPManager {
 			}
 		}));
 	}
+}
+
+function truncateToolDescriptions(tools: Tool[]): Tool[] {
+	return tools.map((tool) => ({
+		...tool,
+		description: tool.description?.slice(0, MAX_MCP_DESCRIPTION_LENGTH),
+	}));
+}
+
+function stripMcpToolPrefix(toolName: string): string {
+	const parts = toolName.split('__');
+	if (parts.length >= 3 && parts[0] === 'mcp') {
+		return parts.slice(2).join('__');
+	}
+
+	return toolName;
 }
