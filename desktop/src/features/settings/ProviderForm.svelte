@@ -1,23 +1,37 @@
 <script lang="ts">
-	import type { ProviderEntry, ProviderFormat } from '$lib/daemon/types.js';
+	import type {
+		ProviderEntry,
+		ProviderFormat,
+		RegistryProvider,
+	} from '$lib/daemon/types.js';
 
 	type Props = {
 		provider?: ProviderEntry;
+		template?: RegistryProvider;
 		onSave: (provider: ProviderEntry) => void;
 		onCancel: () => void;
 	};
 
-	let { provider, onSave, onCancel }: Props = $props();
+	let { provider, template, onSave, onCancel }: Props = $props();
 
 	const isEditing = $derived(!!provider);
 
-	let name = $state(provider?.name ?? '');
-	let baseURL = $state(provider?.baseURL ?? '');
+	let name = $state(provider?.name ?? template?.name ?? '');
+	let baseURL = $state(provider?.baseURL ?? template?.baseURL ?? '');
 	let apiKey = $state(provider?.apiKey ?? '');
-	let model = $state(provider?.model ?? '');
-	let format = $state<ProviderFormat>(provider?.format ?? 'openai');
+	let model = $state(provider?.model ?? template?.models[0]?.id ?? '');
+	let format = $state<ProviderFormat>(
+		provider?.format ?? template?.format ?? 'openai',
+	);
 	let showApiKey = $state(false);
 	let errors = $state<Record<string, string>>({});
+	let apiKeyInput = $state<HTMLInputElement | null>(null);
+
+	$effect(() => {
+		if (template && !provider && apiKeyInput) {
+			apiKeyInput.focus();
+		}
+	});
 
 	function validate(): boolean {
 		const newErrors: Record<string, string> = {};
@@ -52,6 +66,12 @@
 <div class="provider-form">
 	<h4 class="form-title">{isEditing ? 'Edit Provider' : 'Add Provider'}</h4>
 
+	{#if template && !provider}
+		<p class="template-hint">
+			Pre-filled from {template.name} registry. Add your API key to get started.
+		</p>
+	{/if}
+
 	<div class="form-fields">
 		<div class="form-group">
 			<label class="field-label" for="prov-name">Name</label>
@@ -73,6 +93,7 @@
 			<select id="prov-format" class="field-select" bind:value={format}>
 				<option value="openai">OpenAI-compatible</option>
 				<option value="anthropic">Anthropic</option>
+				<option value="anthropic-compatible">Anthropic-compatible</option>
 			</select>
 		</div>
 
@@ -113,6 +134,7 @@
 					class="field-input"
 					class:field-error={!!errors.apiKey}
 					bind:value={apiKey}
+					bind:this={apiKeyInput}
 					placeholder="sk-..."
 					autocomplete="off"
 					aria-invalid={!!errors.apiKey}
@@ -153,6 +175,12 @@
 		font-size: var(--font-size-md);
 		font-weight: var(--font-weight-semibold);
 		color: var(--color-text-primary);
+	}
+
+	.template-hint {
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
+		margin: 0;
 	}
 
 	.form-fields {
