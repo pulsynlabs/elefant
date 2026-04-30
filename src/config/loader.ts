@@ -494,6 +494,13 @@ export class ConfigManager {
 		return ok(resolved);
 	}
 
+	public async getConfig(): Promise<Result<ElefantConfig, ConfigError>> {
+		const globalResult = await this.getGlobalConfig();
+		if (!globalResult.ok) return globalResult;
+
+		return ok(globalResult.data ?? configSchema.parse({}));
+	}
+
 	public async listProjectProfiles(
 		projectId: string | undefined,
 	): Promise<Result<Record<string, AgentProfile>, ConfigError>> {
