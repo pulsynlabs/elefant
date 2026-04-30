@@ -143,6 +143,7 @@ export interface ElefantConfig {
 	providers: ProviderEntry[];
 	defaultProvider: string;
 	logLevel: LogLevel;
+	hardwareAccelerationDisabled?: boolean;
 }
 
 /** A single model entry within a provider's model list. */

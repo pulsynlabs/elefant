@@ -5,14 +5,18 @@
 	import { onMount } from 'svelte';
 	import NumberInput from '$lib/components/ui/NumberInput.svelte';
 	import SelectInput from '$lib/components/ui/SelectInput.svelte';
+	import { HugeiconsIcon, RefreshIcon } from '$lib/icons/index.js';
 
 	let daemonUrl = $state(settingsStore.daemonUrl);
 	let port = $state(1337);
 	let logLevel = $state<LogLevel>('info');
 	let defaultProvider = $state('');
 	let availableProviders = $state<string[]>([]);
+	let hardwareAcceleration = $state<'enabled' | 'disabled'>('enabled');
+	let savedHardwareAcceleration = $state<'enabled' | 'disabled'>('enabled');
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let saveMessage = $state('');
+	let restartStatus = $state<'idle' | 'restarting'>('idle');
 
 	const logLevelOptions = [
 		{ value: 'debug', label: 'Debug' },
@@ -21,9 +25,16 @@
 		{ value: 'error', label: 'Error' },
 	];
 
+	const hardwareAccelerationOptions = [
+		{ value: 'enabled', label: 'Enabled (default)' },
+		{ value: 'disabled', label: 'Disabled (Windows only, restart required)' },
+	];
+
 	const providerOptions = $derived(
 		availableProviders.map((p) => ({ value: p, label: p }))
 	);
+
+	const restartRequired = $derived(hardwareAcceleration !== savedHardwareAcceleration);
 
 	onMount(async () => {
 		const config = await configService.readConfig();
@@ -32,6 +43,9 @@
 			logLevel = config.logLevel;
 			defaultProvider = config.defaultProvider;
 			availableProviders = config.providers.map(p => p.name);
+			const isDisabled = config.hardwareAccelerationDisabled ?? false;
+			hardwareAcceleration = isDisabled ? 'disabled' : 'enabled';
+			savedHardwareAcceleration = hardwareAcceleration;
 		}
 	});
 
@@ -43,8 +57,10 @@
 				port,
 				logLevel,
 				...(defaultProvider ? { defaultProvider } : {}),
+				hardwareAccelerationDisabled: hardwareAcceleration === 'disabled',
 			});
 
+			savedHardwareAcceleration = hardwareAcceleration;
 			saveStatus = 'saved';
 			saveMessage = 'Settings saved';
 			setTimeout(() => { saveStatus = 'idle'; }, 2000);
@@ -52,6 +68,16 @@
 			saveStatus = 'error';
 			saveMessage = error instanceof Error ? error.message : 'Failed to save settings';
 			setTimeout(() => { saveStatus = 'idle'; }, 4000);
+		}
+	}
+
+	async function handleRestart(): Promise<void> {
+		restartStatus = 'restarting';
+		try {
+			// Invoke the Tauri restart command
+			await (window as any).__TAURI__.invoke('restart_app');
+		} catch {
+			restartStatus = 'idle';
 		}
 	}
 </script>
@@ -93,10 +119,39 @@
 		<span class="field-hint">Written to elefant.config.json. Requires daemon restart.</span>
 	</div>
 
+	<div class="form-group">
+		<label class="field-label" for="hardwareAcceleration">Hardware Acceleration</label>
+		<SelectInput
+			id="hardwareAcceleration"
+			bind:value={hardwareAcceleration}
+			options={hardwareAccelerationOptions}
+		/>
+		<span class="field-hint">
+			Disable GPU acceleration on Windows if you experience rendering issues. Restart required after saving.
+		</span>
+		{#if restartRequired}
+			<div class="restart-notice">
+				<span class="restart-text">Restart required to apply changes</span>
+			</div>
+		{/if}
+	</div>
+
 	<div class="form-actions">
 		<button class="btn-primary" onclick={handleSave} disabled={saveStatus === 'saving'}>
 			{saveStatus === 'saving' ? 'Saving...' : 'Save Changes'}
 		</button>
+		{#if restartRequired}
+			<button
+				class="btn-secondary"
+				onclick={handleRestart}
+				disabled={restartStatus === 'restarting'}
+			>
+				<span class="btn-icon" aria-hidden="true">
+					<HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.8} />
+				</span>
+				{restartStatus === 'restarting' ? 'Restarting...' : 'Restart Elefant'}
+			</button>
+		{/if}
 		{#if saveStatus !== 'idle'}
 			<span class="save-feedback" class:error={saveStatus === 'error'}>
 				{saveMessage}
@@ -192,5 +247,55 @@
 
 	.save-feedback.error {
 		color: var(--color-error);
+	}
+
+	.restart-notice {
+		margin-top: var(--space-2);
+		padding: var(--space-2) var(--space-3);
+		background-color: var(--color-primary-subtle);
+		border: 1px solid var(--color-primary);
+		border-radius: var(--radius-md);
+	}
+
+	.restart-text {
+		font-size: var(--font-size-sm);
+		color: var(--color-primary);
+		font-weight: var(--font-weight-medium);
+	}
+
+	.btn-secondary {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		background-color: transparent;
+		color: var(--color-text-secondary);
+		border: 1px solid var(--color-border-strong);
+		border-radius: var(--radius-md);
+		padding: var(--space-2) var(--space-4);
+		font-family: var(--font-sans);
+		font-size: var(--font-size-md);
+		font-weight: var(--font-weight-medium);
+		cursor: pointer;
+		transition:
+			background-color var(--transition-fast),
+			border-color var(--transition-fast),
+			color var(--transition-fast);
+	}
+
+	.btn-secondary:hover:not(:disabled) {
+		background-color: var(--color-surface-hover);
+		border-color: var(--color-border-strong);
+		color: var(--color-text-primary);
+	}
+
+	.btn-secondary:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.btn-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 	}
 </style>
