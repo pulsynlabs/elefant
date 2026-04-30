@@ -1,10 +1,8 @@
 @import "tailwindcss";
 
-/* ===== FONTS — Variable axes only ===== */
+/* ===== FONTS ===== */
 
-/* Fraunces Variable — display serif (opsz, wght, italic axes) */
-@import "@fontsource-variable/fraunces/index.css";
-@import "@fontsource-variable/fraunces/wght-italic.css";
+/* DM Serif Display — display serif (regular + italic, loaded via Google Fonts in app.html) */
 
 /* Geist Sans Variable — body (wght axis, 100-900 + italic) */
 @font-face {

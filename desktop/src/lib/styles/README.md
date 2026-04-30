@@ -13,7 +13,7 @@ The visual token system for Elefant Desktop, built on the **Quire** material lan
 | File | Purpose |
 |---|---|
 | `tokens.css` | Color, surface, border, text, motion, radius, spacing tokens for both themes; shadcn-svelte CSS variable mapping |
-| `typography.css` | Fraunces (display), Geist Sans (body), Geist Mono (telemetry) variable axes; seven canonical type tiers |
+| `typography.css` | DM Serif Display (display), Geist Sans (body), Geist Mono (telemetry); seven canonical type tiers |
 | `quire.css` | Three surface tiers (sm, md, lg) and the nested bezel pair (plate + leaf) |
 | `texture.css` | Mono labels, hairline borders, structural dividers — non-surface utility classes |
 | `forms.css` | Native form control styling (input, select, textarea) as quire-sm |
@@ -154,11 +154,11 @@ Each shadow is composed of a dark base layer (opacity-graded) plus a subtle indi
 | `.text-meta` | Geist Mono | 12px | tabular | Timestamps, telemetry |
 | `.text-body` | Geist Sans | 14px | wght 400 | Default body |
 | `.text-prose` | Geist Sans | 16px | wght 400 | Long-form, max-width 65ch |
-| `.text-title` | Fraunces | 24px | opsz 24, wght 400 | Section titles |
-| `.text-display` | Fraunces | 40px | opsz 40, wght 350 | Page titles |
-| `.text-hero` | Fraunces | clamp(40-64px) | opsz 60, wght 320 | Hero moments |
+| `.text-title` | DM Serif Display | 24px | wght 400 | Section titles |
+| `.text-display` | DM Serif Display | 40px | wght 400 | Page titles |
+| `.text-hero` | DM Serif Display | clamp(40-64px) | wght 400 | Hero moments |
 
-Italic variants available via `.italic` utility — Fraunces and Geist Sans both support italic axes.
+Italic variants available via `.italic` utility — DM Serif Display ships regular + italic; Geist Sans supports a full italic axis.
 
 ---
 
