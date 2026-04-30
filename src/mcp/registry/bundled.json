@@ -440,5 +440,18 @@
     "toolNames": ["airtable_list_bases", "airtable_get_records", "airtable_create_record", "airtable_update_record", "airtable_search_records"],
     "homepage": "https://github.com/mcp/airtable-server",
     "oneLiner": "Read and write Airtable bases and records"
+  },
+  {
+    "id": "bundled-context7",
+    "source": "bundled",
+    "name": "context7",
+    "displayName": "Context7",
+    "description": "Fetches up-to-date documentation and code examples for any library or framework on demand. Prevents hallucinated APIs by grounding responses in real docs.",
+    "transport": "stdio",
+    "command": ["npx", "-y", "@upstash/context7-mcp"],
+    "useCases": ["research", "dev-tools"],
+    "toolNames": ["resolve-library-id", "get-library-docs"],
+    "homepage": "https://context7.com",
+    "oneLiner": "Up-to-date library docs and code examples, on demand"
   }
 ]
