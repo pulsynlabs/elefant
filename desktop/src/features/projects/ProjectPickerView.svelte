@@ -1,15 +1,15 @@
 <script lang="ts">
-	// ProjectPickerView — the full-page view shown when no project is active.
+	// ProjectPickerView — the full-page editorial home shown when no project is active.
 	//
-	// Renders:
-	//   - Header with title + primary "Open New Folder" button
-	//   - A responsive grid of ProjectCard tiles
-	//   - A loading skeleton while projects are first fetching
-	//   - A friendly empty state when there are no projects yet
+	// Layout:
+	//   - Hero: ambient animated gradient + display-serif title + primary CTA
+	//   - Optional search bar (only when there are projects)
+	//   - Featured strip (top 3 most-recent projects when projects.length >= 3)
+	//   - Responsive grid of remaining ProjectCards
+	//   - Loading skeleton, empty state, no-results state, error banner
 	//
-	// The folder-picker + fuzzy-search + rename/delete wiring lands in later
-	// tasks (2.5 / 2.6). This file establishes the scaffolding and visual
-	// language the follow-up tasks will build on.
+	// All motion is gated by `prefers-reduced-motion: no-preference`. No external
+	// animation libraries — the orb drift and card stagger are pure CSS.
 
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import type { Project } from '$lib/types/project.js';
@@ -63,10 +63,6 @@
 			if (!dir) return; // User cancelled — no error, no navigation.
 			await projectsStore.openProject(dir);
 			onProjectSelected();
-			// Navigation transition lands in W3.T5. At that point this is:
-			//   navigationStore.navigate('chat');
-			// For now, successfully opening a project is visible via the
-			// project appearing at the top of the grid and becoming active.
 		} catch {
 			// openProject already surfaces the message via projectsStore.lastError.
 			// Swallow here so an unhandled rejection doesn't bubble to the console.
@@ -80,21 +76,15 @@
 	}
 
 	function handleSelect(project: Project): void {
-		// Real navigation lands in W3.T5; for now, select via the store so
-		// reactive consumers can already see the change in dev.
 		void projectsStore.selectProject(project.id);
 		onProjectSelected();
 	}
 
 	function handleRename(project: Project, newName: string): void {
-		// The card commits the rename against the store itself — this
-		// callback is an observability hook (useful for analytics/logging).
 		console.info('[picker] renamed', project.id, '→', newName);
 	}
 
 	function handleDelete(project: Project): void {
-		// The card commits the delete against the store itself; this is
-		// the post-delete observation hook.
 		console.info('[picker] deleted', project.id);
 	}
 
@@ -124,33 +114,51 @@
 			filteredProjects.length === 0 &&
 			searchQuery.trim().length > 0
 	);
+
+	// --- Featured strip ---------------------------------------------------
+	// Show a featured strip of the top 3 projects only when:
+	//   - We have at least 3 projects total, AND
+	//   - The user isn't actively filtering (so the strip doesn't churn as
+	//     they type and the layout stays predictable while searching).
+	const featuredCount = $derived(
+		!searchQuery.trim() && filteredProjects.length >= 3 ? 3 : 0
+	);
+	const featuredProjects = $derived(filteredProjects.slice(0, featuredCount));
+	const remainingProjects = $derived(filteredProjects.slice(featuredCount));
 </script>
 
 <section class="picker" aria-labelledby="picker-title">
+	<div class="hero">
+		<div class="hero-orb hero-orb-a" aria-hidden="true"></div>
+		<div class="hero-orb hero-orb-b" aria-hidden="true"></div>
+
+		<div class="hero-inner">
+			<header class="picker-header">
+				<div class="picker-heading">
+					<p class="picker-eyebrow">Workspace</p>
+					<h1 id="picker-title" class="picker-title">Your projects</h1>
+					<p class="picker-subtitle">
+						Pick up where you left off.
+					</p>
+				</div>
+
+				<button
+					type="button"
+					class="primary-button"
+					onclick={handleOpenNewFolder}
+					disabled={isOpeningFolder}
+					aria-busy={isOpeningFolder}
+				>
+					<span class="primary-button-icon" aria-hidden="true">
+						<HugeiconsIcon icon={FolderAddIcon} size={16} strokeWidth={1.8} />
+					</span>
+					{isOpeningFolder ? 'Opening…' : 'Open New Folder'}
+				</button>
+			</header>
+		</div>
+	</div>
+
 	<div class="picker-inner">
-		<header class="picker-header">
-			<div class="picker-heading">
-				<p class="picker-eyebrow">Workspace</p>
-				<h1 id="picker-title" class="picker-title">Choose a project</h1>
-				<p class="picker-subtitle">
-					Open a folder to start a project, or pick up where you left off.
-				</p>
-			</div>
-
-			<button
-				type="button"
-				class="primary-button"
-				onclick={handleOpenNewFolder}
-				disabled={isOpeningFolder}
-				aria-busy={isOpeningFolder}
-			>
-				<span class="primary-button-icon" aria-hidden="true">
-					<HugeiconsIcon icon={FolderAddIcon} size={16} strokeWidth={1.8} />
-				</span>
-				{isOpeningFolder ? 'Opening…' : 'Open New Folder'}
-			</button>
-		</header>
-
 		{#if showError && lastError}
 			<div class="error-banner" role="alert">
 				<span class="error-label">Error</span>
@@ -243,22 +251,58 @@
 				</button>
 			</div>
 		{:else}
-			<div
-				class="grid"
-				role="list"
-				aria-label="Recent projects"
-			>
-				{#each filteredProjects as project (project.id)}
-					<div role="listitem" class="grid-item">
-						<ProjectCard
-							{project}
-							onSelect={handleSelect}
-							onRename={handleRename}
-							onDelete={handleDelete}
-						/>
-					</div>
-				{/each}
-			</div>
+			{#if featuredCount > 0}
+				<div class="section-label" aria-hidden="true">Recent</div>
+				<div
+					class="featured-grid"
+					role="list"
+					aria-label="Featured projects"
+				>
+					{#each featuredProjects as project, i (project.id)}
+						<div
+							role="listitem"
+							class="grid-item featured"
+							style="--card-index: {i}"
+						>
+							<ProjectCard
+								{project}
+								featured
+								onSelect={handleSelect}
+								onRename={handleRename}
+								onDelete={handleDelete}
+							/>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if remainingProjects.length > 0}
+				{#if featuredCount > 0}
+					<div class="section-label" aria-hidden="true">All projects</div>
+				{/if}
+				<div
+					class="grid"
+					role="list"
+					aria-label={featuredCount > 0
+						? 'All projects'
+						: 'Recent projects'}
+				>
+					{#each remainingProjects as project, i (project.id)}
+						<div
+							role="listitem"
+							class="grid-item"
+							style="--card-index: {featuredCount + i}"
+						>
+							<ProjectCard
+								{project}
+								onSelect={handleSelect}
+								onRename={handleRename}
+								onDelete={handleDelete}
+							/>
+						</div>
+					{/each}
+				</div>
+			{/if}
 		{/if}
 	</div>
 </section>
@@ -272,18 +316,103 @@
 		height: 100%;
 		overflow-y: auto;
 		background-color: var(--color-bg);
-		/* Soft ambient warmth behind the content. */
+	}
+
+	/* --- Hero ----------------------------------------------------------- */
+	.hero {
+		position: relative;
+		width: 100%;
+		display: flex;
+		justify-content: center;
+		overflow: hidden;
+		isolation: isolate;
+		/* Subtle base glow that anchors the orbs without depending on motion. */
 		background-image: radial-gradient(
-			ellipse 800px 400px at 50% 0%,
+			ellipse 900px 400px at 50% -10%,
 			var(--color-primary-subtle),
 			transparent 70%
 		);
 	}
 
+	.hero-inner {
+		width: 100%;
+		max-width: 960px;
+		padding: var(--space-10) var(--space-7) var(--space-8);
+		position: relative;
+		z-index: 1;
+	}
+
+	/* Two ambient orbs that quietly drift behind the hero. They're decorative
+	   and use color-mix for a tinted indigo bloom that sits naturally on the
+	   substrate without clashing with content. */
+	.hero-orb {
+		position: absolute;
+		top: 0;
+		border-radius: 50%;
+		filter: blur(60px);
+		pointer-events: none;
+		z-index: 0;
+		opacity: 0.9;
+	}
+
+	.hero-orb-a {
+		width: 500px;
+		height: 500px;
+		left: -120px;
+		top: -160px;
+		background: radial-gradient(
+			circle at 50% 50%,
+			color-mix(in oklch, var(--color-primary) 12%, transparent),
+			transparent 65%
+		);
+	}
+
+	.hero-orb-b {
+		width: 350px;
+		height: 350px;
+		right: -100px;
+		top: -80px;
+		background: radial-gradient(
+			circle at 50% 50%,
+			color-mix(in oklch, var(--color-primary) 18%, transparent),
+			transparent 65%
+		);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.hero-orb-a {
+			animation: orb-drift-a 40s ease-in-out infinite;
+		}
+
+		.hero-orb-b {
+			animation: orb-drift-b 30s ease-in-out infinite;
+		}
+	}
+
+	@keyframes orb-drift-a {
+		0%,
+		100% {
+			transform: translate(0, 0);
+		}
+		50% {
+			transform: translate(30px, -20px);
+		}
+	}
+
+	@keyframes orb-drift-b {
+		0%,
+		100% {
+			transform: translate(0, 0);
+		}
+		50% {
+			transform: translate(-20px, 30px);
+		}
+	}
+
 	.picker-inner {
 		width: 100%;
 		max-width: 960px;
-		padding: var(--space-10) var(--space-7) var(--space-9);
+		padding: 0 var(--space-7) var(--space-9);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-7);
@@ -300,22 +429,24 @@
 	.picker-heading {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-2);
+		gap: var(--space-3);
 		min-width: 0;
 	}
 
 	.picker-eyebrow {
 		font-family: var(--font-mono);
-		font-size: var(--font-size-2xs);
+		font-size: var(--font-size-xs);
 		text-transform: uppercase;
-		letter-spacing: var(--tracking-widest);
-		color: var(--color-primary);
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
 		margin: 0;
 	}
 
 	.picker-title {
-		font-size: var(--font-size-4xl);
-		font-weight: var(--font-weight-normal);
+		font-family: var(--font-display);
+		font-style: italic;
+		font-weight: 400;
+		font-size: clamp(32px, 4vw, 52px);
 		color: var(--color-text-primary);
 		letter-spacing: var(--tracking-tight);
 		line-height: var(--line-height-tight);
@@ -323,8 +454,9 @@
 	}
 
 	.picker-subtitle {
-		font-size: var(--font-size-md);
-		color: var(--color-text-muted);
+		font-family: var(--font-body);
+		font-size: var(--font-size-base);
+		color: var(--color-text-secondary);
 		line-height: var(--line-height-relaxed);
 		margin: 0;
 		max-width: 52ch;
@@ -347,9 +479,11 @@
 		font-weight: var(--font-weight-semibold);
 		letter-spacing: var(--tracking-snug);
 		cursor: pointer;
+		box-shadow: 0 0 16px rgba(64, 73, 225, 0.25);
 		transition:
 			background-color var(--transition-fast),
 			border-color var(--transition-fast),
+			box-shadow var(--transition-fast),
 			transform var(--transition-fast);
 		white-space: nowrap;
 	}
@@ -357,6 +491,7 @@
 	.primary-button:hover {
 		background-color: var(--color-primary-hover);
 		border-color: var(--color-primary-hover);
+		box-shadow: 0 0 24px rgba(64, 73, 225, 0.4);
 	}
 
 	.primary-button:focus-visible {
@@ -583,6 +718,30 @@
 		max-width: 44ch;
 	}
 
+	/* --- Section label -------------------------------------------------- */
+	.section-label {
+		font-family: var(--font-mono);
+		font-size: var(--font-size-2xs);
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+		margin-top: calc(-1 * var(--space-3));
+		margin-bottom: calc(-1 * var(--space-3));
+	}
+
+	/* --- Featured strip ------------------------------------------------- */
+	.featured-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: var(--space-4);
+	}
+
+	@media (max-width: 880px) {
+		.featured-grid {
+			grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		}
+	}
+
 	/* --- Grid ----------------------------------------------------------- */
 	.grid {
 		display: grid;
@@ -592,6 +751,27 @@
 
 	.grid-item {
 		min-width: 0;
+	}
+
+	/* Staggered card entry — gated by reduced-motion. We use `both` so the
+	   "from" frame applies pre-animation and avoids a flash of unstyled
+	   content when the cards mount. */
+	@media (prefers-reduced-motion: no-preference) {
+		.grid-item {
+			animation: card-enter 0.35s var(--ease-out-expo) both;
+			animation-delay: calc(var(--card-index, 0) * 50ms);
+		}
+	}
+
+	@keyframes card-enter {
+		from {
+			opacity: 0;
+			transform: translateY(12px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	/* --- Skeleton ------------------------------------------------------- */
@@ -703,13 +883,13 @@
 
 	/* --- Responsive tweaks ---------------------------------------------- */
 	@media (max-width: 640px) {
-		.picker-inner {
-			padding: var(--space-7) var(--space-4) var(--space-7);
-			gap: var(--space-6);
+		.hero-inner {
+			padding: var(--space-8) var(--space-4) var(--space-7);
 		}
 
-		.picker-title {
-			font-size: var(--font-size-3xl);
+		.picker-inner {
+			padding: 0 var(--space-4) var(--space-7);
+			gap: var(--space-6);
 		}
 
 		.picker-header {
