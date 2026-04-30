@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import MCPRegistryCard from './MCPRegistryCard.svelte';
 
-	type Source = 'anthropic' | 'smithery' | 'bundled';
+	type Source = 'smithery' | 'bundled';
 
 	type Props = {
 		onAddEntry: (entry: RegistryEntry) => void;
@@ -17,7 +17,6 @@
 	let { onAddEntry, onClose }: Props = $props();
 
 	const TABS: ReadonlyArray<{ id: Source; label: string }> = [
-		{ id: 'anthropic', label: 'Curated' },
 		{ id: 'smithery', label: 'Community' },
 		{ id: 'bundled', label: 'Bundled' },
 	] as const;
