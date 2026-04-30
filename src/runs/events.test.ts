@@ -21,6 +21,7 @@ describe('publishRunEvent', () => {
 			sessionId: crypto.randomUUID(),
 			projectId: crypto.randomUUID(),
 			signal: new AbortController().signal,
+			discoveredMcpTools: new Set<string>(),
 		}
 
 		const captured: Array<{

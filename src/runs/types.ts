@@ -51,6 +51,7 @@ export interface RunContext {
 	sessionId: string
 	projectId: string
 	signal: AbortSignal
+	discoveredMcpTools: Set<string>
 }
 
 export interface AgentRunEventEnvelope {

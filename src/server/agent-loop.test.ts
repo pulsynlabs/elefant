@@ -43,6 +43,7 @@ function createRunContext(runId: string) {
 		sessionId: `session-${runId}`,
 		projectId: 'project-test',
 		signal: new AbortController().signal,
+		discoveredMcpTools: new Set<string>(),
 	}
 }
 

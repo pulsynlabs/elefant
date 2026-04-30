@@ -5,6 +5,7 @@ import type {
 	AgentRunStatus,
 	AgentRunToolCallMetadataData,
 } from './types.ts'
+import { createRunContext } from './context.ts'
 
 interface SsePublisher {
 	publish(projectId: string, sessionId: string, eventType: string, data: unknown): void
@@ -60,7 +61,7 @@ export function publishStatusChange(
 		}
 
 		// Emit immediately
-		const runContext: RunContext = {
+		const runContext: RunContext = createRunContext({
 			runId: data.runId,
 			parentRunId: data.parentRunId,
 			depth: 0,
@@ -69,7 +70,7 @@ export function publishStatusChange(
 			sessionId: data.sessionId,
 			projectId: data.projectId,
 			signal: new AbortController().signal,
-		}
+		})
 
 		publishRunEvent(runContext, sseManager, 'agent_run.status_changed', {
 			previousStatus: data.previousStatus,
@@ -90,7 +91,7 @@ export function publishStatusChange(
 
 		pendingStatusChanges.delete(data.runId)
 
-		const runContext: RunContext = {
+		const runContext: RunContext = createRunContext({
 			runId: pending.data.runId,
 			parentRunId: pending.data.parentRunId,
 			depth: 0,
@@ -99,7 +100,7 @@ export function publishStatusChange(
 			sessionId: pending.data.sessionId,
 			projectId: pending.data.projectId,
 			signal: new AbortController().signal,
-		}
+		})
 
 		publishRunEvent(runContext, sseManager, 'agent_run.status_changed', {
 			previousStatus: pending.data.previousStatus,
@@ -179,7 +180,7 @@ export function publishToolCallMetadata(
 		: data.runId
 
 	publishRunEvent(
-		{
+		createRunContext({
 			runId: transcriptRunId,
 			parentRunId: data.parentRunId,
 			depth: 0,
@@ -188,7 +189,7 @@ export function publishToolCallMetadata(
 			sessionId,
 			projectId,
 			signal: new AbortController().signal,
-		},
+		}),
 		sseManager,
 		'agent_run.tool_call_metadata',
 		{

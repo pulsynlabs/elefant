@@ -12,6 +12,7 @@ import { formatSSEEvent, formatSSEKeepalive } from './sse.ts'
 import type { QuestionSsePayload } from '../tools/question/emitter.ts'
 import { createMetadataEmitter, type ToolCallMetadataPayload } from '../tools/task/metadata-emitter.ts'
 import type { RunContext } from '../runs/types.ts'
+import { createRunContext } from '../runs/context.ts'
 import type { Database } from '../db/database.ts'
 import type { RunRegistry } from '../runs/registry.ts'
 import type { SseManager } from '../transport/sse-manager.ts'
@@ -324,7 +325,7 @@ export function createConversationRoute<TApp extends Elysia>(
 		const runId = `chat:${sessionId}:${crypto.randomUUID()}`
 		const abortController = new AbortController()
 
-		const runContext: RunContext = {
+		const runContext: RunContext = createRunContext({
 			runId,
 			depth: 0,
 			agentType: 'primary',
@@ -332,7 +333,7 @@ export function createConversationRoute<TApp extends Elysia>(
 			sessionId,
 			projectId,
 			signal: abortController.signal,
-		}
+		})
 
 		const stream = createSSEStream(
 			providerRouter,
