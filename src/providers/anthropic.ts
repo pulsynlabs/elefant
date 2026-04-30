@@ -214,7 +214,7 @@ function mapStopReason(reason: string | null | undefined): 'stop' | 'tool_calls'
 	return 'stop'
 }
 
-export class AnthropicAdapter implements ProviderAdapter {
+export class AnthropicCompatibleAdapter implements ProviderAdapter {
 	public readonly name: string
 	private readonly config: ProviderConfig
 
@@ -261,20 +261,20 @@ export class AnthropicAdapter implements ProviderAdapter {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'anthropic-version': '2023-06-01',
+					...(this.config.format === 'anthropic' ? { 'anthropic-version': '2023-06-01' } : {}),
 					'x-api-key': this.config.apiKey,
 				},
 				body: JSON.stringify(requestBody),
 				signal: options?.signal,
 			})
 		} catch (error) {
-			yield createProviderError('Network request to Anthropic failed', error)
+			yield createProviderError('Network request to Anthropic-compatible API failed', error)
 			return
 		}
 
 		if (!response.ok) {
 			const responseBody = await response.text().catch(() => '')
-			yield createProviderError(`Anthropic request failed with status ${response.status}`, {
+			yield createProviderError(`Anthropic-compatible API request failed with status ${response.status}`, {
 				status: response.status,
 				body: responseBody,
 			})
@@ -282,7 +282,7 @@ export class AnthropicAdapter implements ProviderAdapter {
 		}
 
 		if (!response.body) {
-			yield createProviderError('Anthropic response body is empty')
+			yield createProviderError('Anthropic-compatible API response body is empty')
 			return
 		}
 
@@ -300,7 +300,7 @@ export class AnthropicAdapter implements ProviderAdapter {
 			try {
 				data = JSON.parse(sseEvent.data)
 			} catch (error) {
-				yield createProviderError('Failed to parse Anthropic SSE chunk', {
+				yield createProviderError('Failed to parse Anthropic-compatible API SSE chunk', {
 					event: sseEvent.event,
 					chunk: sseEvent.data,
 					error,
@@ -402,7 +402,7 @@ export class AnthropicAdapter implements ProviderAdapter {
 				try {
 					parsedArguments = parseToolArguments(pending.arguments)
 				} catch (error) {
-					yield createProviderError('Failed to parse Anthropic tool call arguments', {
+					yield createProviderError('Failed to parse Anthropic-compatible API tool call arguments', {
 						toolCallId: pending.id,
 						rawArguments: pending.arguments,
 						error,
@@ -479,7 +479,7 @@ export class AnthropicAdapter implements ProviderAdapter {
 			if (sseEvent.event === 'error') {
 				const errorPayload = data as { error?: { message?: string }; message?: string }
 				yield createProviderError(
-					errorPayload.error?.message ?? errorPayload.message ?? 'Anthropic stream returned an error event',
+					errorPayload.error?.message ?? errorPayload.message ?? 'Anthropic-compatible API stream returned an error event',
 					errorPayload,
 				)
 				return
@@ -487,3 +487,5 @@ export class AnthropicAdapter implements ProviderAdapter {
 		}
 	}
 }
+
+export { AnthropicCompatibleAdapter as AnthropicAdapter }
