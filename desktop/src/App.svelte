@@ -6,7 +6,6 @@
 	import ConnectionStatus from "$lib/components/ConnectionStatus.svelte";
 	import ThemeToggle from "$lib/components/ThemeToggle.svelte";
 	import ApprovalPanel from "$lib/components/ApprovalPanel.svelte";
-	import LiquidGlassDefs from "$lib/components/LiquidGlassDefs.svelte";
 	import { themeStore } from "$lib/stores/theme.svelte.js";
 	import { navigationStore } from "$lib/stores/navigation.svelte.js";
 	import { connectionStore } from "$lib/stores/connection.svelte.js";
@@ -166,8 +165,6 @@
 
 	const currentView = $derived(navigationStore.current);
 </script>
-
-<LiquidGlassDefs />
 
 <AppShell bind:sidebarCollapsed>
 	{#snippet sidebar()}

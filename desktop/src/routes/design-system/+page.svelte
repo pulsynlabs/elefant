@@ -335,8 +335,8 @@
 				<span class="text-caption">Select</span>
 				<select>
 					<option>Quire material</option>
-					<option>Liquid Glass</option>
-					<option>Liquid Metal</option>
+					<option>Editorial print</option>
+					<option>Hairline binding</option>
 				</select>
 			</label>
 

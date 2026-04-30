@@ -38,7 +38,7 @@
 	}
 </script>
 
-<li class="provider-card glass-sm">
+<li class="provider-card quire-sm">
 	<div class="card-main">
 		<div class="card-info">
 			<div class="card-header">

@@ -58,30 +58,32 @@
 		/* Ambient ring — re-declared per tone below. */
 	}
 
-	/* Tone fills + ambient rings — one ring colour per tone. */
+	/* Tone fills + ambient rings — derived from semantic tokens via color-mix.
+	   Each ring is a 16% tint of its tone in oklch space, giving theme-aware
+	   ambient halos that adapt automatically to light/dark surfaces. */
 	.tone-neutral {
 		background: var(--text-muted);
-		box-shadow: 0 0 0 3px rgba(111, 111, 142, 0.16);
+		box-shadow: 0 0 0 3px color-mix(in oklch, var(--text-muted) 16%, transparent);
 	}
 	.tone-primary {
 		background: var(--color-primary);
-		box-shadow: 0 0 0 3px rgba(64, 73, 225, 0.16);
+		box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 16%, transparent);
 	}
 	.tone-success {
 		background: var(--color-success);
-		box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.16);
+		box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-success) 16%, transparent);
 	}
 	.tone-warning {
 		background: var(--color-warning);
-		box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.16);
+		box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-warning) 16%, transparent);
 	}
 	.tone-error {
 		background: var(--color-error);
-		box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.16);
+		box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-error) 16%, transparent);
 	}
 	.tone-info {
 		background: var(--color-info);
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+		box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-info) 16%, transparent);
 	}
 
 	/* Pulse uses opacity + transform only — never animate box-shadow size. */
