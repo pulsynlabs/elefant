@@ -3,6 +3,8 @@
 	import { configService } from '$lib/services/config-service.js';
 	import type { LogLevel } from '$lib/daemon/types.js';
 	import { onMount } from 'svelte';
+	import NumberInput from '$lib/components/ui/NumberInput.svelte';
+	import SelectInput from '$lib/components/ui/SelectInput.svelte';
 
 	let daemonUrl = $state(settingsStore.daemonUrl);
 	let port = $state(1337);
@@ -11,6 +13,17 @@
 	let availableProviders = $state<string[]>([]);
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let saveMessage = $state('');
+
+	const logLevelOptions = [
+		{ value: 'debug', label: 'Debug' },
+		{ value: 'info', label: 'Info' },
+		{ value: 'warn', label: 'Warn' },
+		{ value: 'error', label: 'Error' },
+	];
+
+	const providerOptions = $derived(
+		availableProviders.map((p) => ({ value: p, label: p }))
+	);
 
 	onMount(async () => {
 		const config = await configService.readConfig();
@@ -63,36 +76,20 @@
 
 	<div class="form-group">
 		<label class="field-label" for="port">Daemon Port</label>
-		<input
-			id="port"
-			type="number"
-			class="field-input field-input-narrow"
-			bind:value={port}
-			min="1"
-			max="65535"
-		/>
+		<NumberInput id="port" bind:value={port} min={1} max={65535} />
 		<span class="field-hint">Written to elefant.config.json. Requires daemon restart.</span>
 	</div>
 
 	{#if availableProviders.length > 0}
 		<div class="form-group">
 			<label class="field-label" for="defaultProvider">Default Provider</label>
-			<select id="defaultProvider" class="field-select" bind:value={defaultProvider}>
-				{#each availableProviders as provider}
-					<option value={provider}>{provider}</option>
-				{/each}
-			</select>
+			<SelectInput id="defaultProvider" bind:value={defaultProvider} options={providerOptions} />
 		</div>
 	{/if}
 
 	<div class="form-group">
 		<label class="field-label" for="logLevel">Log Level</label>
-		<select id="logLevel" class="field-select" bind:value={logLevel}>
-			<option value="debug">Debug</option>
-			<option value="info">Info</option>
-			<option value="warn">Warn</option>
-			<option value="error">Error</option>
-		</select>
+		<SelectInput id="logLevel" bind:value={logLevel} options={logLevelOptions} />
 		<span class="field-hint">Written to elefant.config.json. Requires daemon restart.</span>
 	</div>
 
@@ -149,27 +146,6 @@
 	}
 
 	.field-input:focus {
-		border-color: var(--color-primary);
-	}
-
-	.field-input-narrow {
-		max-width: 120px;
-	}
-
-	.field-select {
-		background-color: var(--color-surface-elevated);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		color: var(--color-text-primary);
-		font-family: var(--font-sans);
-		font-size: var(--font-size-md);
-		padding: var(--space-2) var(--space-3);
-		outline: none;
-		cursor: pointer;
-		transition: border-color var(--transition-fast);
-	}
-
-	.field-select:focus {
 		border-color: var(--color-primary);
 	}
 
