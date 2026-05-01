@@ -23,9 +23,11 @@ exports[`system-prompt structure snapshot Spec Mode prompt structure matches sna
   "### Filesystem",
   "### Provider",
   "### Other",
+  "## Available Skills",
   "## Workflow Mode: Spec (Phase: execute | Wave 3/6)",
   "## Slash Commands",
   "### Workflow Commands",
+  "### Skill Commands",
   "## Context Assembly",
 ]
 `;

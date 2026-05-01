@@ -4,6 +4,7 @@ import {
 	buildCommandsSection,
 	buildContextNoteSection,
 	buildIdentitySection,
+	buildSkillsSection,
 	buildSystemPrompt,
 	buildToolInventorySection,
 	buildWorkflowSection,
@@ -52,19 +53,35 @@ describe('system-prompt-builder', () => {
 		const prompt = buildSystemPrompt(createContext({
 			sessionMode: 'spec',
 			workflowState: { phase: 'execute', currentWave: 5, totalWaves: 6 },
+			skills: [
+				{
+					name: 'p5js',
+					description: 'Production pipeline for interactive and generative visual art using p5.js',
+					source: 'user',
+					path: '/home/user/.agents/skills/p5js/SKILL.md',
+				},
+			],
 		}))
 
 		const identity = prompt.indexOf('## Identity')
 		const tools = prompt.indexOf('## Available Tools')
+		const skills = prompt.indexOf('## Available Skills')
 		const workflow = prompt.indexOf('## Workflow Mode:')
 		const commands = prompt.indexOf('## Slash Commands')
 		const context = prompt.indexOf('## Context Assembly')
 
 		expect(identity).toBeGreaterThanOrEqual(0)
 		expect(tools).toBeGreaterThan(identity)
-		expect(workflow).toBeGreaterThan(tools)
+		expect(skills).toBeGreaterThan(tools)
+		expect(workflow).toBeGreaterThan(skills)
 		expect(commands).toBeGreaterThan(workflow)
 		expect(context).toBeGreaterThan(commands)
+	})
+
+	it('omits skills section when no skills are provided', () => {
+		const prompt = buildSystemPrompt(createContext())
+
+		expect(prompt).not.toContain('<available_skills>')
 	})
 
 	it('omits workflow section in Quick Mode', () => {
@@ -88,6 +105,7 @@ describe('system-prompt-builder', () => {
 	it('exposes each section generator for isolated testing', () => {
 		expect(buildIdentitySection()).toContain('## Identity')
 		expect(buildToolInventorySection(createContext().toolRegistry)).toContain('**read** — Read a file')
+		expect(buildSkillsSection([])).toBe('')
 		expect(buildWorkflowSection({ sessionMode: 'quick' })).toBe('')
 		expect(buildCommandsSection(createContext().commands)).toContain('/status — Show current workflow state')
 		expect(buildContextNoteSection()).toContain('## Context Assembly')

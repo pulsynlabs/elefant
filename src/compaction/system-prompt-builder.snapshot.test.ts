@@ -8,10 +8,11 @@ import {
 import { estimateTokens } from './system-prompt/token-count.ts';
 import { DEFAULT_COMMANDS } from './system-prompt/command-listing.ts';
 import type { ToolDefinition } from '../types/tools.ts';
+import type { SkillInfo } from '../tools/skill/resolver.ts';
 
 // ---------------------------------------------------------------------------
 // Realistic mock ToolRegistry — reflects the CURRENT set of tools registered
-// by createToolRegistryForRun() (src/tools/registry.ts), including all 11
+// by createToolRegistryForRun() (src/tools/registry.ts), including all 10
 // wf_* workflow tools, interactive tools, filesystem tools, and misc.
 // ---------------------------------------------------------------------------
 
@@ -27,7 +28,7 @@ function tool(name: string, description: string, category?: string): ToolDefinit
 
 const mockRegistry: Pick<ToolRegistry, 'getAll'> = {
 	getAll: (): ToolDefinition[] => [
-		// ---- Workflow tools (11) ----
+		// ---- Workflow tools (10) ----
 		tool('wf_status', 'Read the active Spec Mode workflow status with an invariant payload shape.'),
 		tool('wf_state', 'Read or mutate Spec Mode workflow state through StateManager operations.'),
 		tool('wf_workflow', 'List, create, or activate Spec Mode workflows for a project.'),
@@ -37,7 +38,6 @@ const mockRegistry: Pick<ToolRegistry, 'getAll'> = {
 		tool('wf_chronicle', 'Append to or read from the Spec Mode CHRONICLE log.'),
 		tool('wf_adl', 'Append to or read from the Spec Mode architectural decision log.'),
 		tool('wf_checkpoint', 'Save, load, or list workflow checkpoints stored in CHRONICLE entries.'),
-		tool('wf_skill', 'List or load bundled Spec Mode skill markdown resources.'),
 		tool('wf_reference', 'List, load, or extract sections from bundled reference markdown resources.'),
 
 		// ---- Interactive tools (2) ----
@@ -86,6 +86,15 @@ const specExecuteState: WorkflowPromptState = {
 	totalWaves: 6,
 };
 
+const fixtureSkills: readonly SkillInfo[] = [
+	{
+		name: 'p5js',
+		description: 'Production pipeline for interactive and generative visual art using p5.js',
+		source: 'user' as const,
+		path: '/home/user/.agents/skills/p5js/SKILL.md',
+	},
+];
+
 function quickContext(): SystemPromptContext {
 	return {
 		toolRegistry: mockRegistryQuick,
@@ -100,6 +109,7 @@ function specContext(workflowState?: WorkflowPromptState): SystemPromptContext {
 		sessionMode: 'spec',
 		workflowState,
 		commands: DEFAULT_COMMANDS,
+		skills: fixtureSkills,
 	};
 }
 
@@ -167,9 +177,34 @@ describe('system-prompt structure snapshot', () => {
 		const prompt = buildSystemPrompt(specContext(specExecuteState));
 		expect(prompt).toContain('## Identity');
 		expect(prompt).toContain('## Available Tools');
+		expect(prompt).toContain('## Available Skills');
 		expect(prompt).toContain('## Workflow Mode: Spec');
 		expect(prompt).toContain('## Slash Commands');
 		expect(prompt).toContain('## Context Assembly');
+	});
+
+	it('includes available skills XML when fixture skills are provided', () => {
+		const prompt = buildSystemPrompt(specContext(specExecuteState));
+
+		expect(prompt).toContain('<available_skills>');
+		expect(prompt).toContain('<name>p5js</name>');
+	});
+
+	it('omits available skills XML when skills are empty or undefined', () => {
+		const withEmptySkills = buildSystemPrompt({
+			...specContext(specExecuteState),
+			skills: [],
+		});
+		const contextWithoutSkills: SystemPromptContext = {
+			toolRegistry: mockRegistry,
+			sessionMode: 'spec',
+			workflowState: specExecuteState,
+			commands: DEFAULT_COMMANDS,
+		};
+		const withUndefinedSkills = buildSystemPrompt(contextWithoutSkills);
+
+		expect(withEmptySkills).not.toContain('<available_skills>');
+		expect(withUndefinedSkills).not.toContain('<available_skills>');
 	});
 
 	it('Quick Mode omits workflow section', () => {

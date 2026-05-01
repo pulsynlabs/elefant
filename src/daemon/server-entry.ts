@@ -1,4 +1,5 @@
 import { loadConfig } from '../config/index.ts'
+import { fetchRegistries } from '../tools/skill/registry-fetcher.js'
 import { createDaemon } from './create.ts'
 import { acquireDaemonLock } from './pid.ts'
 import { gracefulShutdown } from './shutdown.ts'
@@ -19,7 +20,14 @@ if (!configResult.ok) {
 	process.exit(1)
 }
 
-const daemonResult = await createDaemon(configResult.data)
+const config = configResult.data
+if (config.skills?.registries?.some((registry) => registry.enabled !== false)) {
+	void fetchRegistries(config.skills).catch((err) => {
+		console.warn('[skills] Registry fetch startup error:', err)
+	})
+}
+
+const daemonResult = await createDaemon(config)
 if (!daemonResult.ok) {
 	console.error('[elefant] Daemon error:', daemonResult.error.message)
 	process.exit(1)

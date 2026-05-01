@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe('workflow tool registry integration', () => {
-	it('registers all 11 workflow tools for spec mode runs', () => {
+	it('registers all 10 workflow tools for spec mode runs', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'elefant-spec-registry-'));
 		tempDirs.push(dir);
 		const database = new Database(join(dir, 'db.sqlite'));
@@ -37,7 +37,6 @@ describe('workflow tool registry integration', () => {
 			'wf_chronicle',
 			'wf_reference',
 			'wf_requirements',
-			'wf_skill',
 			'wf_spec',
 			'wf_state',
 			'wf_status',

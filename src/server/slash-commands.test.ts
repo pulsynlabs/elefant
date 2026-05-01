@@ -11,8 +11,10 @@ import {
 	loadCommandRegistry,
 	suggestCommands,
 	type SlashCommandDefinition,
+	type ResolveSkillFn,
 } from './slash-commands.ts';
 import type { StateManager } from '../state/manager.ts';
+import type { SkillInfo } from '../tools/skill/resolver.ts';
 
 let tmpDir: string;
 
@@ -90,6 +92,32 @@ describe('loadCommandRegistry', () => {
 });
 
 describe('parseSlashCommand', () => {
+	const p5jsSkillContent = `---
+description: Creative coding with p5.js
+---
+
+# p5js Skill
+
+Use p5.js for generative art.`;
+
+	const resolveFixtureSkill: ResolveSkillFn = async (name) => {
+		if (name === 'p5js') {
+			return {
+				path: path.join(tmpDir, '.elefant', 'skills', 'p5js', 'SKILL.md'),
+				content: p5jsSkillContent,
+			};
+		}
+
+		if (name === 'plan') {
+			return {
+				path: path.join(tmpDir, '.elefant', 'skills', 'plan', 'SKILL.md'),
+				content: '# Plan Skill\n\nThis skill must not override the workflow command.',
+			};
+		}
+
+		return null;
+	};
+
 	beforeEach(async () => {
 		await writeRegistry(tmpDir, TEST_REGISTRY);
 		await writeCommandFile(
@@ -120,8 +148,10 @@ describe('parseSlashCommand', () => {
 		expect(match!.args).toBe('some-session-name');
 	});
 
-	it('returns null for unknown command', async () => {
-		const match = await parseSlashCommand('/unknown-command', tmpDir);
+	it('returns null for unknown command or skill', async () => {
+		const match = await parseSlashCommand('/nonexistent', tmpDir, {
+			resolveSkillFn: resolveFixtureSkill,
+		});
 		expect(match).toBeNull();
 	});
 
@@ -142,6 +172,44 @@ describe('parseSlashCommand', () => {
 		expect(match).not.toBeNull();
 		expect(match!.promptContent).toContain('# /discuss');
 		expect(match!.promptContent).toContain('Discovery interview');
+	});
+
+	it('falls back to a skill when no workflow command matches', async () => {
+		const match = await parseSlashCommand('/p5js', tmpDir, {
+			resolveSkillFn: resolveFixtureSkill,
+		});
+
+		expect(match).not.toBeNull();
+		expect(match!.command.name).toBe('p5js');
+		expect(match!.command.trigger).toBe('/p5js');
+		expect(match!.command.description).toBe('Creative coding with p5.js');
+		expect(match!.command.category).toBe('skill');
+		expect(match!.args).toBe('');
+		expect(match!.promptContent).toContain('# p5js Skill');
+		expect(match!.promptContent).toContain('Use p5.js for generative art.');
+	});
+
+	it('keeps workflow commands ahead of skills with the same name', async () => {
+		const match = await parseSlashCommand('/plan', tmpDir, {
+			resolveSkillFn: resolveFixtureSkill,
+		});
+
+		expect(match).not.toBeNull();
+		expect(match!.command.name).toBe('plan');
+		expect(match!.command.category).toBe('spec-mode');
+		expect(match!.promptContent).toContain('# /plan');
+		expect(match!.promptContent).not.toContain('Plan Skill');
+	});
+
+	it('captures args for /discuss workflow command', async () => {
+		const match = await parseSlashCommand('/discuss session-name', tmpDir, {
+			resolveSkillFn: resolveFixtureSkill,
+		});
+
+		expect(match).not.toBeNull();
+		expect(match!.command.name).toBe('discuss');
+		expect(match!.command.category).toBe('spec-mode');
+		expect(match!.args).toBe('session-name');
 	});
 
 	it('returns null when MD file is missing', async () => {
@@ -205,21 +273,43 @@ describe('suggestCommands', () => {
 		{ name: 'execute', trigger: '/execute', description: 'Execute', category: 'spec-mode' },
 		{ name: 'debug', trigger: '/debug', description: 'Debug', category: 'utility' },
 	];
+	const fixtureSkills: SkillInfo[] = [
+		{
+			name: 'p5js',
+			description: 'Creative coding with p5.js',
+			source: 'project',
+			path: '/tmp/p5js/SKILL.md',
+		},
+	];
 
-	it('returns matching suggestions for partial input', () => {
-		const suggestions = suggestCommands('/p', registry, 3);
+	it('returns matching suggestions for partial input', async () => {
+		const suggestions = await suggestCommands('/p', registry, 3, {
+			listSkillsFn: async () => [],
+		});
 		expect(suggestions).toContain('/plan');
 		expect(suggestions).toContain('/pause');
 	});
 
-	it('returns empty array for no matches', () => {
-		const suggestions = suggestCommands('/foo', registry, 3);
+	it('returns empty array for no matches', async () => {
+		const suggestions = await suggestCommands('/foo', registry, 3, {
+			listSkillsFn: async () => [],
+		});
 		expect(suggestions).toEqual([]);
 	});
 
-	it('respects limit', () => {
-		const suggestions = suggestCommands('/', registry, 1);
+	it('respects limit', async () => {
+		const suggestions = await suggestCommands('/', registry, 1, {
+			listSkillsFn: async () => [],
+		});
 		expect(suggestions).toHaveLength(1);
+	});
+
+	it('includes skills in fuzzy suggestions', async () => {
+		const suggestions = await suggestCommands('/p5j', registry, 3, {
+			listSkillsFn: async () => fixtureSkills,
+		});
+
+		expect(suggestions).toContain('/p5js');
 	});
 });
 

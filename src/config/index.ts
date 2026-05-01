@@ -11,6 +11,9 @@ export {
 	mcpServerSchema,
 	mcpStdioConfigSchema,
 	mcpRemoteConfigSchema,
+	registryConfigSchema,
+	skillsConfigSchema,
+	BUNDLED_REGISTRIES,
 } from './schema.ts';
 export type {
 	ElefantConfig,
@@ -24,6 +27,8 @@ export type {
 	McpServerConfig,
 	McpStdioConfig,
 	McpRemoteConfig,
+	RegistryConfig,
+	SkillsConfig,
 } from './schema.ts';
 export {
 	ConfigManager,

@@ -16,17 +16,22 @@ export default defineConfig(async () => ({
   clearScreen: false,
   server: {
     port: 1420,
-    strictPort: true,
-    host: host || false,
+    strictPort: false,
+    host: host || true,
     hmr: host
       ? {
           protocol: "ws",
           host,
-          port: 1421,
+    port: 1420,
         }
       : undefined,
     watch: {
       ignored: ["**/src-tauri/**"],
+    },
+    proxy: {
+      '/health': { target: 'http://localhost:1337', ws: true },
+      '/api': { target: 'http://localhost:1337', ws: true },
+      '/tools': { target: 'http://localhost:1337', ws: true },
     },
   },
 }));

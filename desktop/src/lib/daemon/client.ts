@@ -42,7 +42,9 @@ export interface MessageRow {
 
 // Default daemon URL — consumed by events.ts (SSE) and approvals.ts (WebSocket).
 // Keep in sync with `settingsStore.daemonUrl` when users customise the port.
-export const DAEMON_URL = 'http://localhost:1337';
+// Empty string resolves to the current origin (the Vite dev server or Tauri webview),
+// which proxies daemon routes via the Vite proxy config.
+export const DAEMON_URL = '';
 
 // Eden Treaty client (future wiring):
 //

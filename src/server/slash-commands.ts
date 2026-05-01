@@ -1,12 +1,14 @@
 import path from 'node:path';
 
 import type { StateManager } from '../state/manager.ts';
+import { parseFrontmatter } from '../tools/skill/frontmatter.js';
+import { listSkills, resolveSkill, type SkillInfo } from '../tools/skill/resolver.js';
 
 export interface SlashCommandDefinition {
 	name: string; // e.g., "discuss"
 	trigger: string; // e.g., "/discuss"
 	description: string;
-	category: 'spec-mode' | 'utility';
+	category: 'spec-mode' | 'utility' | 'skill';
 	args?: string; // e.g., "[session-name]"
 }
 
@@ -14,6 +16,19 @@ export interface SlashCommandMatch {
 	command: SlashCommandDefinition;
 	args: string; // remainder of the message after the trigger
 	promptContent: string; // loaded command markdown (injected as system context)
+}
+
+export type ResolveSkillFn = typeof resolveSkill;
+export type ListSkillsFn = typeof listSkills;
+
+export interface ParseSlashCommandOptions {
+	/** Override skill resolution for deterministic tests. */
+	resolveSkillFn?: ResolveSkillFn;
+}
+
+export interface SuggestCommandsOptions {
+	/** Override skill listing for deterministic tests. */
+	listSkillsFn?: ListSkillsFn;
 }
 
 function fuzzyScore(query: string, candidate: string): number {
@@ -36,12 +51,21 @@ function fuzzyScore(query: string, candidate: string): number {
 	return 0;
 }
 
-export function suggestCommands(
+export async function suggestCommands(
 	trigger: string,
 	registry: SlashCommandDefinition[],
 	limit = 3,
-): string[] {
-	return registry
+	options: SuggestCommandsOptions = {},
+): Promise<string[]> {
+	const skills = await (options.listSkillsFn ?? listSkills)();
+	const skillCommands: SlashCommandDefinition[] = skills.map((skill: SkillInfo) => ({
+		name: skill.name,
+		trigger: `/${skill.name}`,
+		description: skill.description,
+		category: 'skill',
+	}));
+
+	return [...registry, ...skillCommands]
 		.map((cmd) => ({
 			name: cmd.trigger,
 			score: fuzzyScore(trigger, cmd.trigger),
@@ -100,6 +124,7 @@ export async function loadCommandRegistry(
 export async function parseSlashCommand(
 	message: string,
 	commandsDir: string,
+	options: ParseSlashCommandOptions = {},
 ): Promise<SlashCommandMatch | null> {
 	const trimmed = message.trimStart();
 	if (!trimmed.startsWith('/')) return null;
@@ -116,7 +141,24 @@ export async function parseSlashCommand(
 
 	const commands = await loadCommandRegistry(commandsDir);
 	const cmd = commands.find((c) => c.trigger === trigger);
-	if (!cmd) return null;
+	if (!cmd) {
+		const skillName = trigger.startsWith('/') ? trigger.slice(1) : trigger;
+		const skillResult = await (options.resolveSkillFn ?? resolveSkill)(skillName);
+
+		if (!skillResult) return null;
+
+		const { description } = parseFrontmatter(skillResult.content);
+		return {
+			command: {
+				name: skillName,
+				trigger,
+				description: description ?? `${skillName} skill`,
+				category: 'skill',
+			},
+			args,
+			promptContent: skillResult.content,
+		};
+	}
 
 	const filePath = path.join(commandsDir, `${cmd.name}.md`);
 	const file = Bun.file(filePath);

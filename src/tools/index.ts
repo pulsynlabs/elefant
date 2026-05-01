@@ -30,7 +30,7 @@ export {
 	type TodoReadParams,
 } from './todo/index.js';
 export { questionTool, type QuestionParams, type Question, type QuestionOption } from './question/index.js';
-export { skillTool, type SkillParams } from './skill/index.js';
+export { skillTool, createSkillTool, initializeSkillTool, type SkillParams } from './skill/index.js';
 export { lspTool, type LspParams, type LspOperation } from './lsp/index.js';
 export { createToolListTool, type ToolListParams } from './tool_list/index.js';
 
