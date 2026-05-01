@@ -29,16 +29,27 @@ function extractDescription(content: string): string {
 
 /**
  * Resolve skill in priority order:
- * 1. .elefant/skills/<name>/SKILL.md (project)
- * 2. ~/.config/elefant/skills/<name>/SKILL.md (user)
- * 3. <import.meta.dir>/builtin/<name>/SKILL.md (built-in)
+ * 1. .elefant/skills/<name>/SKILL.md         (project — Elefant)
+ * 2. .claude/skills/<name>/SKILL.md          (project — Claude-compatible)
+ * 3. .agents/skills/<name>/SKILL.md          (project — agents-compatible)
+ * 4. ~/.config/elefant/skills/<name>/SKILL.md (user — Elefant)
+ * 5. ~/.agents/skills/<name>/SKILL.md        (user — agents-compatible)
+ * 6. ~/.claude/skills/<name>/SKILL.md        (user — Claude-compatible)
+ * 7. <import.meta.dir>/builtin/<name>/SKILL.md (bundled)
  */
 export async function resolveSkill(
 	name: string,
 ): Promise<{ path: string; content: string } | null> {
+	const cwd = process.cwd();
+	const home = homedir();
+
 	const candidates = [
-		join(process.cwd(), '.elefant', 'skills', name, 'SKILL.md'),
-		join(homedir(), '.config', 'elefant', 'skills', name, 'SKILL.md'),
+		join(cwd, '.elefant', 'skills', name, 'SKILL.md'),
+		join(cwd, '.claude', 'skills', name, 'SKILL.md'),
+		join(cwd, '.agents', 'skills', name, 'SKILL.md'),
+		join(home, '.config', 'elefant', 'skills', name, 'SKILL.md'),
+		join(home, '.agents', 'skills', name, 'SKILL.md'),
+		join(home, '.claude', 'skills', name, 'SKILL.md'),
 		join(import.meta.dir, 'builtin', name, 'SKILL.md'),
 	];
 
