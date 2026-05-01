@@ -47,32 +47,38 @@
 		position: relative;
 	}
 
-	/* Single indigo ambient field — Quire Rule 4: accent metal is restrained.
-	   One primary glow per view; no competing teal/purple secondaries.
-	   Derived entirely from --color-primary via color-mix so it tracks both
-	   themes without literal rgba authoring.
-	   No blur filter — soft edges come from generous gradient fade zones. */
+	/* Single fluid indigo ambient field — position: fixed so it covers the
+	   entire viewport behind every layer. Orbs in child views (e.g. hero)
+	   must NOT use overflow:hidden or isolation:isolate so they bleed
+	   into each other and into this gradient without a hard seam. */
 	.app-shell::before {
 		content: '';
-		position: absolute;
-		inset: -40%;
+		position: fixed;
+		inset: 0;
 		pointer-events: none;
 		z-index: 0;
 		background:
+			/* Primary bloom: top-center, tall enough to reach the fold */
 			radial-gradient(
-				ellipse 70% 60% at 15% 50%,
+				ellipse 1400px 1000px at 50% -5%,
 				color-mix(in oklch, var(--color-primary) 18%, transparent) 0%,
-				transparent 55%
+				color-mix(in oklch, var(--color-primary) 10%, transparent) 25%,
+				color-mix(in oklch, var(--color-primary) 4%, transparent) 55%,
+				transparent 85%
 			),
+			/* Left mid-bloom — anchors the left side */
 			radial-gradient(
-				ellipse 50% 50% at 5% 85%,
-				color-mix(in oklch, var(--color-primary) 9%, transparent) 0%,
-				transparent 50%
+				ellipse 900px 700px at 15% 35%,
+				color-mix(in oklch, var(--color-primary) 10%, transparent) 0%,
+				color-mix(in oklch, var(--color-primary) 4%, transparent) 45%,
+				transparent 80%
 			),
+			/* Right accent — subtle tint near top-right */
 			radial-gradient(
-				ellipse 60% 40% at 60% 8%,
-				color-mix(in oklch, var(--color-primary) 6%, transparent) 0%,
-				transparent 48%
+				ellipse 700px 600px at 85% 15%,
+				color-mix(in oklch, var(--color-primary) 8%, transparent) 0%,
+				color-mix(in oklch, var(--color-primary) 3%, transparent) 45%,
+				transparent 78%
 			);
 	}
 
@@ -92,15 +98,11 @@
 		transition: width var(--transition-spring);
 	}
 
-	/* Sidebar override — the navigation rail reads as a confident, lifted
-	   editorial sheet bound by a single hairline on its trailing edge.
-	   We keep the .quire-md tinted fill and inset highlights from quire.css
-	   but neutralise the outer shadow and border-radius so the sidebar
-	   meets the screen edge cleanly. */
+	/* Sidebar override — transparent to let the single AppShell gradient show through.
+	   Only keep the trailing hairline border for visual separation. */
 	:global(.sidebar.quire-md) {
-		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.05),
-			inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+		background: transparent !important;
+		box-shadow: none;
 		border: none;
 		border-right: 1px solid var(--border-edge);
 		border-radius: 0;
@@ -117,7 +119,10 @@
 		grid-column: 2 / 3;
 		display: grid;
 		grid-template-rows: var(--topbar-height) 1fr;
-		overflow: hidden;
+		/* overflow: hidden removed — it was clipping the hero orbs in
+		   ProjectPickerView. Overflow is managed per-child instead:
+		   .content handles scroll, .topbar is sticky-positioned. */
+		overflow: visible;
 		position: relative;
 		z-index: 1;
 	}
@@ -132,25 +137,22 @@
 		position: sticky;
 		top: 0;
 		z-index: var(--z-sticky);
-		/* Reset the border shorthand from .quire-sm so the topbar reads as a
-		   bound editorial shelf with only a hairline at its bottom edge. */
-		border-top: none;
-		border-left: none;
-		border-right: none;
-		border-radius: 0;
+		/* Transparent to let the single AppShell gradient show through.
+		   !important overrides .quire-sm background from quire.css. */
+		background: transparent !important;
+		border-top: none !important;
+		border-left: none !important;
+		border-right: none !important;
+		border-radius: 0 !important;
+		box-shadow: none !important;
 	}
 
 	.content {
 		grid-row: 2 / 3;
 		overflow-y: auto;
 		overflow-x: hidden;
-		/* Subtle indigo vignette upper-left — lets the ambient field bleed
-		   through visually without painting it. Tokenised via color-mix. */
-		background: radial-gradient(
-			ellipse at 30% 20%,
-			color-mix(in oklch, var(--color-primary) 4%, transparent) 0%,
-			var(--surface-substrate) 60%
-		);
+		/* Transparent to let the single AppShell gradient show through */
+		background: transparent;
 		position: relative;
 	}
 

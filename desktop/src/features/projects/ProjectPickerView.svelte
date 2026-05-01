@@ -315,7 +315,8 @@
 		width: 100%;
 		height: 100%;
 		overflow-y: auto;
-		background-color: var(--color-bg);
+		/* Transparent to let AppShell ambient gradient show through */
+		background: transparent;
 	}
 
 	/* --- Hero ----------------------------------------------------------- */
@@ -324,14 +325,10 @@
 		width: 100%;
 		display: flex;
 		justify-content: center;
-		overflow: hidden;
-		isolation: isolate;
-		/* Subtle base glow that anchors the orbs without depending on motion. */
-		background-image: radial-gradient(
-			ellipse 900px 400px at 50% -10%,
-			var(--color-primary-subtle),
-			transparent 70%
-		);
+		/* overflow: hidden removed — orbs must bleed past the hero boundary
+		   so the indigo glow fades continuously into picker-inner below.
+		   isolation: isolate removed for the same reason: a new stacking
+		   context would clip the fixed AppShell gradient. */
 	}
 
 	.hero-inner {
@@ -345,37 +342,41 @@
 	/* Two ambient orbs that quietly drift behind the hero. They're decorative
 	   and use color-mix for a tinted indigo bloom that sits naturally on the
 	   substrate without clashing with content. */
+	/* Orbs are position:absolute within .hero but overflow freely because
+	   .hero no longer clips. Large blur radii ensure the indigo bleeds
+	   well past the hero bottom edge into the project grid below. */
 	.hero-orb {
 		position: absolute;
-		top: 0;
 		border-radius: 50%;
-		filter: blur(60px);
+		filter: blur(100px);
 		pointer-events: none;
 		z-index: 0;
-		opacity: 0.9;
+		opacity: 0.7;
 	}
 
 	.hero-orb-a {
-		width: 500px;
-		height: 500px;
-		left: -120px;
-		top: -160px;
+		width: 900px;
+		height: 900px;
+		left: -280px;
+		top: -300px;
 		background: radial-gradient(
 			circle at 50% 50%,
-			color-mix(in oklch, var(--color-primary) 12%, transparent),
-			transparent 65%
+			color-mix(in oklch, var(--color-primary) 18%, transparent) 0%,
+			color-mix(in oklch, var(--color-primary) 7%, transparent) 45%,
+			transparent 78%
 		);
 	}
 
 	.hero-orb-b {
-		width: 350px;
-		height: 350px;
-		right: -100px;
-		top: -80px;
+		width: 700px;
+		height: 700px;
+		right: -200px;
+		top: -150px;
 		background: radial-gradient(
 			circle at 50% 50%,
-			color-mix(in oklch, var(--color-primary) 18%, transparent),
-			transparent 65%
+			color-mix(in oklch, var(--color-primary) 22%, transparent) 0%,
+			color-mix(in oklch, var(--color-primary) 9%, transparent) 45%,
+			transparent 72%
 		);
 	}
 
