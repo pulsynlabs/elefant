@@ -12,6 +12,28 @@
 import { DAEMON_URL } from '$lib/daemon/client.js';
 import type { Command } from '$features/chat/command-completions/fuzzy.js';
 
+// Hardcoded fallback used when the daemon isn't reachable. Keeps the
+// completions overlay functional offline / pre-daemon-start so users
+// always see the canonical command list. Kept in sync manually with
+// the daemon's GET /api/wf/commands handler.
+const FALLBACK_COMMANDS: Command[] = [
+	{ trigger: '/discuss', description: 'Start a discovery interview to gather requirements' },
+	{ trigger: '/plan', description: 'Create specification and execution blueprint' },
+	{ trigger: '/execute', description: 'Begin wave-based implementation' },
+	{ trigger: '/audit', description: 'Verify implementation against requirements' },
+	{ trigger: '/accept', description: 'Review and confirm completed work' },
+	{ trigger: '/status', description: 'Check current workflow phase and progress' },
+	{ trigger: '/amend', description: 'Propose changes to a locked specification' },
+	{ trigger: '/help', description: 'Show available commands and workflow guide' },
+	{ trigger: '/pause', description: 'Save checkpoint and pause work' },
+	{ trigger: '/resume', description: 'Resume from a saved checkpoint' },
+	{ trigger: '/quick', description: 'Fast-track a small task without full workflow' },
+	{ trigger: '/research', description: 'Launch research for unknowns or risks' },
+	{ trigger: '/debug', description: 'Debug with a systematic workflow' },
+	{ trigger: '/map-codebase', description: 'Map and understand an existing codebase' },
+	{ trigger: '/pr-review', description: 'Review a GitHub pull request end-to-end' },
+];
+
 let commands = $state<Command[]>([]);
 let loaded = $state(false);
 let loading = $state(false);
@@ -64,7 +86,12 @@ async function load(): Promise<void> {
 		loaded = true;
 	} catch (err) {
 		error = err instanceof Error ? err.message : 'Failed to load commands';
-		console.error('[commands]', error);
+		console.warn('[commands] fetch failed, using fallback:', error);
+		// Use fallback so the overlay works offline / without the daemon.
+		// Mark as loaded so subsequent calls return immediately and we
+		// don't spam the network on every mount.
+		commands = FALLBACK_COMMANDS;
+		loaded = true;
 	} finally {
 		loading = false;
 		inflight = null;

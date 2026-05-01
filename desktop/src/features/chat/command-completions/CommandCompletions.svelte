@@ -28,13 +28,25 @@
 
 	let listEl: HTMLUListElement | undefined = $state(undefined);
 	let highlightedIndex = $state(0);
+	let commands = $state<Command[]>([]);
 
 	// Kick off the initial fetch on first mount; subsequent mounts are no-ops.
 	onMount(() => {
 		void commandsStore.load();
 	});
 
-	const ranked: RankedCommand[] = $derived(rankCommands(commandsStore.commands, query));
+	// Explicitly track commandsStore.commands to ensure reactivity works.
+	// Module-level $state with getters can have reactivity issues in Svelte 5
+	// when accessed directly in $derived, so we use $effect to sync it.
+	$effect(() => {
+		commands = commandsStore.commands;
+		// Also read `loading` so this effect re-runs when the fetch
+		// completes — that guarantees the overlay re-renders out of
+		// the loading state once commands arrive.
+		void commandsStore.loading;
+	});
+
+	const ranked: RankedCommand[] = $derived(rankCommands(commands, query));
 
 	// Reset / clamp the highlight whenever the visible list changes so the
 	// user never lands on a stale row after typing further characters.
@@ -160,51 +172,57 @@
 	}
 </script>
 
-{#if ranked.length > 0}
+{#if ranked.length > 0 || commandsStore.loading}
 	<div
 		class="command-completions"
 		role="presentation"
 		data-testid="command-completions"
 	>
-		<ul
-			bind:this={listEl}
-			class="command-list"
-			role="listbox"
-			aria-label="Slash command completions"
-			aria-activedescendant={activeOptionId()}
-			tabindex="-1"
-		>
-			{#each ranked as { command, matchIndices }, index (command.trigger)}
-				{@const segments = highlightSegments(command.trigger, matchIndices)}
-				{@const isHighlighted = index === highlightedIndex}
-				<li
-					id={`command-completion-${command.trigger.replace(/[^\w-]/g, '_')}`}
-					class="command-item"
-					class:highlighted={isHighlighted}
-					role="option"
-					aria-selected={isHighlighted}
-					data-index={index}
-					data-testid={`command-completion-${command.trigger}`}
-					onpointerenter={() => onItemPointerEnter(index)}
-					onmousedown={(event) => {
-						// mousedown (not click) so the input keeps focus before the
-						// event listener replaces its value. Without this, blur
-						// would fire mid-handler and re-render the textarea empty.
-						event.preventDefault();
-						onItemClick(index);
-					}}
-				>
-					<span class="trigger">
-						{#each segments as segment, segIdx (segIdx)}
-							{#if segment.matched}
-								<mark class="match">{segment.text}</mark>
-							{:else}<span>{segment.text}</span>{/if}
-						{/each}
-					</span>
-					<span class="description">{command.description}</span>
-				</li>
-			{/each}
-		</ul>
+		{#if commandsStore.loading && ranked.length === 0}
+			<div class="loading-state" role="status" aria-live="polite">
+				Loading commands…
+			</div>
+		{:else}
+			<ul
+				bind:this={listEl}
+				class="command-list"
+				role="listbox"
+				aria-label="Slash command completions"
+				aria-activedescendant={activeOptionId()}
+				tabindex="-1"
+			>
+				{#each ranked as { command, matchIndices }, index (command.trigger)}
+					{@const segments = highlightSegments(command.trigger, matchIndices)}
+					{@const isHighlighted = index === highlightedIndex}
+					<li
+						id={`command-completion-${command.trigger.replace(/[^\w-]/g, '_')}`}
+						class="command-item"
+						class:highlighted={isHighlighted}
+						role="option"
+						aria-selected={isHighlighted}
+						data-index={index}
+						data-testid={`command-completion-${command.trigger}`}
+						onpointerenter={() => onItemPointerEnter(index)}
+						onmousedown={(event) => {
+							// mousedown (not click) so the input keeps focus before the
+							// event listener replaces its value. Without this, blur
+							// would fire mid-handler and re-render the textarea empty.
+							event.preventDefault();
+							onItemClick(index);
+						}}
+					>
+						<span class="trigger">
+							{#each segments as segment, segIdx (segIdx)}
+								{#if segment.matched}
+									<mark class="match">{segment.text}</mark>
+								{:else}<span>{segment.text}</span>{/if}
+							{/each}
+						</span>
+						<span class="description">{command.description}</span>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	</div>
 {/if}
 
@@ -278,5 +296,12 @@
 		.command-item {
 			transition: none;
 		}
+	}
+
+	.loading-state {
+		padding: var(--space-3) var(--space-4);
+		font-size: var(--font-size-sm);
+		color: var(--text-meta);
+		font-family: var(--font-sans);
 	}
 </style>
