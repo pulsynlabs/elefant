@@ -10,6 +10,7 @@ export * from "./chip/index.js";
 export * from "./avatar/index.js";
 export * from "./spinner/index.js";
 export * from "./progress-bar/index.js";
+export * from "./slider/index.js";
 export * from "./tooltip/index.js";
 export * from "./panel/index.js";
 export * from "./quire-card/index.js";
