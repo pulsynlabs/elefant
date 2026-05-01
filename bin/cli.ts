@@ -2,6 +2,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { unlink } from 'node:fs/promises';
 
+import type { ElefantError } from '../src/types/errors.ts';
+import type { Result } from '../src/types/result.ts';
+
 import { daemonStatus, startDaemon, stopDaemon } from '../src/daemon/lifecycle.ts';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -95,10 +98,39 @@ export async function runStatus(_args: string[]): Promise<number> {
 // New subcommand stubs — implemented in Tasks 1.2–1.6 and Wave 2
 // ---------------------------------------------------------------------------
 
-async function runRestart(_args: string[]): Promise<number> {
-	// Task 1.4: stop then start
-	console.log('elefant restart: not yet implemented');
+/**
+ * Pure restart logic — stop then start.  Takes the two lifecycle functions
+ * as parameters so it can be tested without touching the real daemon.
+ */
+export async function restartDaemon(
+	stop: () => Promise<Result<void, ElefantError>>,
+	start: () => Promise<Result<{ pid: number }, ElefantError>>,
+): Promise<number> {
+	const stopResult = await stop();
+	if (!stopResult.ok) {
+		const isNotRunning =
+			stopResult.error.code === 'FILE_NOT_FOUND' ||
+			stopResult.error.message.toLowerCase().includes('not running');
+		if (isNotRunning) {
+			console.log('Daemon was not running; starting fresh.');
+		} else {
+			console.error(`Failed to stop daemon: ${stopResult.error.message}`);
+			return 1;
+		}
+	}
+
+	const startResult = await start();
+	if (!startResult.ok) {
+		console.error(startResult.error.message);
+		return 1;
+	}
+
+	console.log(`Elefant daemon restarted (PID ${startResult.data.pid})`);
 	return 0;
+}
+
+async function runRestart(_args: string[]): Promise<number> {
+	return restartDaemon(stopDaemon, startDaemon);
 }
 
 async function runVersion(_args: string[]): Promise<number> {

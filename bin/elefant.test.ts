@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { handlers, isAllowedInstallPath, isCommand } from './cli.ts';
+import { handlers, isAllowedInstallPath, isCommand, restartDaemon } from './cli.ts';
 import type { Command } from './cli.ts';
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ describe('handlers', () => {
 	});
 
 	it('safe stub handlers return Promise<number> without side effects', () => {
-		// Only call stub handlers — the lifecycle handlers (start/stop/status)
+		// Only call stub handlers — the lifecycle handlers (start/stop/status/restart)
 		// have real side effects and should not be invoked in unit tests.
 		const stubCommands: Command[] = [
 			'--version',
@@ -97,7 +97,6 @@ describe('handlers', () => {
 			'update',
 			'uninstall',
 			'serve',
-			'restart',
 		];
 		for (const cmd of stubCommands) {
 			const result = handlers[cmd]([]);
@@ -116,7 +115,6 @@ describe('handlers', () => {
 			'update',
 			'uninstall',
 			'serve',
-			'restart',
 		];
 		for (const cmd of safeCommands) {
 			const code = await handlers[cmd]([]);
@@ -160,5 +158,46 @@ describe('isAllowedInstallPath', () => {
 	it('rejects a path that is a substring but not a prefix match', () => {
 		// /usr/local/binaries/elefant should NOT match /usr/local/bin
 		expect(isAllowedInstallPath('/usr/local/binaries/elefant', homedir)).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// restartDaemon — pure logic tested with mock stop/start functions
+// ---------------------------------------------------------------------------
+
+describe('restartDaemon', () => {
+	const mockStopSuccess = (): Promise<{ ok: true; data: undefined }> =>
+		Promise.resolve({ ok: true, data: undefined });
+
+	const mockStopNotFound = (): Promise<{ ok: false; error: { code: 'FILE_NOT_FOUND'; message: string } }> =>
+		Promise.resolve({ ok: false, error: { code: 'FILE_NOT_FOUND', message: 'PID file not found' } });
+
+	const mockStopDenied = (): Promise<{ ok: false; error: { code: 'PERMISSION_DENIED'; message: string } }> =>
+		Promise.resolve({ ok: false, error: { code: 'PERMISSION_DENIED', message: 'Permission denied' } });
+
+	const mockStartSuccess = (): Promise<{ ok: true; data: { pid: number } }> =>
+		Promise.resolve({ ok: true, data: { pid: 12345 } });
+
+	const mockStartFail = (): Promise<{ ok: false; error: { code: 'TOOL_EXECUTION_FAILED'; message: string } }> =>
+		Promise.resolve({ ok: false, error: { code: 'TOOL_EXECUTION_FAILED', message: 'Start failed' } });
+
+	it('stop succeeds → start succeeds → prints PID, exit 0', async () => {
+		const code = await restartDaemon(mockStopSuccess, mockStartSuccess);
+		expect(code).toBe(0);
+	});
+
+	it('stop returns FILE_NOT_FOUND → start succeeds → prints "not running", PID, exit 0', async () => {
+		const code = await restartDaemon(mockStopNotFound, mockStartSuccess);
+		expect(code).toBe(0);
+	});
+
+	it('stop fails with real error (PERMISSION_DENIED) → prints error, exit 1', async () => {
+		const code = await restartDaemon(mockStopDenied, mockStartSuccess);
+		expect(code).toBe(1);
+	});
+
+	it('stop succeeds → start fails → prints error, exit 1', async () => {
+		const code = await restartDaemon(mockStopSuccess, mockStartFail);
+		expect(code).toBe(1);
 	});
 });
