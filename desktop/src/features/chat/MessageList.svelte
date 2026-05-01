@@ -40,7 +40,7 @@
 		inset: 0;
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-7);
+		gap: var(--space-5);
 		overflow-y: auto;
 		overflow-x: hidden;
 		padding: var(--space-6) var(--space-5);

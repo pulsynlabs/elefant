@@ -106,23 +106,22 @@
 		margin: 0;
 	}
 
-	/* Assistant prose — no container, text on substrate */
+	/* Assistant card — subtle elevation, clear message boundary */
 	.msg-prose {
 		width: 100%;
+		background-color: var(--surface-plate);
+		border: 1px solid var(--border-hairline);
+		border-radius: var(--radius-lg);
+		padding: var(--space-4) var(--space-5);
 		font-family: var(--font-sans);
 		font-size: var(--font-size-md);
 		line-height: 1.75;
 		color: var(--text-prose);
 	}
 
-	/* Error: subtle left border + tint */
+	/* Error: left accent border + tint */
 	.msg-prose--error {
 		border-left: 3px solid var(--color-error);
-		padding-left: var(--space-4);
-		background-color: color-mix(in oklch, var(--color-error) 5%, transparent);
-		border-radius: 0 var(--radius-md) var(--radius-md) 0;
-		padding-top: var(--space-3);
-		padding-right: var(--space-3);
-		padding-bottom: var(--space-3);
+		background-color: color-mix(in oklch, var(--color-error) 5%, var(--surface-plate));
 	}
 </style>
