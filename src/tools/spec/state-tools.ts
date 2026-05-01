@@ -48,7 +48,7 @@ function toStatus(workflow: SpecWorkflow): SpecStatusPayload {
 
 /** @example {"projectId":"project-1","workflowId":"spec-mode"} */
 export class SpecStatusTool extends SpecTool<SpecStatusArgs, SpecStatusPayload> {
-	readonly name = 'spec_status';
+	readonly name = 'wf_status';
 	readonly description = 'Read the active Spec Mode workflow status with an invariant payload shape.';
 	readonly schema = statusSchema;
 	readonly allowedPhases = [];
@@ -77,7 +77,7 @@ export type SpecStateArgs = z.infer<typeof stateSchema>;
 
 /** @example {"action":"get","projectId":"project-1","workflowId":"spec-mode"} */
 export class SpecStateTool extends SpecTool<SpecStateArgs, SpecWorkflow | null> {
-	readonly name = 'spec_state';
+	readonly name = 'wf_state';
 	readonly description = 'Read or mutate Spec Mode workflow state through StateManager operations.';
 	readonly schema = stateSchema;
 	readonly allowedPhases = [];
@@ -108,7 +108,7 @@ export type SpecWorkflowArgs = z.infer<typeof workflowSchema>;
 
 /** @example {"action":"list","projectId":"project-1"} */
 export class SpecWorkflowTool extends SpecTool<SpecWorkflowArgs, SpecWorkflow[] | SpecWorkflow> {
-	readonly name = 'spec_workflow';
+	readonly name = 'wf_workflow';
 	readonly description = 'List, create, or activate Spec Mode workflows for a project.';
 	readonly schema = workflowSchema;
 	readonly allowedPhases = [];

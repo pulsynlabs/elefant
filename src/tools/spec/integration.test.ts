@@ -28,19 +28,19 @@ describe('spec tool registry integration', () => {
 			configManager: {} as never,
 			currentRun: { runId: 'run-1', depth: 0, agentType: 'orchestrator', title: 'Run', sessionId: 'session-1', projectId: 'project-1', signal: new AbortController().signal, discoveredMcpTools: new Set<string>() },
 		});
-		const names = registry.getAll().map((tool) => tool.name).filter((name) => name.startsWith('spec_')).sort();
+		const names = registry.getAll().map((tool) => tool.name).filter((name) => name.startsWith('wf_')).sort();
 		expect(names).toEqual([
-			'spec_adl',
-			'spec_blueprint',
-			'spec_checkpoint',
-			'spec_chronicle',
-			'spec_reference',
-			'spec_requirements',
-			'spec_skill',
-			'spec_spec',
-			'spec_state',
-			'spec_status',
-			'spec_workflow',
+			'wf_adl',
+			'wf_blueprint',
+			'wf_checkpoint',
+			'wf_chronicle',
+			'wf_reference',
+			'wf_requirements',
+			'wf_skill',
+			'wf_spec',
+			'wf_state',
+			'wf_status',
+			'wf_workflow',
 		]);
 		database.close();
 	});

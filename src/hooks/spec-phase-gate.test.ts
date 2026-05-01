@@ -35,32 +35,32 @@ describe('spec phase gate', () => {
 		return { db, state, handler, projectId, workflowId };
 	}
 
-	it('vetoes spec_chronicle.append in discuss phase', async () => {
+	it('vetoes wf_chronicle.append in discuss phase', async () => {
 		const { db, handler, projectId, workflowId } = await setup('discuss');
-		const result = await handler({ toolName: 'spec_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
+		const result = await handler({ toolName: 'wf_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
 		expect(result).toEqual({
 			veto: true,
 			error: {
 				code: 'INVALID_PHASE',
 				expected: ['execute', 'audit', 'accept'],
 				actual: 'discuss',
-				tool: 'spec_chronicle',
-				message: "Tool 'spec_chronicle' is not allowed in phase 'discuss'. Allowed: execute, audit, accept",
+				tool: 'wf_chronicle',
+				message: "Tool 'wf_chronicle' is not allowed in phase 'discuss'. Allowed: execute, audit, accept",
 			},
 		});
 		db.close();
 	});
 
-	it('allows spec_chronicle.append in execute phase', async () => {
+	it('allows wf_chronicle.append in execute phase', async () => {
 		const { db, handler, projectId, workflowId } = await setup('execute');
-		const result = await handler({ toolName: 'spec_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
+		const result = await handler({ toolName: 'wf_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
 		expect(result).toBeUndefined();
 		db.close();
 	});
 
-	it('allows unrestricted spec_status in any phase', async () => {
+	it('allows unrestricted wf_status in any phase', async () => {
 		const { db, handler, projectId, workflowId } = await setup('discuss');
-		const result = await handler({ toolName: 'spec_status', args: { projectId, workflowId }, conversationId: 'conv-1' });
+		const result = await handler({ toolName: 'wf_status', args: { projectId, workflowId }, conversationId: 'conv-1' });
 		expect(result).toBeUndefined();
 		db.close();
 	});
@@ -74,18 +74,18 @@ describe('spec phase gate', () => {
 
 	it('phase changes make previously-vetoed calls succeed', async () => {
 		const { db, state, handler, projectId, workflowId } = await setup('discuss');
-		const first = await handler({ toolName: 'spec_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
+		const first = await handler({ toolName: 'wf_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
 		expect(first).toMatchObject({ veto: true });
 		await state.transitionSpecPhase(projectId, workflowId, 'plan');
 		await state.transitionSpecPhase(projectId, workflowId, 'execute');
-		const second = await handler({ toolName: 'spec_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
+		const second = await handler({ toolName: 'wf_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
 		expect(second).toBeUndefined();
 		db.close();
 	});
 
 	it('allows missing workflow id because the tool will validate context', async () => {
 		const { db, handler, projectId } = await setup('discuss');
-		const result = await handler({ toolName: 'spec_chronicle', args: { action: 'append', projectId }, conversationId: 'conv-1' });
+		const result = await handler({ toolName: 'wf_chronicle', args: { action: 'append', projectId }, conversationId: 'conv-1' });
 		expect(result).toBeUndefined();
 		db.close();
 	});

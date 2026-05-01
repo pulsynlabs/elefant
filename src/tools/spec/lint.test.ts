@@ -8,22 +8,22 @@ describe('spec tool lint', () => {
 		const tools = instantiateSpecTools();
 		expect(tools).toHaveLength(11);
 		expect(tools.map((tool) => tool.name).sort()).toEqual([
-			'spec_adl',
-			'spec_blueprint',
-			'spec_checkpoint',
-			'spec_chronicle',
-			'spec_reference',
-			'spec_requirements',
-			'spec_skill',
-			'spec_spec',
-			'spec_state',
-			'spec_status',
-			'spec_workflow',
+			'wf_adl',
+			'wf_blueprint',
+			'wf_checkpoint',
+			'wf_chronicle',
+			'wf_reference',
+			'wf_requirements',
+			'wf_skill',
+			'wf_spec',
+			'wf_state',
+			'wf_status',
+			'wf_workflow',
 		]);
 
 		for (const tool of tools) {
 			expect(tool).toBeInstanceOf(SpecTool);
-			expect(tool.name.startsWith('spec_')).toBe(true);
+			expect(tool.name.startsWith('wf_')).toBe(true);
 			expect(tool.description.length).toBeGreaterThan(10);
 			expect(tool.schema).toBeDefined();
 			expect(Array.isArray(tool.allowedPhases)).toBe(true);
@@ -54,7 +54,7 @@ describe('spec tool lint', () => {
 		const definitions = createSpecTools(ctx);
 		expect(definitions).toHaveLength(11);
 		for (const definition of definitions) {
-			expect(definition.name.startsWith('spec_')).toBe(true);
+			expect(definition.name.startsWith('wf_')).toBe(true);
 			expect(definition.execute).toBeFunction();
 		}
 		const first = instantiateSpecTools()[0];

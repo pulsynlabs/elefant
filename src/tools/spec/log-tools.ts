@@ -52,7 +52,7 @@ type ChronicleArgs = z.infer<typeof chronicleSchema>;
 
 /** @example {"action":"read","projectId":"project-1","workflowId":"spec-mode"} */
 export class SpecChronicleTool extends SpecTool<ChronicleArgs, unknown> {
-	readonly name = 'spec_chronicle';
+	readonly name = 'wf_chronicle';
 	readonly description = 'Append to or read from the Spec Mode CHRONICLE log.';
 	readonly schema = chronicleSchema;
 	readonly allowedPhases = [];
@@ -65,7 +65,7 @@ export class SpecChronicleTool extends SpecTool<ChronicleArgs, unknown> {
 			const workflow = await ctx.stateManager.getSpecWorkflow(parsed.data.projectId, parsed.data.workflowId);
 			if (!workflow) return new SpecToolError('WORKFLOW_NOT_FOUND', `Workflow not found: ${parsed.data.workflowId}`);
 			if (!['execute', 'audit', 'accept'].includes(workflow.phase)) {
-				return new SpecToolError('INVALID_PHASE', 'spec_chronicle.append is only allowed in execute, audit, or accept', { actual: workflow.phase, allowed: ['execute', 'audit', 'accept'] });
+				return new SpecToolError('INVALID_PHASE', 'wf_chronicle.append is only allowed in execute, audit, or accept', { actual: workflow.phase, allowed: ['execute', 'audit', 'accept'] });
 			}
 		}
 		return super.run(ctx, rawArgs);
@@ -89,7 +89,7 @@ type AdlArgs = z.infer<typeof adlSchema>;
 
 /** @example {"action":"read","projectId":"project-1","workflowId":"spec-mode"} */
 export class SpecAdlTool extends SpecTool<AdlArgs, unknown> {
-	readonly name = 'spec_adl';
+	readonly name = 'wf_adl';
 	readonly description = 'Append to or read from the Spec Mode architectural decision log.';
 	readonly schema = adlSchema;
 	readonly allowedPhases = [];
@@ -120,7 +120,7 @@ type CheckpointArgs = z.infer<typeof checkpointSchema>;
 
 /** @example {"action":"list","projectId":"project-1","workflowId":"spec-mode"} */
 export class SpecCheckpointTool extends SpecTool<CheckpointArgs, unknown> {
-	readonly name = 'spec_checkpoint';
+	readonly name = 'wf_checkpoint';
 	readonly description = 'Save, load, or list workflow checkpoints stored in CHRONICLE entries.';
 	readonly schema = checkpointSchema;
 	readonly allowedPhases = [];
@@ -142,7 +142,7 @@ type SkillArgs = z.infer<typeof skillSchema>;
 
 /** @example {"action":"list"} */
 export class SpecSkillTool extends SpecTool<SkillArgs, unknown> {
-	readonly name = 'spec_skill';
+	readonly name = 'wf_skill';
 	readonly description = 'List or load bundled Spec Mode skill markdown resources.';
 	readonly schema = skillSchema;
 	readonly allowedPhases = [];
@@ -163,7 +163,7 @@ type ReferenceArgs = z.infer<typeof referenceSchema>;
 
 /** @example {"action":"list"} */
 export class SpecReferenceTool extends SpecTool<ReferenceArgs, unknown> {
-	readonly name = 'spec_reference';
+	readonly name = 'wf_reference';
 	readonly description = 'List, load, or extract sections from bundled reference markdown resources.';
 	readonly schema = referenceSchema;
 	readonly allowedPhases = [];

@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe('state spec tools', () => {
-	it('spec_status shape is invariant before and after transition', async () => {
+	it('wf_status shape is invariant before and after transition', async () => {
 		const ctx = setup();
 		const tool = new SpecStatusTool();
 		const first = await tool.run(ctx, { projectId: 'project-1', workflowId: 'spec-mode' }) as unknown as Record<string, unknown>;
@@ -37,7 +37,7 @@ describe('state spec tools', () => {
 		ctx.cleanup();
 	});
 
-	it('spec_state updates mode/depth/autopilot/wave/interview', async () => {
+	it('wf_state updates mode/depth/autopilot/wave/interview', async () => {
 		const ctx = setup();
 		const tool = new SpecStateTool();
 		await tool.run(ctx, { action: 'set-mode', projectId: 'project-1', workflowId: 'spec-mode', mode: 'comprehensive' });
@@ -53,7 +53,7 @@ describe('state spec tools', () => {
 		ctx.cleanup();
 	});
 
-	it('spec_workflow lists, creates, and activates workflows', async () => {
+	it('wf_workflow lists, creates, and activates workflows', async () => {
 		const ctx = setup();
 		const tool = new SpecWorkflowTool();
 		await tool.run(ctx, { action: 'create', projectId: 'project-1', workflowId: 'other-flow' });

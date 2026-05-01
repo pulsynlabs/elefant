@@ -23,10 +23,10 @@ export function createSpecPhaseGateHandler(
 	return async (ctx) => {
 		try {
 			const { toolName, args } = ctx;
-			if (!toolName.startsWith('spec_')) return;
+			if (!toolName.startsWith('wf_')) return;
 
 			const action = typeof args.action === 'string' ? args.action : undefined;
-			const allowed = toolName === 'spec_chronicle' && action === 'append'
+			const allowed = toolName === 'wf_chronicle' && action === 'append'
 				? ['execute', 'audit', 'accept'] as const
 				: phaseAllowList.get(toolName);
 			if (!allowed || allowed.length === 0) return;

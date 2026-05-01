@@ -20,7 +20,7 @@ type RequirementsArgs = z.infer<typeof requirementsSchema>;
 
 /** @example {"action":"read","projectId":"project-1","workflowId":"spec-mode"} */
 export class SpecRequirementsTool extends SpecTool<RequirementsArgs, unknown> {
-	readonly name = 'spec_requirements';
+	readonly name = 'wf_requirements';
 	readonly description = 'Read, write, or extract sections from the REQUIREMENTS document.';
 	readonly schema = requirementsSchema;
 	readonly allowedPhases = ['discuss', 'plan', 'research', 'specify'] as const satisfies import('../../state/schema.ts').SpecWorkflowPhase[];
@@ -49,7 +49,7 @@ type SpecArgs = z.infer<typeof specSchema>;
 
 /** @example {"action":"read","projectId":"project-1","workflowId":"spec-mode"} */
 export class SpecSpecTool extends SpecTool<SpecArgs, unknown> {
-	readonly name = 'spec_spec';
+	readonly name = 'wf_spec';
 	readonly description = 'Read, write, lock, or amend the locked SPEC contract.';
 	readonly schema = specSchema;
 	readonly allowedPhases = ['specify', 'execute', 'audit', 'accept'] as const satisfies import('../../state/schema.ts').SpecWorkflowPhase[];
@@ -97,7 +97,7 @@ type BlueprintArgs = z.infer<typeof blueprintSchema>;
 
 /** @example {"action":"read","projectId":"project-1","workflowId":"spec-mode"} */
 export class SpecBlueprintTool extends SpecTool<BlueprintArgs, unknown> {
-	readonly name = 'spec_blueprint';
+	readonly name = 'wf_blueprint';
 	readonly description = 'Read, write, or query wave sections from the BLUEPRINT document.';
 	readonly schema = blueprintSchema;
 	readonly allowedPhases = ['plan', 'specify', 'execute', 'audit'] as const satisfies import('../../state/schema.ts').SpecWorkflowPhase[];
