@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { handlers, isAllowedInstallPath, isCommand, parseServeArgs, restartDaemon } from './cli.ts';
 import type { Command } from './cli.ts';
 
@@ -158,6 +158,16 @@ describe('isAllowedInstallPath', () => {
 		// /usr/local/binaries/elefant should NOT match /usr/local/bin
 		expect(isAllowedInstallPath('/usr/local/binaries/elefant', homedir)).toBe(false);
 	});
+
+	it('rejects ~/.local/bin-extra/elefant (path-segment match, not string prefix)', () => {
+		// '/home/testuser/.local/bin' is a string prefix of
+		// '/home/testuser/.local/bin-extra/elefant' but NOT a path-segment prefix
+		expect(isAllowedInstallPath('/home/testuser/.local/bin-extra/elefant', homedir)).toBe(false);
+	});
+
+	it('rejects ~/.local/bin-something/elefant (must match exact directory)', () => {
+		expect(isAllowedInstallPath('/home/testuser/.local/bin-something/elefant', homedir)).toBe(false);
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -251,6 +261,73 @@ describe('parseServeArgs', () => {
 		const result = parseServeArgs(['--port', '--daemon-port', '7777']);
 		expect(isNaN(result.port)).toBe(true); // Number('--daemon-port') → NaN
 		expect(result.daemonPort).toBe(1337);  // 7777 was not preceded by --daemon-port
+	});
+});
+
+// ---------------------------------------------------------------------------
+// parseServeArgs — env var fallback (requires setup/teardown)
+// ---------------------------------------------------------------------------
+
+describe('parseServeArgs env var defaults', () => {
+	const savedUiPort = process.env.ELEFANT_UI_PORT;
+	const savedDaemonPort = process.env.ELEFANT_DAEMON_PORT;
+
+	afterEach(() => {
+		delete process.env.ELEFANT_UI_PORT;
+		delete process.env.ELEFANT_DAEMON_PORT;
+	});
+
+	afterAll(() => {
+		if (savedUiPort === undefined) {
+			delete process.env.ELEFANT_UI_PORT;
+		} else {
+			process.env.ELEFANT_UI_PORT = savedUiPort;
+		}
+		if (savedDaemonPort === undefined) {
+			delete process.env.ELEFANT_DAEMON_PORT;
+		} else {
+			process.env.ELEFANT_DAEMON_PORT = savedDaemonPort;
+		}
+	});
+
+	it('reads ELEFANT_UI_PORT env var as default port', () => {
+		process.env.ELEFANT_UI_PORT = '8080';
+		const result = parseServeArgs([]);
+		expect(result.port).toBe(8080);
+		expect(result.daemonPort).toBe(1337);
+	});
+
+	it('reads ELEFANT_DAEMON_PORT env var as default daemon port', () => {
+		process.env.ELEFANT_DAEMON_PORT = '9999';
+		const result = parseServeArgs([]);
+		expect(result.port).toBe(3000);
+		expect(result.daemonPort).toBe(9999);
+	});
+
+	it('reads both env vars simultaneously', () => {
+		process.env.ELEFANT_UI_PORT = '7070';
+		process.env.ELEFANT_DAEMON_PORT = '8080';
+		const result = parseServeArgs([]);
+		expect(result.port).toBe(7070);
+		expect(result.daemonPort).toBe(8080);
+	});
+
+	it('--port flag overrides ELEFANT_UI_PORT env var', () => {
+		process.env.ELEFANT_UI_PORT = '8080';
+		const result = parseServeArgs(['--port', '4000']);
+		expect(result.port).toBe(4000);
+	});
+
+	it('--daemon-port flag overrides ELEFANT_DAEMON_PORT env var', () => {
+		process.env.ELEFANT_DAEMON_PORT = '9999';
+		const result = parseServeArgs(['--daemon-port', '9000']);
+		expect(result.daemonPort).toBe(9000);
+	});
+
+	it('ignores non-numeric env var values (NaN falls back to default)', () => {
+		process.env.ELEFANT_UI_PORT = 'not-a-number';
+		const result = parseServeArgs([]);
+		expect(result.port).toBe(3000); // Number('not-a-number') is NaN, NaN || 3000 → 3000
 	});
 });
 
