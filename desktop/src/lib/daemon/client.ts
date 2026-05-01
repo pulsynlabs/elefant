@@ -218,6 +218,36 @@ export class DaemonClient {
 	}
 
 	/**
+	 * Submit a numeric value chosen by the user for a slider tool call.
+	 * Mirrors `answerQuestion`: the daemon's slider broker resolves the
+	 * pending tool execution with the supplied value.
+	 */
+	async answerSlider(
+		sliderId: string,
+		value: number
+	): Promise<{ ok: true } | { ok: false; error: string }> {
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+		try {
+			const response = await fetch(`${this.baseUrl}/tools/slider/answer/${sliderId}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ value }),
+				signal: controller.signal,
+			});
+			if (!response.ok) {
+				const text = await response.text().catch(() => `HTTP ${response.status}`);
+				return { ok: false, error: text };
+			}
+			return await response.json() as { ok: true } | { ok: false; error: string };
+		} catch (err) {
+			return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
+		} finally {
+			clearTimeout(timeoutId);
+		}
+	}
+
+	/**
 	 * Fetch all messages for a session by fanning out through agent runs.
 	 * Retrieves runs for the session, then fetches messages for each run.
 	 * Returns messages in chronological order (by run creation, then by seq within run).
