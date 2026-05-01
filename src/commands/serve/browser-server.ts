@@ -1,16 +1,27 @@
 import path from 'node:path';
 import type { ElefantError } from '../../types/errors.ts';
 import { err, ok, type Result } from '../../types/result.ts';
+import { getServeAuthPath, loadServeAuth, type ServeAuth } from './serve-auth.ts';
+import { detectTailscaleIp } from './tailscale.ts';
+
+export type BindMode = 'localhost' | 'network' | 'tailscale';
 
 export interface BrowserServerOptions {
   port: number;
   daemonPort: number;
   distPath?: string;
+  bindMode?: BindMode;
+  tailscaleDetectOnly?: boolean;
+  auth?: ServeAuth;
 }
 
 export interface BrowserServer {
   server: ReturnType<typeof Bun.serve>;
   url: string;
+  bindMode: BindMode;
+  hostname: string;
+  tailscaleDetectOnly: boolean;
+  tailscaleIp?: string; // populated when tailscale mode detected an IP
 }
 
 const proxyPrefixes = ['/api/', '/tools/'] as const;
@@ -18,7 +29,7 @@ const proxyExact = ['/health'] as const;
 
 function notFoundError(): ElefantError {
   return {
-    code: 'NOT_FOUND' as ElefantError['code'],
+    code: 'NOT_FOUND',
     message:
       `Desktop build not found. Build it first:\n` +
       `  cd desktop && bun run build\n\n` +
@@ -57,6 +68,46 @@ export function buildProxyResponse(daemonResponse: Response): Response {
     statusText: daemonResponse.statusText,
     headers: daemonResponse.headers,
   });
+}
+
+export function buildUnauthorizedResponse(): Response {
+  return new Response('Unauthorized', {
+    status: 401,
+    headers: { 'WWW-Authenticate': 'Basic realm="Elefant"' },
+  });
+}
+
+/**
+ * NFR6: Use Bun.password.verify — NEVER string === comparison for secrets.
+ * This prevents timing attacks on the password comparison.
+ */
+export async function verifyBasicAuth(req: Request, auth: ServeAuth): Promise<boolean> {
+  const header = req.headers.get('authorization');
+  if (!header || !header.startsWith('Basic ')) {
+    return false;
+  }
+
+  const b64 = header.slice('Basic '.length);
+  let decoded: string;
+  try {
+    decoded = atob(b64);
+  } catch {
+    return false;
+  }
+
+  const colonIdx = decoded.indexOf(':');
+  if (colonIdx === -1) {
+    return false;
+  }
+
+  const username = decoded.slice(0, colonIdx);
+  const password = decoded.slice(colonIdx + 1);
+
+  if (username !== auth.username) {
+    return false;
+  }
+
+  return Bun.password.verify(password, auth.passwordHash);
 }
 
 async function proxyToDaemon(req: Request, daemonBaseUrl: string): Promise<Response> {
@@ -111,6 +162,34 @@ async function staticResponse(distPath: string, pathname: string): Promise<Respo
   return new Response(Bun.file(path.join(distPath, 'index.html')));
 }
 
+/**
+ * Pre-flight check: if the server is bound to anything other than localhost,
+ * auth credentials must exist.  This is a pure function that takes the auth
+ * file path so it can be tested without touching the real filesystem.
+ */
+export async function authPreflightCheck(
+  bindMode: BindMode,
+  authFilePath?: string,
+): Promise<Result<void, ElefantError>> {
+  if (bindMode === 'localhost') {
+    return ok(undefined);
+  }
+
+  const filePath = authFilePath ?? getServeAuthPath();
+  const file = Bun.file(filePath);
+
+  if (!(await file.exists())) {
+    return err({
+      code: 'VALIDATION_ERROR',
+      message:
+        'Auth credentials required for network/Tailscale mode. ' +
+        'Run: elefant auth set <user> <pass>',
+    });
+  }
+
+  return ok(undefined);
+}
+
 export async function createBrowserServer(
   opts: BrowserServerOptions,
 ): Promise<Result<BrowserServer, ElefantError>> {
@@ -121,12 +200,61 @@ export async function createBrowserServer(
 
   const distPath = distResult.data;
   const daemonBaseUrl = `http://localhost:${opts.daemonPort}`;
+  const bindMode = opts.bindMode ?? 'localhost';
+  const tailscaleDetectOnly = opts.tailscaleDetectOnly ?? false;
+
+  let loadedAuth: ServeAuth | undefined = opts.auth;
+  if (bindMode !== 'localhost') {
+    if (!loadedAuth) {
+      const authResult = await authPreflightCheck(bindMode);
+      if (!authResult.ok) {
+        return authResult;
+      }
+
+      const loadedAuthResult = await loadServeAuth();
+      if (!loadedAuthResult.ok) {
+        return loadedAuthResult;
+      }
+      loadedAuth = loadedAuthResult.data;
+    }
+  }
+
+  // Resolve hostname from bind mode
+  let hostname: string;
+  let tailscaleIp: string | undefined;
+  switch (bindMode) {
+    case 'network':
+      hostname = '0.0.0.0';
+      break;
+    case 'tailscale': {
+      const tsResult = await detectTailscaleIp();
+      if (!tsResult.ok) {
+        return tsResult;
+      }
+      tailscaleIp = tsResult.data;
+      if (tailscaleDetectOnly) {
+        hostname = '0.0.0.0';
+      } else {
+        hostname = tailscaleIp;
+      }
+      break;
+    }
+    case 'localhost':
+    default:
+      hostname = '127.0.0.1';
+      break;
+  }
 
   try {
     const server = Bun.serve({
       port: opts.port,
+      hostname,
       async fetch(req) {
         const url = new URL(req.url);
+
+        if (bindMode !== 'localhost' && loadedAuth && !(await verifyBasicAuth(req, loadedAuth))) {
+          return buildUnauthorizedResponse();
+        }
 
         if (shouldProxy(url.pathname)) {
           return proxyToDaemon(req, daemonBaseUrl);
@@ -139,7 +267,14 @@ export async function createBrowserServer(
       },
     });
 
-    return ok({ server, url: `http://localhost:${server.port}` });
+    return ok({
+      server,
+      url: tailscaleIp ? `http://${tailscaleIp}:${server.port}` : `http://${hostname}:${server.port}`,
+      bindMode,
+      hostname,
+      tailscaleDetectOnly,
+      tailscaleIp,
+    });
   } catch (error) {
     return err({
       code: 'TOOL_EXECUTION_FAILED',

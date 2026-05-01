@@ -2,7 +2,15 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { buildProxyResponse, resolveDistPath, shouldProxy } from './browser-server.ts';
+import {
+  authPreflightCheck,
+  buildProxyResponse,
+  buildUnauthorizedResponse,
+  resolveDistPath,
+  shouldProxy,
+  verifyBasicAuth,
+} from './browser-server.ts';
+import type { ServeAuth } from './serve-auth.ts';
 
 const tempDirs: string[] = [];
 const originalCwd = process.cwd();
@@ -164,5 +172,95 @@ describe('shouldProxy', () => {
     expect(shouldProxy('/apiary')).toBe(false);
     expect(shouldProxy('/tool')).toBe(false);
     expect(shouldProxy('/toolsies')).toBe(false);
+  });
+});
+
+describe('authPreflightCheck', () => {
+  it('returns ok for localhost mode regardless of file existence', async () => {
+    const result = await authPreflightCheck('localhost', '/nonexistent/auth.json');
+    expect(result.ok).toBe(true);
+  });
+
+  it('returns ok for network mode when auth file exists', async () => {
+    const tmpDir = createTempDir();
+    const authPath = path.join(tmpDir, 'serve-auth.json');
+    writeFileSync(authPath, JSON.stringify({ username: 'alice', passwordHash: '...' }));
+
+    const result = await authPreflightCheck('network', authPath);
+    expect(result.ok).toBe(true);
+  });
+
+  it('returns err for network mode when auth file does NOT exist', async () => {
+    const result = await authPreflightCheck('network', '/nonexistent/auth.json');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('VALIDATION_ERROR');
+      expect(result.error.message).toContain('elefant auth set');
+    }
+  });
+
+  it('returns err for tailscale mode when auth file does NOT exist', async () => {
+    const result = await authPreflightCheck('tailscale', '/nonexistent/auth.json');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  it('returns ok for tailscale mode when auth file exists', async () => {
+    const tmpDir = createTempDir();
+    const authPath = path.join(tmpDir, 'serve-auth.json');
+    writeFileSync(authPath, JSON.stringify({ username: 'bob', passwordHash: '...' }));
+
+    const result = await authPreflightCheck('tailscale', authPath);
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('verifyBasicAuth', () => {
+  async function createAuth(): Promise<ServeAuth> {
+    return {
+      username: 'alice',
+      passwordHash: await Bun.password.hash('secret'),
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  function requestWithBasicAuth(value?: string): Request {
+    const headers = new Headers();
+    if (value !== undefined) {
+      headers.set('authorization', `Basic ${btoa(value)}`);
+    }
+
+    return new Request('http://localhost:3000/', { headers });
+  }
+
+  it('returns true with correct credentials', async () => {
+    const auth = await createAuth();
+    expect(await verifyBasicAuth(requestWithBasicAuth('alice:secret'), auth)).toBe(true);
+  });
+
+  it('returns false with wrong password', async () => {
+    const auth = await createAuth();
+    expect(await verifyBasicAuth(requestWithBasicAuth('alice:wrong'), auth)).toBe(false);
+  });
+
+  it('returns false with wrong username', async () => {
+    const auth = await createAuth();
+    expect(await verifyBasicAuth(requestWithBasicAuth('bob:secret'), auth)).toBe(false);
+  });
+
+  it('returns false with missing Authorization header', async () => {
+    const auth = await createAuth();
+    expect(await verifyBasicAuth(requestWithBasicAuth(), auth)).toBe(false);
+  });
+});
+
+describe('buildUnauthorizedResponse', () => {
+  it('returns a 401 with the Basic Auth challenge header', () => {
+    const response = buildUnauthorizedResponse();
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Basic realm="Elefant"');
   });
 });
