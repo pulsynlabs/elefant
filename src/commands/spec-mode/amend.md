@@ -1,4 +1,4 @@
-# /spec-amend
+# /amend
 
 **Description:** Propose and apply a change to a locked specification through the amendment flow. Temporarily lifts and re-asserts the spec lock within a single transaction.
 **Category:** Spec Mode

@@ -1,4 +1,4 @@
-# /spec-discuss
+# /discuss
 
 **Description:** Start a discovery interview to gather requirements, constraints, risks, and out-of-scope items for a new workflow.
 **Category:** Spec Mode
@@ -33,7 +33,7 @@ When starting a new Spec Mode workflow and you need to capture the user's vision
 ## Autopilot Behavior
 When `autopilot=true` or `lazyAutopilot=true`:
 - In **Autopilot:** Ask discovery questions but auto-finalize at the end without per-answer confirmation. Pause at the REQUIREMENTS summary gate.
-- In **Lazy Autopilot:** Skip the question tool entirely. Infer requirements from the initial prompt that triggered the workflow. Immediately invoke `/spec-plan` after interview completion.
+- In **Lazy Autopilot:** Skip the question tool entirely. Infer requirements from the initial prompt that triggered the workflow. Immediately invoke `/plan` after interview completion.
 
 ## Output
 - A populated REQUIREMENTS document in `.goopspec/<workflowId>/REQUIREMENTS.md` (rendered from DB).
@@ -44,7 +44,7 @@ When `autopilot=true` or `lazyAutopilot=true`:
 - [ ] All 6 discovery areas are addressed in REQUIREMENTS (vision, must-haves, constraints, OOS, assumptions, risks).
 - [ ] `spec_workflows.interview_complete` is `1` after completion.
 - [ ] REQUIREMENTS document is readable as standalone markdown.
-- [ ] Autopilot mode proceeds to `/spec-plan` without manual intervention.
+- [ ] Autopilot mode proceeds to `/plan` without manual intervention.
 
 ## Anti-Patterns
 **DON'T:** Start planning before the interview is complete — the planner needs REQUIREMENTS as input.

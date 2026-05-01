@@ -1,4 +1,4 @@
-# /spec-debug
+# /debug
 
 **Description:** Dispatch the debugger agent with a scientific debugging workflow: hypothesis formation, controlled experiments, root cause identification, and fix.
 **Category:** Spec Mode

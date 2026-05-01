@@ -1,10 +1,10 @@
-# /spec-resume
+# /resume
 
 **Description:** Resume a paused workflow from the last saved checkpoint. Picks up from the exact phase, wave, and task where execution stopped.
 **Category:** Spec Mode
 
 ## When to Use
-After `/spec-pause` or when restarting a workflow session. Restores the orchestrator's context to the pause point.
+After `/pause` or when restarting a workflow session. Restores the orchestrator's context to the pause point.
 
 ## Prerequisites
 - A checkpoint must exist for the workflow (`spec_checkpoint.list` returns at least one entry).
@@ -18,7 +18,7 @@ After `/spec-pause` or when restarting a workflow session. Restores the orchestr
 5. Read the last 5 CHRONICLE entries to rebuild context about what happened before pausing.
 6. Read the last 5 ADL entries to recall decisions that were made.
 7. Tell the user where they left off: "Resuming at Wave <N>, Task <M>: <task-name>. X tasks completed, Y remaining."
-8. Continue execution from the current wave/task — the orchestrator follows the same process as `/spec-execute` from the resume point.
+8. Continue execution from the current wave/task — the orchestrator follows the same process as `/execute` from the resume point.
 9. Log a CHRONICLE entry: `{ kind: "workflow_resumed" }`.
 
 ## Tools Used

@@ -1,4 +1,4 @@
-# /spec-pause
+# /pause
 
 **Description:** Save a checkpoint of the current workflow state and pause execution. Generates a HANDOFF.md for clean session handoff.
 **Category:** Spec Mode
@@ -18,9 +18,9 @@ When you need to stop mid-workflow and resume later — at a wave boundary, end 
    - **What the next task is** (from BLUEPRINT)
    - **Key decisions made** (last 5 ADL entries)
    - **Files modified** (from CHRONICLE)
-   - **Command to resume:** `/spec-resume`
+   - **Command to resume:** `/resume`
 4. Write HANDOFF.md to `.goopspec/<workflowId>/HANDOFF.md`.
-5. Tell the user: "Checkpoint saved. Run `/spec-resume` to continue from exactly where you left off."
+5. Tell the user: "Checkpoint saved. Run `/resume` to continue from exactly where you left off."
 
 ## Tools Used
 - `spec_status` — read current state
@@ -43,7 +43,7 @@ No autopilot continuation — pausing is the end state. The workflow stays pause
 - [ ] The user is told exactly how to resume.
 
 ## Anti-Patterns
-**DON'T:** Save a checkpoint without telling the user how to resume — the HANDOFF.md must include the `/spec-resume` command.
+**DON'T:** Save a checkpoint without telling the user how to resume — the HANDOFF.md must include the `/resume` command.
 **DON'T:** Pause mid-task without recording which task was in progress and the last LLM context.
 **DON'T:** Overwrite an existing checkpoint with the same ID without confirming — checkpoints should be append-only.
 **DON'T:** Generate a HANDOFF.md that references internal task IDs without human-readable task descriptions.

@@ -1,10 +1,10 @@
-# /spec-audit
+# /audit
 
 **Description:** Dispatch the verifier agent in a fresh context against the locked SPEC's validation contract. Routes failures by severity.
 **Category:** Spec Mode
 
 ## When to Use
-After all waves of `/spec-execute` are complete. This is the quality gate before acceptance.
+After all waves of `/execute` are complete. This is the quality gate before acceptance.
 
 ## Prerequisites
 - All waves must be complete (`currentWave === totalWaves`).
@@ -18,10 +18,9 @@ After all waves of `/spec-execute` are complete. This is the quality gate before
 4. Parse the verifier's response envelope. The `<verification>` block contains JSON matching `AuditReportSchema` from `src/tools/spec/verifier-output.ts` — `{ workflowId, auditedAt, results: [{ vcId, status, evidence, severity?, recommendation? }], summary, recommendation }`.
 5. Persist the parsed report as a `spec_chronicle_entries` row with `kind: "audit_report"` and `payload: { auditReport }`.
 6. Route by `recommendation` (computed by `classifyAuditFailures` in `src/server/audit-router.ts`):
-   - **`minor-fix`:** Dispatch `executor-medium` to patch the failing VCs. Re-run `/spec-audit` after the patch lands.
-   - **`moderate-fix`:** Dispatch `planner` to amend the SPEC/BLUEPRINT. Re-run `/spec-audit` after amendment.
-   - **`major-stop`:** HALT. Surface to user via `permission:ask` with the failed VC IDs. Do NOT auto-remediate.
-   - **`accept`:** All VCs pass. Log to CHRONICLE and progress to `/spec-accept`.
+   - **`minor-fix`:** Dispatch `executor-medium` to patch the failing VCs. Re-run `/audit` after the patch lands.
+   - **`moderate-fix`:** Dispatch `planner` to amend the SPEC/BLUEPRINT. Re-run `/audit` after amendment.
+   - **`accept`:** All VCs pass. Log to CHRONICLE and progress to `/accept`.
 7. If any result is `partial`, treat it as moderate at minimum; require explicit user confirmation before continuing.
 
 ## Tools Used
@@ -36,7 +35,7 @@ After all waves of `/spec-execute` are complete. This is the quality gate before
 When `autopilot=true`:
 - Auto-route minor and moderate failures to remediation. Only pause on major failures or partial VCs.
 When `lazyAutopilot=true`:
-- On full pass, immediately invoke `/spec-accept`.
+- On full pass, immediately invoke `/accept`.
 
 ## Output
 - A `verifier_runs` row with per-VC results and evidence.

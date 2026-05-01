@@ -1,10 +1,10 @@
-# /spec-accept
+# /accept
 
 **Description:** Final acceptance gate. Presents the completed work summary and requires explicit user confirmation to close the workflow.
 **Category:** Spec Mode
 
 ## When to Use
-After `/spec-audit` has passed all validation contract assertions. This is the final human checkpoint before archiving the workflow.
+After `/audit` has passed all validation contract assertions. This is the final human checkpoint before archiving the workflow.
 
 ## Prerequisites
 - All waves must be complete.

@@ -1,4 +1,4 @@
-# /spec-pr-review
+# /pr-review
 
 **Description:** Review a GitHub pull request end-to-end against the locked SPEC. Dispatches a researcher to fetch PR details and a verifier to check the changes against the validation contract. Presents findings with fix options.
 **Category:** Spec Mode

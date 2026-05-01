@@ -1,4 +1,4 @@
-# /spec-map-codebase
+# /map-codebase
 
 **Description:** Dispatch the explorer agent to map a brownfield codebase — identifies architecture, stack, entry points, patterns, and conventions. Results are saved to the Project Knowledge Base for injection into future agent contexts.
 **Category:** Spec Mode

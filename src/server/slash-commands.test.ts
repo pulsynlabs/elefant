@@ -18,20 +18,20 @@ let tmpDir: string;
 
 const TEST_REGISTRY: SlashCommandDefinition[] = [
 	{
-		name: 'spec-plan',
-		trigger: '/spec-plan',
+		name: 'plan',
+		trigger: '/plan',
 		description: 'Create SPEC + BLUEPRINT from REQUIREMENTS.',
 		category: 'spec-mode',
 	},
 	{
-		name: 'spec-execute',
-		trigger: '/spec-execute',
+		name: 'execute',
+		trigger: '/execute',
 		description: 'Begin wave-based implementation.',
 		category: 'spec-mode',
 	},
 	{
-		name: 'spec-discuss',
-		trigger: '/spec-discuss',
+		name: 'discuss',
+		trigger: '/discuss',
 		description: 'Start discovery interview.',
 		category: 'spec-mode',
 		args: '[session-name]',
@@ -62,19 +62,19 @@ describe('loadCommandRegistry', () => {
 		await writeRegistry(tmpDir, TEST_REGISTRY);
 		const registry = await loadCommandRegistry(tmpDir);
 		expect(registry).toHaveLength(3);
-		expect(registry[0].name).toBe('spec-plan');
+		expect(registry[0].name).toBe('plan');
 	});
 
 	it('falls back to scanning *.md files when JSON is missing', async () => {
-		await writeCommandFile(tmpDir, 'spec-status', '# /spec-status\n\nStatus check');
-		await writeCommandFile(tmpDir, 'spec-help', '# /spec-help\n\nHelp listing');
+		await writeCommandFile(tmpDir, 'status', '# /status\n\nStatus check');
+		await writeCommandFile(tmpDir, 'help', '# /help\n\nHelp listing');
 
 		const registry = await loadCommandRegistry(tmpDir);
 		expect(registry.length).toBeGreaterThanOrEqual(2);
 
 		const triggers = registry.map((r) => r.trigger);
-		expect(triggers).toContain('/spec-status');
-		expect(triggers).toContain('/spec-help');
+		expect(triggers).toContain('/status');
+		expect(triggers).toContain('/help');
 	});
 
 	it('returns empty array for empty directory with no JSON', async () => {
@@ -94,28 +94,28 @@ describe('parseSlashCommand', () => {
 		await writeRegistry(tmpDir, TEST_REGISTRY);
 		await writeCommandFile(
 			tmpDir,
-			'spec-plan',
-			'# /spec-plan\n\n**Description:** Plan workflow.\n\n## Process\n\n1. Read REQUIREMENTS\n2. Dispatch planner',
+			'plan',
+			'# /plan\n\n**Description:** Plan workflow.\n\n## Process\n\n1. Read REQUIREMENTS\n2. Dispatch planner',
 		);
 		await writeCommandFile(
 			tmpDir,
-			'spec-discuss',
-			'# /spec-discuss\n\n**Description:** Discovery interview.\n\n## Process\n\n1. Ask discovery questions',
+			'discuss',
+			'# /discuss\n\n**Description:** Discovery interview.\n\n## Process\n\n1. Ask discovery questions',
 		);
 	});
 
-	it('matches /spec-plan command and loads content', async () => {
-		const match = await parseSlashCommand('/spec-plan', tmpDir);
+	it('matches /plan command and loads content', async () => {
+		const match = await parseSlashCommand('/plan', tmpDir);
 		expect(match).not.toBeNull();
-		expect(match!.command.name).toBe('spec-plan');
-		expect(match!.command.trigger).toBe('/spec-plan');
+		expect(match!.command.name).toBe('plan');
+		expect(match!.command.trigger).toBe('/plan');
 		expect(match!.args).toBe('');
-		expect(match!.promptContent).toContain('# /spec-plan');
+		expect(match!.promptContent).toContain('# /plan');
 		expect(match!.promptContent).toContain('Read REQUIREMENTS');
 	});
 
-	it('extracts args from /spec-plan with session name', async () => {
-		const match = await parseSlashCommand('/spec-plan some-session-name', tmpDir);
+	it('extracts args from /plan with session name', async () => {
+		const match = await parseSlashCommand('/plan some-session-name', tmpDir);
 		expect(match).not.toBeNull();
 		expect(match!.args).toBe('some-session-name');
 	});
@@ -131,30 +131,30 @@ describe('parseSlashCommand', () => {
 	});
 
 	it('trims leading whitespace before matching', async () => {
-		const match = await parseSlashCommand('  /spec-plan my-args', tmpDir);
+		const match = await parseSlashCommand('  /plan my-args', tmpDir);
 		expect(match).not.toBeNull();
-		expect(match!.command.name).toBe('spec-plan');
+		expect(match!.command.name).toBe('plan');
 		expect(match!.args).toBe('my-args');
 	});
 
 	it('loads command content from file', async () => {
-		const match = await parseSlashCommand('/spec-discuss', tmpDir);
+		const match = await parseSlashCommand('/discuss', tmpDir);
 		expect(match).not.toBeNull();
-		expect(match!.promptContent).toContain('# /spec-discuss');
+		expect(match!.promptContent).toContain('# /discuss');
 		expect(match!.promptContent).toContain('Discovery interview');
 	});
 
 	it('returns null when MD file is missing', async () => {
 		await writeRegistry(tmpDir, [
 			{
-				name: 'spec-missing',
-				trigger: '/spec-missing',
+				name: 'missing',
+				trigger: '/missing',
 				description: 'Missing file',
 				category: 'spec-mode',
 			},
 		]);
 
-		const match = await parseSlashCommand('/spec-missing', tmpDir);
+		const match = await parseSlashCommand('/missing', tmpDir);
 		expect(match).toBeNull();
 	});
 
@@ -164,19 +164,19 @@ describe('parseSlashCommand', () => {
 	});
 
 	it('handles multi-line message with slash on first line', async () => {
-		const match = await parseSlashCommand('/spec-plan\nmore text here', tmpDir);
+		const match = await parseSlashCommand('/plan\nmore text here', tmpDir);
 		expect(match).not.toBeNull();
-		expect(match!.command.name).toBe('spec-plan');
+		expect(match!.command.name).toBe('plan');
 		expect(match!.args).toBe('');
 	});
 
 	it('does NOT match slash on second line', async () => {
-		const match = await parseSlashCommand('some text\n/spec-plan', tmpDir);
+		const match = await parseSlashCommand('some text\n/plan', tmpDir);
 		expect(match).toBeNull();
 	});
 
 	it('handles args with multiple spaces', async () => {
-		const match = await parseSlashCommand('/spec-discuss    my session   name', tmpDir);
+		const match = await parseSlashCommand('/discuss    my session   name', tmpDir);
 		expect(match).not.toBeNull();
 		expect(match!.args).toBe('my session   name');
 	});
@@ -193,23 +193,23 @@ describe('parseSlashCommand', () => {
 
 	it('returns null when registry is empty', async () => {
 		await writeRegistry(tmpDir, []);
-		const match = await parseSlashCommand('/spec-plan', tmpDir);
+		const match = await parseSlashCommand('/plan', tmpDir);
 		expect(match).toBeNull();
 	});
 });
 
 describe('suggestCommands', () => {
 	const registry: SlashCommandDefinition[] = [
-		{ name: 'spec-plan', trigger: '/spec-plan', description: 'Plan', category: 'spec-mode' },
-		{ name: 'spec-pause', trigger: '/spec-pause', description: 'Pause', category: 'spec-mode' },
-		{ name: 'spec-execute', trigger: '/spec-execute', description: 'Execute', category: 'spec-mode' },
+		{ name: 'plan', trigger: '/plan', description: 'Plan', category: 'spec-mode' },
+		{ name: 'pause', trigger: '/pause', description: 'Pause', category: 'spec-mode' },
+		{ name: 'execute', trigger: '/execute', description: 'Execute', category: 'spec-mode' },
 		{ name: 'debug', trigger: '/debug', description: 'Debug', category: 'utility' },
 	];
 
 	it('returns matching suggestions for partial input', () => {
-		const suggestions = suggestCommands('/spec-p', registry, 3);
-		expect(suggestions).toContain('/spec-plan');
-		expect(suggestions).toContain('/spec-pause');
+		const suggestions = suggestCommands('/p', registry, 3);
+		expect(suggestions).toContain('/plan');
+		expect(suggestions).toContain('/pause');
 	});
 
 	it('returns empty array for no matches', () => {
@@ -218,7 +218,7 @@ describe('suggestCommands', () => {
 	});
 
 	it('respects limit', () => {
-		const suggestions = suggestCommands('/spec', registry, 1);
+		const suggestions = suggestCommands('/', registry, 1);
 		expect(suggestions).toHaveLength(1);
 	});
 });
@@ -233,41 +233,41 @@ describe('executeAutoProgression', () => {
 
 	beforeEach(async () => {
 		await writeRegistry(tmpDir, [
-			{ name: 'spec-plan', trigger: '/spec-plan', description: 'Plan', category: 'spec-mode' },
+			{ name: 'plan', trigger: '/plan', description: 'Plan', category: 'spec-mode' },
 		]);
-		await writeCommandFile(tmpDir, 'spec-plan', '# /spec-plan\n\nbody');
+		await writeCommandFile(tmpDir, 'plan', '# /plan\n\nbody');
 	});
 
 	it('returns the next command when autopilot is true', async () => {
 		const state = makeStateManager({ autopilot: true });
-		const match = await executeAutoProgression('/spec-discuss', state, 'wf', 'proj', tmpDir);
+		const match = await executeAutoProgression('/discuss', state, 'wf', 'proj', tmpDir);
 		expect(match).not.toBeNull();
-		expect(match!.command.trigger).toBe('/spec-plan');
+		expect(match!.command.trigger).toBe('/plan');
 	});
 
 	it('returns null when autopilot is false', async () => {
 		const state = makeStateManager({ autopilot: false });
-		const match = await executeAutoProgression('/spec-discuss', state, 'wf', 'proj', tmpDir);
+		const match = await executeAutoProgression('/discuss', state, 'wf', 'proj', tmpDir);
 		expect(match).toBeNull();
 	});
 
-	it('returns null for /spec-accept (no successor)', async () => {
+	it('returns null for /accept (no successor)', async () => {
 		const state = makeStateManager({ autopilot: true });
-		const match = await executeAutoProgression('/spec-accept', state, 'wf', 'proj', tmpDir);
+		const match = await executeAutoProgression('/accept', state, 'wf', 'proj', tmpDir);
 		expect(match).toBeNull();
 	});
 
 	it('returns null when workflow is missing', async () => {
 		const state = makeStateManager(null);
-		const match = await executeAutoProgression('/spec-discuss', state, 'wf', 'proj', tmpDir);
+		const match = await executeAutoProgression('/discuss', state, 'wf', 'proj', tmpDir);
 		expect(match).toBeNull();
 	});
 
 	it('AUTO_PROGRESSION covers every non-accept phase command', () => {
-		expect(AUTO_PROGRESSION['/spec-discuss']).toBe('/spec-plan');
-		expect(AUTO_PROGRESSION['/spec-plan']).toBe('/spec-execute');
-		expect(AUTO_PROGRESSION['/spec-execute']).toBe('/spec-audit');
-		expect(AUTO_PROGRESSION['/spec-audit']).toBe('/spec-accept');
-		expect(AUTO_PROGRESSION['/spec-accept']).toBeUndefined();
+		expect(AUTO_PROGRESSION['/discuss']).toBe('/plan');
+		expect(AUTO_PROGRESSION['/plan']).toBe('/execute');
+		expect(AUTO_PROGRESSION['/execute']).toBe('/audit');
+		expect(AUTO_PROGRESSION['/audit']).toBe('/accept');
+		expect(AUTO_PROGRESSION['/accept']).toBeUndefined();
 	});
 });

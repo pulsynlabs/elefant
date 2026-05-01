@@ -23,21 +23,21 @@ async function setupTestRegistry(dir: string): Promise<void> {
 
 	const registry = [
 		{
-			name: 'spec-discuss',
-			trigger: '/spec-discuss',
+			name: 'discuss',
+			trigger: '/discuss',
 			description: 'Start discovery interview.',
 			category: 'spec-mode',
 			args: '[session-name]',
 		},
 		{
-			name: 'spec-plan',
-			trigger: '/spec-plan',
+			name: 'plan',
+			trigger: '/plan',
 			description: 'Create SPEC + BLUEPRINT.',
 			category: 'spec-mode',
 		},
 		{
-			name: 'spec-status',
-			trigger: '/spec-status',
+			name: 'status',
+			trigger: '/status',
 			description: 'Show workflow status.',
 			category: 'spec-mode',
 		},
@@ -79,8 +79,8 @@ describe('routes-commands', () => {
 
 		const body = await response.json() as Array<Record<string, unknown>>;
 		expect(body).toHaveLength(4);
-		expect(body[0].name).toBe('spec-discuss');
-		expect(body[0].trigger).toBe('/spec-discuss');
+		expect(body[0].name).toBe('discuss');
+		expect(body[0].trigger).toBe('/discuss');
 		expect(body[0].category).toBe('spec-mode');
 	});
 

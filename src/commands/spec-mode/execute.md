@@ -1,4 +1,4 @@
-# /spec-execute
+# /execute
 
 **Description:** Begin wave-based implementation. Dispatches executor agents per wave, tracks progress, and saves checkpoints at wave boundaries.
 **Category:** Spec Mode
@@ -37,7 +37,7 @@ After SPEC is locked and BLUEPRINT is ready. This command runs the implementatio
 When `autopilot=true`:
 - Execute all waves without pausing for per-task confirmation. Only stop if a task fails and auto-retry is exhausted.
 When `lazyAutopilot=true`:
-- After the last wave completes, immediately invoke `/spec-audit`.
+- After the last wave completes, immediately invoke `/audit`.
 
 ## Output
 - All tasks transitioned to `done` or `blocked`.

@@ -1,4 +1,4 @@
-# /spec-research
+# /research
 
 **Description:** Dispatch the researcher agent on a specific topic. Saves findings to `.goopspec/<workflowId>/research/<topic-slug>.md` and logs the research decision to ADL.
 **Category:** Spec Mode
@@ -7,7 +7,7 @@
 When you need deep domain exploration before planning — technology tradeoffs, library comparisons, architectural patterns, or competitive analysis.
 
 ## Prerequisites
-- A topic must be provided as the command argument (e.g., `/spec-research "WebSocket vs SSE for real-time events"`).
+- A topic must be provided as the command argument (e.g., `/research "WebSocket vs SSE for real-time events"`).
 - A workflow should exist (or a new one is created for the research session).
 
 ## Process
@@ -50,4 +50,4 @@ When `lazyAutopilot=true`:
 **DON'T:** Dispatch research without a specific topic — the researcher needs a focused question to produce useful output.
 **DON'T:** Skip the ADL entry — research dispatches are decisions that should be traceable.
 **DON'T:** Overwrite existing research on the same topic without asking — check for prior files first.
-**DON'T:** Use the researcher for codebase mapping — that's what `/spec-map-codebase` and the explorer agent are for.
+**DON'T:** Use the researcher for codebase mapping — that's what `/map-codebase` and the explorer agent are for.

@@ -1,10 +1,10 @@
-# /spec-plan
+# /plan
 
 **Description:** Create a locked SPEC and executable BLUEPRINT from the REQUIREMENTS document.
 **Category:** Spec Mode
 
 ## When to Use
-After `/spec-discuss` has produced a confirmed REQUIREMENTS document. This command transforms requirements into a formal specification contract and a task-level execution plan.
+After `/discuss` has produced a confirmed REQUIREMENTS document. This command transforms requirements into a formal specification contract and a task-level execution plan.
 
 ## Prerequisites
 - REQUIREMENTS must exist and `spec_workflows.interview_complete` must be `true`.
@@ -36,7 +36,7 @@ After `/spec-discuss` has produced a confirmed REQUIREMENTS document. This comma
 When `autopilot=true`:
 - Run the full planning flow without pausing at the contract gate. The SPEC is automatically locked.
 When `lazyAutopilot=true`:
-- Immediately invoke `/spec-execute` after SPEC lock.
+- Immediately invoke `/execute` after SPEC lock.
 
 ## Output
 - A locked SPEC document with must-haves, acceptance criteria, and validation contracts.

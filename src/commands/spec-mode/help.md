@@ -1,4 +1,4 @@
-# /spec-help
+# /help
 
 **Description:** List all Spec Mode commands with one-line descriptions, queried from the command discovery API.
 **Category:** Spec Mode
@@ -17,29 +17,29 @@ When you need to discover available Spec Mode commands or remember their exact t
 ## Spec Mode Commands
 
 ### Workflow Pipeline
-- `/spec-discuss [session-name]` — Start discovery interview. Gather requirements, constraints, risks.
-- `/spec-plan` — Create SPEC + BLUEPRINT from REQUIREMENTS. Lock spec before execute.
-- `/spec-execute` — Begin wave-based implementation. Dispatches executor agents per wave.
-- `/spec-audit` — Dispatch verifier in fresh context against validation contract.
-- `/spec-accept` — Final acceptance gate. Requires user confirmation.
+- `/discuss [session-name]` — Start discovery interview. Gather requirements, constraints, risks.
+- `/plan` — Create SPEC + BLUEPRINT from REQUIREMENTS. Lock spec before execute.
+- `/execute` — Begin wave-based implementation. Dispatches executor agents per wave.
+- `/audit` — Dispatch verifier in fresh context against validation contract.
+- `/accept` — Final acceptance gate. Requires user confirmation.
 
 ### State & Navigation
-- `/spec-status` — Show current workflow phase, wave progress, spec lock state.
-- `/spec-amend` — Propose a change to a locked spec via the amendment flow.
-- `/spec-pause` — Save checkpoint and pause. Generates HANDOFF.md.
-- `/spec-resume` — Resume from last checkpoint.
+- `/status` — Show current workflow phase, wave progress, spec lock state.
+- `/amend` — Propose a change to a locked spec via the amendment flow.
+- `/pause` — Save checkpoint and pause. Generates HANDOFF.md.
+- `/resume` — Resume from last checkpoint.
 
 ### Specialized Agents
-- `/spec-quick <task>` — Fast-track a small task. Runs full pipeline in lazy autopilot.
-- `/spec-research <topic>` — Dispatch researcher agent on a specific topic.
-- `/spec-debug` — Dispatch debugger with scientific debugging workflow.
-- `/spec-map-codebase` — Dispatch explorer to map codebase and build knowledge base.
-- `/spec-pr-review <pr-url>` — Review a GitHub PR end-to-end with fix options.
+- `/quick <task>` — Fast-track a small task. Runs full pipeline in lazy autopilot.
+- `/research <topic>` — Dispatch researcher agent on a specific topic.
+- `/debug` — Dispatch debugger with scientific debugging workflow.
+- `/map-codebase` — Dispatch explorer to map codebase and build knowledge base.
+- `/pr-review <pr-url>` — Review a GitHub PR end-to-end with fix options.
 
 ### Meta
-- `/spec-help` — List all Spec Mode commands with descriptions (this command).
+- `/help` — List all Spec Mode commands with descriptions (this command).
 
-Type any command to start, e.g., `/spec-discuss my-feature`.
+Type any command to start, e.g., `/discuss my-feature`.
 ```
 
 3. If the API is unavailable, fall back to reading `COMMANDS_REGISTRY.json` directly from the daemon's source tree.

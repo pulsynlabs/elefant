@@ -1,4 +1,4 @@
-# /spec-status
+# /status
 
 **Description:** Show the current workflow phase, wave progress, spec lock state, and a human-readable status table.
 **Category:** Spec Mode
