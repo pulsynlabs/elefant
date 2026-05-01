@@ -55,9 +55,10 @@
 
 <style>
 	.settings-view {
+		position: absolute;
+		inset: 0;
 		display: flex;
 		flex-direction: column;
-		height: 100%;
 		background-color: var(--color-bg);
 	}
 
@@ -80,6 +81,7 @@
 	.settings-layout {
 		display: flex;
 		flex: 1;
+		min-height: 0;
 		overflow: hidden;
 	}
 
@@ -130,6 +132,7 @@
 
 	.settings-content {
 		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
 		padding: var(--space-6);
 	}

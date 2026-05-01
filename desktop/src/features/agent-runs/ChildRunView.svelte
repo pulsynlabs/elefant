@@ -199,10 +199,10 @@
 
 <style>
 	.child-run-view {
+		position: absolute;
+		inset: 0;
 		display: grid;
 		grid-template-rows: auto 1fr auto;
-		height: 100%;
-		min-height: 0;
 		overflow: hidden;
 		background-color: var(--color-bg);
 	}

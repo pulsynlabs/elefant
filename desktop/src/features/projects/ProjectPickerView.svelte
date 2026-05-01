@@ -309,14 +309,9 @@
 
 <style>
 	.picker {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		width: 100%;
-		height: 100%;
+		position: absolute;
+		inset: 0;
 		overflow-y: auto;
-		/* Transparent to let AppShell ambient gradient show through */
-		background: transparent;
 	}
 
 	/* --- Hero ----------------------------------------------------------- */

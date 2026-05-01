@@ -43,10 +43,9 @@
 
 <style>
 	.models-view {
-		display: flex;
-		flex-direction: column;
-		height: 100%;
-		background-color: var(--color-bg);
+		position: absolute;
+		inset: 0;
+		overflow-y: auto;
 	}
 
 	.models-header {
