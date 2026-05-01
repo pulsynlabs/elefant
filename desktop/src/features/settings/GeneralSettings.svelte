@@ -3,14 +3,38 @@
 	import { configService } from '$lib/services/config-service.js';
 	import type { LogLevel } from '$lib/daemon/types.js';
 	import { onMount } from 'svelte';
+	import NumberInput from '$lib/components/ui/NumberInput.svelte';
+	import SelectInput from '$lib/components/ui/SelectInput.svelte';
+	import { HugeiconsIcon, RefreshIcon } from '$lib/icons/index.js';
 
 	let daemonUrl = $state(settingsStore.daemonUrl);
 	let port = $state(1337);
 	let logLevel = $state<LogLevel>('info');
 	let defaultProvider = $state('');
 	let availableProviders = $state<string[]>([]);
+	let hardwareAcceleration = $state<'enabled' | 'disabled'>('enabled');
+	let savedHardwareAcceleration = $state<'enabled' | 'disabled'>('enabled');
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let saveMessage = $state('');
+	let restartStatus = $state<'idle' | 'restarting'>('idle');
+
+	const logLevelOptions = [
+		{ value: 'debug', label: 'Debug' },
+		{ value: 'info', label: 'Info' },
+		{ value: 'warn', label: 'Warn' },
+		{ value: 'error', label: 'Error' },
+	];
+
+	const hardwareAccelerationOptions = [
+		{ value: 'enabled', label: 'Enabled (default)' },
+		{ value: 'disabled', label: 'Disabled (Windows only, restart required)' },
+	];
+
+	const providerOptions = $derived(
+		availableProviders.map((p) => ({ value: p, label: p }))
+	);
+
+	const restartRequired = $derived(hardwareAcceleration !== savedHardwareAcceleration);
 
 	onMount(async () => {
 		const config = await configService.readConfig();
@@ -19,6 +43,9 @@
 			logLevel = config.logLevel;
 			defaultProvider = config.defaultProvider;
 			availableProviders = config.providers.map(p => p.name);
+			const isDisabled = config.hardwareAccelerationDisabled ?? false;
+			hardwareAcceleration = isDisabled ? 'disabled' : 'enabled';
+			savedHardwareAcceleration = hardwareAcceleration;
 		}
 	});
 
@@ -30,8 +57,10 @@
 				port,
 				logLevel,
 				...(defaultProvider ? { defaultProvider } : {}),
+				hardwareAccelerationDisabled: hardwareAcceleration === 'disabled',
 			});
 
+			savedHardwareAcceleration = hardwareAcceleration;
 			saveStatus = 'saved';
 			saveMessage = 'Settings saved';
 			setTimeout(() => { saveStatus = 'idle'; }, 2000);
@@ -39,6 +68,16 @@
 			saveStatus = 'error';
 			saveMessage = error instanceof Error ? error.message : 'Failed to save settings';
 			setTimeout(() => { saveStatus = 'idle'; }, 4000);
+		}
+	}
+
+	async function handleRestart(): Promise<void> {
+		restartStatus = 'restarting';
+		try {
+			// Invoke the Tauri restart command
+			await (window as any).__TAURI__.invoke('restart_app');
+		} catch {
+			restartStatus = 'idle';
 		}
 	}
 </script>
@@ -63,43 +102,56 @@
 
 	<div class="form-group">
 		<label class="field-label" for="port">Daemon Port</label>
-		<input
-			id="port"
-			type="number"
-			class="field-input field-input-narrow"
-			bind:value={port}
-			min="1"
-			max="65535"
-		/>
+		<NumberInput id="port" bind:value={port} min={1} max={65535} />
 		<span class="field-hint">Written to elefant.config.json. Requires daemon restart.</span>
 	</div>
 
 	{#if availableProviders.length > 0}
 		<div class="form-group">
 			<label class="field-label" for="defaultProvider">Default Provider</label>
-			<select id="defaultProvider" class="field-select" bind:value={defaultProvider}>
-				{#each availableProviders as provider}
-					<option value={provider}>{provider}</option>
-				{/each}
-			</select>
+			<SelectInput id="defaultProvider" bind:value={defaultProvider} options={providerOptions} />
 		</div>
 	{/if}
 
 	<div class="form-group">
 		<label class="field-label" for="logLevel">Log Level</label>
-		<select id="logLevel" class="field-select" bind:value={logLevel}>
-			<option value="debug">Debug</option>
-			<option value="info">Info</option>
-			<option value="warn">Warn</option>
-			<option value="error">Error</option>
-		</select>
+		<SelectInput id="logLevel" bind:value={logLevel} options={logLevelOptions} />
 		<span class="field-hint">Written to elefant.config.json. Requires daemon restart.</span>
+	</div>
+
+	<div class="form-group">
+		<label class="field-label" for="hardwareAcceleration">Hardware Acceleration</label>
+		<SelectInput
+			id="hardwareAcceleration"
+			bind:value={hardwareAcceleration}
+			options={hardwareAccelerationOptions}
+		/>
+		<span class="field-hint">
+			Disable GPU acceleration on Windows if you experience rendering issues. Restart required after saving.
+		</span>
+		{#if restartRequired}
+			<div class="restart-notice">
+				<span class="restart-text">Restart required to apply changes</span>
+			</div>
+		{/if}
 	</div>
 
 	<div class="form-actions">
 		<button class="btn-primary" onclick={handleSave} disabled={saveStatus === 'saving'}>
 			{saveStatus === 'saving' ? 'Saving...' : 'Save Changes'}
 		</button>
+		{#if restartRequired}
+			<button
+				class="btn-secondary"
+				onclick={handleRestart}
+				disabled={restartStatus === 'restarting'}
+			>
+				<span class="btn-icon" aria-hidden="true">
+					<HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.8} />
+				</span>
+				{restartStatus === 'restarting' ? 'Restarting...' : 'Restart Elefant'}
+			</button>
+		{/if}
 		{#if saveStatus !== 'idle'}
 			<span class="save-feedback" class:error={saveStatus === 'error'}>
 				{saveMessage}
@@ -152,27 +204,6 @@
 		border-color: var(--color-primary);
 	}
 
-	.field-input-narrow {
-		max-width: 120px;
-	}
-
-	.field-select {
-		background-color: var(--color-surface-elevated);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		color: var(--color-text-primary);
-		font-family: var(--font-sans);
-		font-size: var(--font-size-md);
-		padding: var(--space-2) var(--space-3);
-		outline: none;
-		cursor: pointer;
-		transition: border-color var(--transition-fast);
-	}
-
-	.field-select:focus {
-		border-color: var(--color-primary);
-	}
-
 	.field-hint {
 		font-size: var(--font-size-xs);
 		color: var(--color-text-disabled);
@@ -216,5 +247,55 @@
 
 	.save-feedback.error {
 		color: var(--color-error);
+	}
+
+	.restart-notice {
+		margin-top: var(--space-2);
+		padding: var(--space-2) var(--space-3);
+		background-color: var(--color-primary-subtle);
+		border: 1px solid var(--color-primary);
+		border-radius: var(--radius-md);
+	}
+
+	.restart-text {
+		font-size: var(--font-size-sm);
+		color: var(--color-primary);
+		font-weight: var(--font-weight-medium);
+	}
+
+	.btn-secondary {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		background-color: transparent;
+		color: var(--color-text-secondary);
+		border: 1px solid var(--color-border-strong);
+		border-radius: var(--radius-md);
+		padding: var(--space-2) var(--space-4);
+		font-family: var(--font-sans);
+		font-size: var(--font-size-md);
+		font-weight: var(--font-weight-medium);
+		cursor: pointer;
+		transition:
+			background-color var(--transition-fast),
+			border-color var(--transition-fast),
+			color var(--transition-fast);
+	}
+
+	.btn-secondary:hover:not(:disabled) {
+		background-color: var(--color-surface-hover);
+		border-color: var(--color-border-strong);
+		color: var(--color-text-primary);
+	}
+
+	.btn-secondary:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.btn-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 	}
 </style>

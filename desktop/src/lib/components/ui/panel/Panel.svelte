@@ -11,7 +11,7 @@
 		/** Extra classes appended to the outer surface. */
 		class?: string;
 		/**
-		 * Snippet form of title — Fraunces serif at the title tier. Takes
+		 * Snippet form of title — DM Serif Display at the title tier. Takes
 		 * precedence over the `title` string prop when both are set.
 		 */
 		titleSnippet?: Snippet;

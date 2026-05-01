@@ -1,17 +1,17 @@
 /* =========================================
    QUIRE — TYPOGRAPHY
-   Fraunces (display) + Geist Sans (body) + Geist Mono (telemetry)
+   DM Serif Display (display) + Geist Sans (body) + Geist Mono (telemetry)
    Clean neo-grotesque body paired with editorial display.
 
    Variation axes:
-     • Fraunces  — opsz, wght, italic
+     • DM Serif Display — none (regular + italic only, weight 400)
      • Geist Sans — wght, italic
      • Geist Mono — wght (no italic axis available)
    ========================================= */
 
 :root {
 	/* Font families */
-	--font-display: "Fraunces Variable", "Fraunces", Georgia, "Times New Roman", serif;
+	--font-display: "DM Serif Display", Georgia, "Times New Roman", serif;
 	--font-body: "Geist Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--font-mono: "Geist Mono Variable", "Geist Mono", "JetBrains Mono", "SF Mono",
 		"Cascadia Code", monospace;
@@ -68,8 +68,9 @@
 
 /* =========================================
    SEVEN NAMED TIERS — canonical type tokens
-   Each tier sets family, size, weight, leading, and explicit
-   font-variation-settings for Fraunces opsz axis.
+   Each tier sets family, size, weight, and leading.
+   DM Serif Display ships at a single optical size (display);
+   no variation axes are exposed.
    ========================================= */
 
 .text-caption {
@@ -115,31 +116,28 @@
 	font-weight: var(--font-weight-regular);
 	line-height: var(--leading-snug);
 	letter-spacing: var(--tracking-snug);
-	font-variation-settings: "opsz" 24, "wght" 400;
 	color: var(--text-prose);
 }
 
 .text-display {
 	font-family: var(--font-display);
 	font-size: var(--font-size-4xl);
-	font-weight: var(--font-weight-light);
+	font-weight: var(--font-weight-regular);
 	line-height: var(--leading-tight);
 	letter-spacing: var(--tracking-tight);
-	font-variation-settings: "opsz" 40, "wght" 350;
 	color: var(--text-prose);
 }
 
 .text-hero {
 	font-family: var(--font-display);
 	font-size: var(--font-size-hero);
-	font-weight: var(--font-weight-light);
+	font-weight: var(--font-weight-regular);
 	line-height: 1.05;
 	letter-spacing: var(--tracking-tighter);
-	font-variation-settings: "opsz" 60, "wght" 320;
 	color: var(--text-prose);
 }
 
-/* Italic display variants — Fraunces italic axis */
+/* Italic display variants — DM Serif Display italic */
 .text-display-italic,
 .text-title-italic {
 	font-style: italic;
@@ -148,7 +146,7 @@
 /* =========================================
    BASE ELEMENT DEFAULTS
    body — Geist Sans at 14px/400
-   h1-h3 — Fraunces with opsz scaled to size
+   h1-h3 — DM Serif Display at 400 weight (single optical size)
    h4-h6 — Geist Sans semibold (body family at heading scale)
    code/pre/kbd — Geist Mono
    ========================================= */
@@ -181,17 +179,14 @@ h3 {
 
 h1 {
 	font-size: var(--font-size-3xl);
-	font-variation-settings: "opsz" 32, "wght" 400;
 }
 
 h2 {
 	font-size: var(--font-size-2xl);
-	font-variation-settings: "opsz" 24, "wght" 400;
 }
 
 h3 {
 	font-size: var(--font-size-xl);
-	font-variation-settings: "opsz" 20, "wght" 500;
 }
 
 h4,
@@ -265,7 +260,6 @@ body {
 	font-style: italic;
 	line-height: var(--leading-tight);
 	letter-spacing: var(--tracking-tight);
-	font-variation-settings: "opsz" 40, "wght" 400;
 }
 
 .heading-lg {
@@ -274,7 +268,6 @@ body {
 	font-weight: var(--font-weight-regular);
 	line-height: var(--leading-snug);
 	letter-spacing: var(--tracking-tight);
-	font-variation-settings: "opsz" 32, "wght" 400;
 }
 
 .heading-md {
@@ -283,7 +276,6 @@ body {
 	font-weight: var(--font-weight-regular);
 	line-height: var(--leading-snug);
 	letter-spacing: var(--tracking-snug);
-	font-variation-settings: "opsz" 24, "wght" 400;
 }
 
 /* =========================================

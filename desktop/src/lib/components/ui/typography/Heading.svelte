@@ -18,7 +18,7 @@
 		tier?: Tier;
 		/** Quire tone — preferred new prop. */
 		tone?: Tone;
-		/** Italic display variant (Fraunces italic axis). */
+		/** Italic display variant (DM Serif Display italic). */
 		italic?: boolean;
 		/** Legacy: explicit size override. */
 		size?: HeadingSize;

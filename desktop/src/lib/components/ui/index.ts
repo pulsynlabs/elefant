@@ -14,3 +14,6 @@ export * from "./tooltip/index.js";
 export * from "./panel/index.js";
 export * from "./quire-card/index.js";
 export * from "./empty-state/index.js";
+export { default as NumberInput } from "./NumberInput.svelte";
+export { default as SelectInput } from "./SelectInput.svelte";
+export type { SelectOption } from "./SelectInput.svelte";

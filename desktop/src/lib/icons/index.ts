@@ -18,6 +18,7 @@ export { default as CloseIcon } from '@hugeicons/core-free-icons/Cancel01Icon';
 export { default as MenuIcon } from '@hugeicons/core-free-icons/Menu01Icon';
 export { default as SearchIcon } from '@hugeicons/core-free-icons/Search01Icon';
 export { default as PlusIcon } from '@hugeicons/core-free-icons/PlusSignIcon';
+export { default as MinusIcon } from '@hugeicons/core-free-icons/MinusSignIcon';
 export { default as CheckIcon } from '@hugeicons/core-free-icons/Tick02Icon';
 export { default as CopyIcon } from '@hugeicons/core-free-icons/Copy01Icon';
 

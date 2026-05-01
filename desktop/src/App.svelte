@@ -213,10 +213,19 @@
 					}
 				}
 			}} />
-		{:else if projectsStore.activeProjectId === null}
+		{:else if projectsStore.activeProjectId === null && navigationStore.current === "projects"}
 			<ProjectPickerView onProjectSelected={() => {
 				navigationStore.navigate("chat");
 			}} />
+		{:else if projectsStore.activeProjectId === null && ["settings", "models", "about"].includes(navigationStore.current)}
+			<!-- Global views work even without an active project -->
+			{#if navigationStore.current === "settings"}
+				<SettingsView />
+			{:else if navigationStore.current === "models"}
+				<ModelsView />
+			{:else if navigationStore.current === "about"}
+				<AboutView />
+			{/if}
 		{:else if currentView === "projects"}
 			<ProjectPickerView />
 		{:else if currentView === "chat"}

@@ -26,12 +26,24 @@
 
 	type Props = {
 		project: Project;
+		/**
+		 * Visual-only flag that adds an indigo highlight border + ambient
+		 * primary glow. Used by the picker's "featured" strip for the
+		 * top-N most-recent projects. No behavioral change.
+		 */
+		featured?: boolean;
 		onSelect?: (project: Project) => void;
 		onRename?: (project: Project, newName: string) => void;
 		onDelete?: (project: Project) => void;
 	};
 
-	let { project, onSelect, onRename, onDelete }: Props = $props();
+	let {
+		project,
+		featured = false,
+		onSelect,
+		onRename,
+		onDelete,
+	}: Props = $props();
 
 	// --- Inline rename state ----------------------------------------------
 	let isRenaming = $state(false);
@@ -205,6 +217,7 @@
 <div
 	class="card"
 	class:card-active={isRenaming || showDeleteConfirm}
+	class:card-featured={featured}
 	role="button"
 	tabindex="0"
 	aria-label="Open project {project.name}"
@@ -315,6 +328,18 @@
 
 	.card-active:active {
 		transform: none;
+	}
+
+	/* Featured cards live in the top strip — visual cue only.
+	   Slightly thicker presence via emphasized border + ambient primary glow. */
+	.card-featured {
+		border-color: var(--color-border-strong);
+		box-shadow: 0 0 0 1px var(--color-primary-subtle), var(--glow-ambient);
+	}
+
+	.card-featured:hover {
+		border-color: var(--color-border-strong);
+		box-shadow: 0 0 0 1px var(--color-primary-subtle), var(--shadow-md);
 	}
 
 	.card-body {

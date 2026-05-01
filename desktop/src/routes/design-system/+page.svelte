@@ -78,9 +78,9 @@
 	} as const;
 
 	const typeTiers = [
-		{ name: 'hero', family: 'Fraunces', sample: 'The quick brown fox' },
-		{ name: 'display', family: 'Fraunces', sample: 'The quick brown fox' },
-		{ name: 'title', family: 'Fraunces', sample: 'The quick brown fox jumps' },
+		{ name: 'hero', family: 'DM Serif Display', sample: 'The quick brown fox' },
+		{ name: 'display', family: 'DM Serif Display', sample: 'The quick brown fox' },
+		{ name: 'title', family: 'DM Serif Display', sample: 'The quick brown fox jumps' },
 		{ name: 'prose', family: 'Geist Sans', sample: 'The quick brown fox jumps over the lazy dog.' },
 		{ name: 'body', family: 'Geist Sans', sample: 'The quick brown fox jumps over the lazy dog.' },
 		{ name: 'meta', family: 'Geist Mono', sample: 'the.quick.brown.fox' },
@@ -149,7 +149,7 @@
 			<span class="text-caption ds-section-eyebrow">01 · Type</span>
 			<Heading level={2} tier="title">Typography</Heading>
 			<Text tag="p" tier="body" tone="meta">
-				Three voices. Fraunces sets the masthead, Geist Sans carries the
+				Three voices. DM Serif Display sets the masthead, Geist Sans carries the
 				prose, Geist Mono keeps telemetry honest.
 			</Text>
 		</div>
@@ -506,7 +506,7 @@
 			<Text tag="p" tier="body" tone="meta">
 				Square <InlineCode>radius-fold</InlineCode> is the Quire-distinctive
 				default; circle is available for traditional contexts. Monogram
-				falls back to Fraunces italic.
+				falls back to DM Serif Display italic.
 			</Text>
 		</div>
 
@@ -524,7 +524,7 @@
 				<span class="text-caption">lg · square</span>
 			</div>
 			<div class="ds-avatar-cell">
-				<Avatar name="Fraunces" size="md" shape="circle" />
+				<Avatar name="DM Serif" size="md" shape="circle" />
 				<span class="text-caption">md · circle</span>
 			</div>
 			<div class="ds-avatar-cell">
@@ -592,7 +592,7 @@
 		<div class="ds-empty-frame">
 			<EmptyState
 				title="No quires here yet"
-				description="An empty state in Quire is pure typographic composition — Fraunces italic title, Geist Sans body, optional centred action. No card, no surface."
+				description="An empty state in Quire is pure typographic composition — DM Serif Display italic title, Geist Sans body, optional centred action. No card, no surface."
 			>
 				{#snippet icon()}
 					<svg
