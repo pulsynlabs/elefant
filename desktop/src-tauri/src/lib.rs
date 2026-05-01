@@ -11,8 +11,9 @@ fn get_config_path() -> Option<PathBuf> {
             return Some(path);
         }
     }
-    if let Ok(app_data) = tauri::api::path::data_dir() {
-        let path = app_data.join("elefant").join("elefant.config.json");
+    // Note: data_dir() requires tauri::path feature, using std::env::var as fallback
+    if let Ok(app_data) = std::env::var("APPDATA").or_else(|_| std::env::var("HOME")) {
+        let path = PathBuf::from(&app_data).join("elefant").join("elefant.config.json");
         if path.exists() {
             return Some(path);
         }
@@ -141,7 +142,7 @@ async fn reveal_in_file_manager(path: String, app: tauri::AppHandle) -> Result<(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
