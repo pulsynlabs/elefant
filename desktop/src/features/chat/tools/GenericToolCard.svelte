@@ -26,7 +26,11 @@
 	const hasDiff = $derived(isFileEdit && diffContent !== null);
 </script>
 
-<div class="tool-call-card" class:has-result={toolCall.result !== undefined}>
+<div
+	class="tool-call-card"
+	class:has-result={toolCall.result !== undefined && !toolCall.result?.isError}
+	class:has-error={toolCall.result?.isError}
+>
 	<div
 		class="tool-header"
 		onclick={() => expanded = !expanded}
@@ -127,11 +131,22 @@
 
 <style>
 	.tool-call-card {
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-lg);
 		overflow: hidden;
 		margin: var(--space-2) 0;
-		background-color: var(--color-surface-elevated);
+		background-color: var(--surface-plate);
+		border: 1px solid var(--border-edge);
+		/* Left accent border — color controlled by state class */
+		border-left: 3px solid var(--color-primary);
+		transition: border-left-color var(--transition-fast);
+	}
+
+	.tool-call-card.has-result {
+		border-left-color: var(--color-success);
+	}
+
+	.tool-call-card.has-error {
+		border-left-color: var(--color-error);
 	}
 
 	.tool-header {
@@ -139,14 +154,14 @@
 		align-items: center;
 		gap: var(--space-2);
 		padding: var(--space-2) var(--space-3);
-		background-color: var(--color-surface);
-		border-bottom: 1px solid var(--color-border);
+		background-color: transparent;
 		cursor: pointer;
 		user-select: none;
+		min-height: 36px;
 	}
 
 	.tool-header:hover {
-		background-color: var(--color-surface-hover);
+		background-color: var(--surface-hover);
 	}
 
 	.tool-icon {
@@ -156,7 +171,7 @@
 		width: 14px;
 		height: 14px;
 		flex-shrink: 0;
-		color: var(--color-text-muted);
+		color: var(--text-muted);
 	}
 
 	.tool-info {
@@ -169,14 +184,15 @@
 	.tool-name {
 		font-size: var(--font-size-sm);
 		font-family: var(--font-mono);
-		color: var(--color-text-primary);
-		font-weight: var(--font-weight-medium);
+		color: var(--text-prose);
+		font-weight: 500;
+		line-height: 1.3;
 	}
 
 	.tool-filepath {
 		font-size: var(--font-size-xs);
 		font-family: var(--font-mono);
-		color: var(--color-text-muted);
+		color: var(--text-muted);
 		overflow: hidden;
 		white-space: nowrap;
 		text-overflow: ellipsis;
@@ -186,8 +202,8 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 14px;
-		height: 14px;
+		width: 16px;
+		height: 16px;
 		color: var(--color-success);
 		flex-shrink: 0;
 	}
@@ -199,38 +215,33 @@
 	.tool-running {
 		display: inline-flex;
 		align-items: center;
-		gap: 2px;
+		gap: 3px;
 		flex-shrink: 0;
 	}
 
 	.tool-running-dot {
 		display: block;
-		width: 3px;
-		height: 3px;
+		width: 4px;
+		height: 4px;
 		border-radius: var(--radius-full);
-		background-color: var(--color-warning);
-		animation: pulse 1.5s ease-in-out infinite;
+		background-color: var(--color-primary);
+		animation: dot-bounce 1.4s ease-in-out infinite;
 	}
 
-	.tool-running-dot:nth-child(2) {
-		animation-delay: 0.15s;
-	}
+	.tool-running-dot:nth-child(2) { animation-delay: 0.2s; }
+	.tool-running-dot:nth-child(3) { animation-delay: 0.4s; }
 
-	.tool-running-dot:nth-child(3) {
-		animation-delay: 0.3s;
-	}
-
-	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.3; }
+	@keyframes dot-bounce {
+		0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+		40% { transform: scale(1); opacity: 1; }
 	}
 
 	.expand-icon {
 		flex-shrink: 0;
 		width: 8px;
 		height: 8px;
-		border-right: 1.5px solid var(--color-text-muted);
-		border-bottom: 1.5px solid var(--color-text-muted);
+		border-right: 1.5px solid var(--text-muted);
+		border-bottom: 1.5px solid var(--text-muted);
 		transform: rotate(45deg);
 		transition: transform var(--transition-fast);
 	}
@@ -239,31 +250,18 @@
 		transform: rotate(225deg);
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		.tool-running-dot {
-			animation: none;
-		}
-		.expand-icon {
-			transition: none;
-		}
-	}
-
 	.tool-body {
 		padding: var(--space-3);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
+		border-top: 1px solid var(--border-edge);
 	}
 
 	.tool-section {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-	}
-
-	.tool-section.error .code-container {
-		border-color: var(--color-error);
-		background-color: color-mix(in oklch, var(--color-error) 5%, transparent);
 	}
 
 	.section-header {
@@ -274,17 +272,18 @@
 
 	.section-label {
 		font-size: var(--font-size-xs);
-		font-weight: var(--font-weight-semibold);
-		color: var(--color-text-muted);
+		font-weight: 600;
+		color: var(--text-muted);
 		text-transform: uppercase;
-		letter-spacing: var(--tracking-wider);
+		letter-spacing: 0.07em;
+		font-family: var(--font-sans);
 	}
 
 	.view-toggle {
 		display: flex;
 		gap: 2px;
-		background-color: var(--color-surface);
-		border: 1px solid var(--color-border);
+		background-color: var(--surface-hover);
+		border: 1px solid var(--border-edge);
 		border-radius: var(--radius-sm);
 		padding: 2px;
 	}
@@ -293,44 +292,55 @@
 		background: none;
 		border: none;
 		padding: 2px 8px;
-		border-radius: calc(var(--radius-sm) - 2px);
+		border-radius: calc(var(--radius-sm) - 1px);
 		font-size: var(--font-size-xs);
-		color: var(--color-text-muted);
+		color: var(--text-muted);
 		cursor: pointer;
 		font-family: var(--font-sans);
 		transition: color var(--transition-fast), background-color var(--transition-fast);
 	}
 
 	.toggle-btn.active {
-		background-color: var(--color-surface-elevated);
-		color: var(--color-text-primary);
+		background-color: var(--surface-leaf);
+		color: var(--text-prose);
 	}
 
 	.code-container {
 		position: relative;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
+		border: 1px solid var(--border-edge);
+		border-radius: var(--radius-md);
 		overflow: hidden;
 	}
 
 	.tool-code {
 		font-family: var(--font-mono);
 		font-size: var(--font-size-xs);
-		color: var(--color-text-secondary);
-		background-color: var(--color-bg);
+		color: var(--text-meta);
+		background-color: var(--surface-substrate);
 		padding: var(--space-3);
 		overflow-x: auto;
-		max-height: 200px;
+		max-height: 240px;
 		overflow-y: auto;
-		white-space: pre-wrap;
-		word-break: break-all;
+		white-space: pre;
+		word-break: normal;
+		margin: 0;
+		line-height: 1.6;
 	}
 
 	.result-code {
-		color: var(--color-text-primary);
+		color: var(--text-prose);
 	}
 
 	.error-text {
 		color: var(--color-error);
+	}
+
+	.tool-section.error .code-container {
+		border-color: var(--color-error);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tool-running-dot { animation: none; }
+		.expand-icon { transition: none; }
 	}
 </style>
