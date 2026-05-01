@@ -26,11 +26,12 @@ export function insertSession(
   const data = parsed.data;
   try {
     db.db.run(
-      'INSERT INTO sessions (id, project_id, workflow_id, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO sessions (id, project_id, workflow_id, mode, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         data.id,
         data.project_id,
         data.workflow_id ?? null,
+        data.mode ?? 'quick',
         data.phase ?? 'idle',
         data.status ?? 'pending',
         data.started_at ?? new Date().toISOString(),
@@ -103,6 +104,15 @@ export function updateSession(
     });
   }
   const { id, ...fields } = parsed.data;
+
+  // Mode is immutable — reject any attempt to change it after creation.
+  if ('mode' in fields) {
+    return err({
+      code: 'VALIDATION_ERROR',
+      message: 'Session mode is immutable and cannot be changed after creation.',
+    });
+  }
+
   const setClauses = Object.keys(fields).map((k) => `${k} = ?`).join(', ');
   if (!setClauses) return getSessionById(db, id);
   try {

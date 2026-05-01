@@ -15,7 +15,9 @@ import type { ProviderRouter } from '../providers/router.ts'
 import type { StreamEvent, UsageEvent } from '../providers/types.ts'
 import { clearRunEventSequence, publishRunEvent, publishStatusChange } from '../runs/events.ts'
 import type { RunContext } from '../runs/types.ts'
+import { buildSystemPrompt, type WorkflowPromptState } from '../compaction/system-prompt-builder.ts'
 import { createQuestionEmitter, type QuestionEmitter } from '../tools/question/emitter.ts'
+import type { SliderEmitter } from '../tools/interactive/types.ts'
 import type { MetadataEmitter } from '../tools/task/metadata-emitter.ts'
 import type { ElefantError } from '../types/errors.ts'
 import { type Message } from '../types/providers.ts'
@@ -23,6 +25,7 @@ import type { Result } from '../types/result.ts'
 import type { ToolCall, ToolDefinition, ToolResult } from '../types/tools.ts'
 import type { SseManager } from '../transport/sse-manager.ts'
 import { estimateMessageTokens } from '../utils/tokens.ts'
+import commandsRegistry from '../commands/workflow/COMMANDS_REGISTRY.json'
 import { parseSlashCommand } from './slash-commands.ts'
 
 export interface ToolExecutor {
@@ -45,6 +48,7 @@ export interface AgentLoopOptions {
 	compaction?: CompactionManager
 	runContext: RunContext
 	questionEmitter?: QuestionEmitter
+	sliderEmitter?: SliderEmitter
 	metadataEmitter?: MetadataEmitter
 	sseManager?: SseManager
 	commandsDir?: string
@@ -91,6 +95,80 @@ function appendManifestToMessages(messages: Message[], manifest: string): Messag
 
 	return [{ role: 'system', content: manifest }, ...cloned]
 }
+
+function insertSystemMessagesAfterLeadingSystem(messages: Message[], systemMessages: Message[]): Message[] {
+	if (systemMessages.length === 0) {
+		return messages
+	}
+
+	const cloned = cloneMessages(messages)
+	let insertAt = 0
+	while (insertAt < cloned.length && cloned[insertAt]?.role === 'system') {
+		insertAt += 1
+	}
+
+	return [
+		...cloned.slice(0, insertAt),
+		...systemMessages,
+		...cloned.slice(insertAt),
+	]
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function readStringField(value: unknown, field: string): string | undefined {
+	if (!isRecord(value)) {
+		return undefined
+	}
+
+	const candidate = value[field]
+	return typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined
+}
+
+function readNumberField(value: unknown, field: string): number | undefined {
+	if (!isRecord(value)) {
+		return undefined
+	}
+
+	const candidate = value[field]
+	return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : undefined
+}
+
+function inferSessionMode(state: unknown): 'spec' | 'quick' {
+	const directMode = readStringField(state, 'mode')
+	if (directMode === 'spec' || directMode === 'quick') {
+		return directMode
+	}
+
+	const session = isRecord(state) ? state.session : undefined
+	const sessionMode = readStringField(session, 'mode')
+	if (sessionMode === 'spec' || sessionMode === 'quick') {
+		return sessionMode
+	}
+
+	return readWorkflowState(state) ? 'spec' : 'quick'
+}
+
+function readWorkflowState(state: unknown): WorkflowPromptState | undefined {
+	const workflow = isRecord(state) && isRecord(state.workflow) ? state.workflow : state
+	const phase = readStringField(workflow, 'phase')
+	if (!phase) {
+		return undefined
+	}
+
+	return {
+		phase,
+		currentWave: readNumberField(workflow, 'currentWave'),
+		totalWaves: readNumberField(workflow, 'totalWaves'),
+	}
+}
+
+const systemPromptCommands = commandsRegistry.map((command) => ({
+	trigger: command.trigger,
+	description: command.description,
+}))
 
 function buildMcpManifestServers(manager: MCPManager, tools: ToolWithMeta[]): Array<{ name: string; tools: ToolWithMeta['tool'][]; alwaysLoad?: string[] }> {
 	const grouped = new Map<string, { name: string; tools: ToolWithMeta['tool'][]; alwaysLoad: Set<string> }>()
@@ -174,6 +252,7 @@ function toToolArguments(
 	runId: string,
 	toolCallId: string,
 	questionEmitter: QuestionEmitter,
+	sliderEmitter: SliderEmitter,
 ): Record<string, unknown> {
 	const baseArgs =
 		typeof args === 'object' && args !== null && !Array.isArray(args)
@@ -185,6 +264,7 @@ function toToolArguments(
 		conversationId: runId,
 		_toolCallId: toolCallId,
 		_questionEmitter: questionEmitter,
+		_sliderEmitter: sliderEmitter,
 	}
 }
 
@@ -216,6 +296,17 @@ export async function* runAgentLoop(
 		options.runContext.runId,
 		questionEmitter,
 	)
+	const baseSliderEmitter = options.sliderEmitter ?? (() => undefined)
+	const sliderEmitter: SliderEmitter = (payload) => {
+		emitRunEvent('agent_run.slider', payload)
+		baseSliderEmitter(payload)
+	}
+	const runSliderEmitter: SliderEmitter = (payload) => {
+		sliderEmitter({
+			...payload,
+			conversationId: options.runContext.runId,
+		})
+	}
 
 	emitRunEvent('agent_run.spawned', {
 		runId: options.runContext.runId,
@@ -289,8 +380,26 @@ export async function* runAgentLoop(
 		let assistantText = ''
 		let lastUsage: UsageEvent | null = null
 
-		// system:transform ordering: [fixed system header] → [injected blocks, deterministic] → [rest of messages]
-		const outgoingMessagesBase = cloneMessages(messages)
+		// system/context ordering: [fixed system header] → [PKB/context transforms]
+		// → [base Elefant prompt] → [system:transform blocks, deterministic] → [rest of messages].
+		const contextTransform = await emit(options.hookRegistry, 'context:transform', {
+			system: [],
+			sessionId,
+			phase: readWorkflowState(options.state)?.phase,
+		})
+		const baseSystemPrompt = buildSystemPrompt({
+			toolRegistry: { getAll: () => effectiveMcpTools.tools },
+			sessionMode: inferSessionMode(options.state),
+			workflowState: readWorkflowState(options.state),
+			commands: systemPromptCommands,
+		})
+		const outgoingMessagesBase = insertSystemMessagesAfterLeadingSystem(
+			messages,
+			[
+				...contextTransform.system.map((content) => ({ role: 'system' as const, content })),
+				{ role: 'system', content: baseSystemPrompt },
+			],
+		)
 		const transformedContext = await emit(options.hookRegistry, 'system:transform', {
 			messages: outgoingMessagesBase,
 			sessionId,
@@ -480,7 +589,7 @@ export async function* runAgentLoop(
 
 				const executeResult = await registry.execute(
 					toolCall.name,
-					toToolArguments(toolCall.arguments, options.runContext.runId, toolCall.id, runQuestionEmitter),
+					toToolArguments(toolCall.arguments, options.runContext.runId, toolCall.id, runQuestionEmitter, runSliderEmitter),
 				)
 
 				if (!executeResult.ok && executeResult.error.code === 'VALIDATION_ERROR') {

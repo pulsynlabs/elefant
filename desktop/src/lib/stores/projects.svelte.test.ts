@@ -25,6 +25,7 @@ const mockSession = (overrides: Partial<Session> = {}): Session => ({
 	id: "sess-1",
 	projectId: "proj-1",
 	workflowId: null,
+	mode: "quick",
 	phase: "idle",
 	status: "active",
 	startedAt: "2026-04-18T00:00:00Z",
@@ -335,6 +336,67 @@ describe("projectsStore", () => {
 			).rejects.toThrow();
 
 			expect(projectsStore.lastError).toContain("HTTP 400");
+		});
+
+		it("sends an empty body when no mode is supplied", async () => {
+			const newSession = mockSession({ id: "no-mode-sess", mode: "quick" });
+			let observedBody: string | undefined;
+			globalThis.fetch = mock(
+				(input: RequestInfo | URL, init?: RequestInit) => {
+					observedBody = init?.body as string;
+					return Promise.resolve(
+						new Response(JSON.stringify(newSession), {
+							status: 201,
+							headers: { "Content-Type": "application/json" },
+						}),
+					);
+				},
+			) as unknown as typeof globalThis.fetch;
+
+			await projectsStore.createSession("proj-1");
+			expect(observedBody).toBe("{}");
+		});
+
+		it("forwards mode=spec to the daemon when supplied", async () => {
+			const newSession = mockSession({ id: "spec-sess", mode: "spec" });
+			let observedBody: string | undefined;
+			globalThis.fetch = mock(
+				(input: RequestInfo | URL, init?: RequestInit) => {
+					observedBody = init?.body as string;
+					return Promise.resolve(
+						new Response(JSON.stringify(newSession), {
+							status: 201,
+							headers: { "Content-Type": "application/json" },
+						}),
+					);
+				},
+			) as unknown as typeof globalThis.fetch;
+
+			const result = await projectsStore.createSession("proj-1", {
+				mode: "spec",
+			});
+
+			expect(observedBody).toBe('{"mode":"spec"}');
+			expect(result.mode).toBe("spec");
+		});
+
+		it("forwards mode=quick to the daemon when supplied", async () => {
+			const newSession = mockSession({ id: "quick-sess", mode: "quick" });
+			let observedBody: string | undefined;
+			globalThis.fetch = mock(
+				(input: RequestInfo | URL, init?: RequestInit) => {
+					observedBody = init?.body as string;
+					return Promise.resolve(
+						new Response(JSON.stringify(newSession), {
+							status: 201,
+							headers: { "Content-Type": "application/json" },
+						}),
+					);
+				},
+			) as unknown as typeof globalThis.fetch;
+
+			await projectsStore.createSession("proj-1", { mode: "quick" });
+			expect(observedBody).toBe('{"mode":"quick"}');
 		});
 	});
 

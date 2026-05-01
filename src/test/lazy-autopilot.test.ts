@@ -5,7 +5,7 @@
 //      (Task 9.1 — covered by src/compaction/blocks.test.ts; re-asserted here
 //      to keep the lazy contract single-glance auditable).
 //   2. The phase auto-progression map covers every non-accept phase command
-//      and the /spec-accept entry has no successor (Task 9.2 / VC9.* + AVC6).
+//      and the /accept entry has no successor (Task 9.2 / VC9.* + AVC6).
 //   3. The `question` tool is NOT requested via the agent-loop dispatch when
 //      lazy autopilot logic runs — modeled here by asserting the AUTO_PROGRESSION
 //      chain never hands the `question` tool name to the next dispatch.
@@ -21,7 +21,7 @@ import { join } from 'node:path';
 
 import { Database } from '../db/database.ts';
 import { StateManager } from '../state/manager.ts';
-import { buildSpecModeBlock } from '../compaction/spec-mode-block.ts';
+import { buildSpecModeBlock } from '../compaction/wf-context-block.ts';
 import { AUTO_PROGRESSION, executeAutoProgression } from '../server/slash-commands.ts';
 
 const tempDirs: string[] = [];
@@ -65,26 +65,26 @@ describe('lazy autopilot integration', () => {
 
 	it('phase auto-progression covers every non-accept phase command', () => {
 		const expectedTransitions: Array<[string, string]> = [
-			['/spec-discuss', '/spec-plan'],
-			['/spec-plan', '/spec-execute'],
-			['/spec-execute', '/spec-audit'],
-			['/spec-audit', '/spec-accept'],
+			['/discuss', '/plan'],
+			['/plan', '/execute'],
+			['/execute', '/audit'],
+			['/audit', '/accept'],
 		];
 		for (const [from, to] of expectedTransitions) {
 			expect(AUTO_PROGRESSION[from]).toBe(to);
 		}
 		// Accept never auto-progresses — terminal human gate
-		expect(AUTO_PROGRESSION['/spec-accept']).toBeUndefined();
+		expect(AUTO_PROGRESSION['/accept']).toBeUndefined();
 	});
 
 	it('lazy autopilot progression never hands "question" as the next command', () => {
-		// The AUTO_PROGRESSION map uses static `/spec-*` triggers — none of them
+		// The AUTO_PROGRESSION map uses static `/` triggers — none of them
 		// reference the `question` tool. This test guards that invariant so a
 		// future regression cannot covertly inject a question-asking step into
 		// the lazy chain.
 		for (const next of Object.values(AUTO_PROGRESSION)) {
 			expect(next).not.toBe('question');
-			expect(next.startsWith('/spec-')).toBe(true);
+			expect(next.startsWith('/')).toBe(true);
 		}
 	});
 
@@ -99,7 +99,7 @@ describe('lazy autopilot integration', () => {
 		});
 		// Pass a path that does not exist for commands; should still return null
 		// without ever touching the filesystem because autopilot=false short-circuits.
-		const match = await executeAutoProgression('/spec-discuss', state, 'spec-mode', projectId, '/nonexistent');
+		const match = await executeAutoProgression('/discuss', state, 'spec-mode', projectId, '/nonexistent');
 		expect(match).toBeNull();
 		db.close();
 	});

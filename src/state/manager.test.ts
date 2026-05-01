@@ -154,21 +154,21 @@ describe('StateManager spec-mode', () => {
     ).rejects.toBeInstanceOf(WorkflowNotFoundError);
   });
 
-  it('transitionSpecPhase persists a valid transition', async () => {
+  it('transitionPhase persists a valid transition', async () => {
     const { manager, projectId } = createSpecManager();
     await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
 
-    const workflow = await manager.transitionSpecPhase(projectId, 'flow-a', 'plan');
+    const workflow = await manager.transitionPhase(projectId, 'flow-a', 'plan');
 
     expect(workflow.phase).toBe('plan');
   });
 
-  it('transitionSpecPhase rejects invalid non-forced transitions with allowed phases', async () => {
+  it('transitionPhase rejects invalid non-forced transitions with allowed phases', async () => {
     const { manager, projectId } = createSpecManager();
     await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
 
     try {
-      await manager.transitionSpecPhase(projectId, 'flow-a', 'execute');
+      await manager.transitionPhase(projectId, 'flow-a', 'execute');
       throw new Error('Expected transition to fail');
     } catch (error) {
       expect(error).toBeInstanceOf(InvalidTransitionError);
@@ -182,11 +182,11 @@ describe('StateManager spec-mode', () => {
     expect(workflow?.phase).toBe('idle');
   });
 
-  it('transitionSpecPhase allows invalid forced transitions and logs to ADL repo', async () => {
+  it('transitionPhase allows invalid forced transitions and logs to ADL repo', async () => {
     const { manager, projectId, database } = createSpecManager();
     await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
 
-    const workflow = await manager.transitionSpecPhase(projectId, 'flow-a', 'execute', {
+    const workflow = await manager.transitionPhase(projectId, 'flow-a', 'execute', {
       force: true,
       reason: 'operator override',
     });
@@ -208,12 +208,12 @@ describe('StateManager spec-mode', () => {
     expect(body.reason).toBe('operator override');
   });
 
-  it('lockSpec and unlockSpec toggle spec_locked', async () => {
+  it('lock and unlock toggle locked', async () => {
     const { manager, projectId } = createSpecManager();
     await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
 
-    const locked = await manager.lockSpec(projectId, 'flow-a');
-    const unlocked = await manager.unlockSpec(projectId, 'flow-a');
+    const locked = await manager.lock(projectId, 'flow-a');
+    const unlocked = await manager.unlock(projectId, 'flow-a');
 
     expect(locked.specLocked).toBe(true);
     expect(unlocked.specLocked).toBe(false);
@@ -281,7 +281,7 @@ describe('StateManager spec-mode', () => {
     expect(reset.acceptanceConfirmed).toBe(false);
   });
 
-  it('amendSpec ends with spec_locked true', async () => {
+  it('amendSpec ends with locked true', async () => {
     const { manager, projectId } = createSpecManager();
     await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a', specLocked: true });
 
@@ -297,11 +297,11 @@ describe('StateManager spec-mode', () => {
     await manager.createSpecWorkflow({ projectId, workflowId: 'flow-a' });
 
     const results = await Promise.all([
-      manager.transitionSpecPhase(projectId, 'flow-a', 'discuss'),
-      manager.transitionSpecPhase(projectId, 'flow-a', 'plan'),
-      manager.transitionSpecPhase(projectId, 'flow-a', 'research'),
-      manager.transitionSpecPhase(projectId, 'flow-a', 'specify'),
-      manager.transitionSpecPhase(projectId, 'flow-a', 'execute'),
+      manager.transitionPhase(projectId, 'flow-a', 'discuss'),
+      manager.transitionPhase(projectId, 'flow-a', 'plan'),
+      manager.transitionPhase(projectId, 'flow-a', 'research'),
+      manager.transitionPhase(projectId, 'flow-a', 'specify'),
+      manager.transitionPhase(projectId, 'flow-a', 'execute'),
     ]);
 
     expect(results.map((workflow) => workflow.phase)).toEqual([
@@ -368,10 +368,10 @@ describe('StateManager', () => {
     expect(await manager.transitionPhase('accept')).toBe(false);
     expect(manager.getState().workflow.phase).toBe('plan');
 
-    await manager.lockSpec();
+    await manager.lock();
     expect(manager.getState().workflow.specLocked).toBe(true);
 
-    await manager.unlockSpec();
+    await manager.unlock();
     expect(manager.getState().workflow.specLocked).toBe(false);
 
     await manager.confirmAcceptance();
@@ -407,7 +407,7 @@ describe('StateManager', () => {
     const managerA = createManager(projectPath);
 
     await managerA.updateWorkflow({ phase: 'plan', mode: 'milestone' });
-    await managerA.lockSpec();
+    await managerA.lock();
     await managerA.createWorkflow('wf-1', { depth: 'deep' });
     await managerA.updateWave(1, 3);
 

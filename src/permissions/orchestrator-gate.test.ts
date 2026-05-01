@@ -33,7 +33,7 @@ describe('orchestrator gate', () => {
 	});
 
 	it('allows orchestrator writes to spec tool internals', () => {
-		expect(evaluateOrchestratorGate({ agentType: 'goop-orchestrator', tool: 'write', targetPath: 'src/tools/spec/state-tools.ts' })).toBe('allow');
+		expect(evaluateOrchestratorGate({ agentType: 'goop-orchestrator', tool: 'write', targetPath: 'src/tools/workflow/state-tools.ts' })).toBe('allow');
 	});
 
 	it('returns a structured deny classification with exact reason code', () => {

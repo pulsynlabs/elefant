@@ -14,7 +14,7 @@ import {
   buildStateBlock,
   buildToolInstructionsBlock,
 } from './blocks.ts';
-import { buildSpecModeBlock } from './spec-mode-block.ts';
+import { buildSpecModeBlock } from './wf-context-block.ts';
 import type { CompactionInput, CompactionOutput } from './types.ts';
 
 const COMPACTION_THRESHOLD = 0.7;

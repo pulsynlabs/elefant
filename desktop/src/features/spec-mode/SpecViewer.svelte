@@ -5,7 +5,7 @@ SpecViewer — five-tab document viewer for spec-mode artifacts.
 Tabs: Requirements | Spec | Blueprint | Chronicle | ADL
 
 Each tab fetches rendered markdown from
-  GET /api/spec/workflows/:id/render/:docType
+  GET /api/wf/workflows/:id/render/:docType
 via specModeStore.loadRendered. We display the markdown as <pre> with
 white-space: pre-wrap so it's readable without pulling in a new
 markdown-rendering dep — this is intentionally lightweight for the GUI
@@ -93,7 +93,7 @@ Accessibility:
 	async function confirmLock(): Promise<void> {
 		const wf = specModeStore.activeWorkflowId;
 		if (!wf) return;
-		await specModeStore.lockSpec(wf);
+		await specModeStore.lock(wf);
 		confirmingLock = false;
 	}
 

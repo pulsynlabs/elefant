@@ -8,6 +8,8 @@ import type { ElefantError } from './errors.js';
 export interface ToolDefinition<TParams = unknown, TResult = string> {
   name: string;
   description: string;
+  /** Optional category for tool inventory generation. Defaults to inference from name when absent. */
+  category?: string;
   parameters: Record<string, ParameterDefinition>;
   inputJSONSchema?: unknown;
   execute: (params: TParams) => Promise<Result<TResult, ElefantError>>;

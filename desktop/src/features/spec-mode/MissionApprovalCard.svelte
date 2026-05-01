@@ -28,8 +28,8 @@ Accessibility:
 
 	let { requestId, tool, args }: Props = $props();
 
-	const isLockSpec = $derived(tool === 'spec_state' && args?.action === 'lock-spec');
-	const isAccept = $derived(tool === 'spec_state' && args?.action === 'confirm-acceptance');
+	const isLockSpec = $derived(tool === 'wf_state' && args?.action === 'lock-spec');
+	const isAccept = $derived(tool === 'wf_state' && args?.action === 'confirm-acceptance');
 
 	const missionLabel = $derived(
 		isLockSpec ? 'Lock Specification' : isAccept ? 'Accept Work' : 'Spec Mission',

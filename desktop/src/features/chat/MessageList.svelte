@@ -49,11 +49,11 @@
 
 <style>
 	.message-list {
+		position: absolute;
+		inset: 0;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
-		min-height: 0;
-		height: 100%;
 		overflow-y: auto;
 		overflow-x: hidden;
 		padding: var(--space-4);

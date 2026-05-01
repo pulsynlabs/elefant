@@ -4,10 +4,10 @@ import type { SseManager } from './sse-manager.ts';
 import type { ElefantWsServer } from './ws-server.ts';
 
 const SPEC_EVENTS = [
-	'spec:locked',
-	'spec:unlocked',
-	'spec:amended',
-	'spec:phase_transitioned',
+	'wf:locked',
+	'wf:unlocked',
+	'wf:amended',
+	'wf:phase_transitioned',
 	'blueprint:created',
 	'wave:started',
 	'wave:completed',

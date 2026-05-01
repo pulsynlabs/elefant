@@ -241,12 +241,9 @@
 
 <style>
 	.onboarding {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		padding: var(--space-6);
-		background-color: var(--color-bg);
+		position: absolute;
+		inset: 0;
+		overflow-y: auto;
 	}
 
 	.step {

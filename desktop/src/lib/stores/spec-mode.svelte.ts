@@ -1,6 +1,6 @@
 // Spec Mode store (Svelte 5 runes)
 //
-// Mirrors `desktop/src/lib/api/spec-mode.ts` as the reactive UI source of truth
+// Mirrors `desktop/src/lib/api/workflow.ts` as the reactive UI source of truth
 // for the Spec Mode panel. Components never call the API client directly — they
 // read from getters and call action methods. SSE event subscription keeps state
 // fresh in real time as the daemon emits spec lifecycle events.
@@ -13,7 +13,7 @@
 //   - File extension `.svelte.ts` is required for runes.
 
 import { DAEMON_URL } from '$lib/daemon/client.js';
-import { specModeApi, type SpecWorkflowSummary } from '$lib/api/spec-mode.js';
+import { specModeApi, type SpecWorkflowSummary } from '$lib/api/workflow.js';
 
 export interface SpecModeTask {
 	id: string;
@@ -116,10 +116,10 @@ async function transitionPhase(workflowId: string, to: string, force?: boolean):
 	}
 }
 
-async function lockSpec(workflowId: string): Promise<void> {
+async function lock(workflowId: string): Promise<void> {
 	clearError();
 	try {
-		await specModeApi.lockSpec(workflowId);
+		await specModeApi.lock(workflowId);
 		// Optimistic update: reflect lock immediately, then reload the row
 		workflows = workflows.map((w) =>
 			w.id === workflowId || w.workflowId === workflowId ? { ...w, specLocked: true } : w,
@@ -210,10 +210,10 @@ function subscribeToSpecEvents(projectId: string): () => void {
 			if (!envelope.workflowId) return;
 			// Phase / lock / amend events change the workflow row — reload list
 			if (
-				envelope.event === 'spec:locked' ||
-				envelope.event === 'spec:unlocked' ||
-				envelope.event === 'spec:amended' ||
-				envelope.event === 'spec:phase_transitioned' ||
+				envelope.event === 'wf:locked' ||
+				envelope.event === 'wf:unlocked' ||
+				envelope.event === 'wf:amended' ||
+				envelope.event === 'wf:phase_transitioned' ||
 				envelope.event === 'blueprint:created'
 			) {
 				void loadWorkflows(projectId);
@@ -296,7 +296,7 @@ export const specModeStore = {
 	createWorkflow,
 	setActiveWorkflow,
 	transitionPhase,
-	lockSpec,
+	lock,
 	loadSpec,
 	loadRendered,
 	loadTasks,

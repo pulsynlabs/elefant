@@ -4,7 +4,7 @@
 // All methods call daemon HTTP endpoints and update reactive state.
 
 import { DAEMON_URL } from '$lib/daemon/client.js';
-import type { Project, Session } from '$lib/types/project.js';
+import type { Project, Session, SessionMode } from '$lib/types/project.js';
 
 let projects = $state<Project[]>([]);
 let activeProjectId = $state<string | null>(null);
@@ -139,15 +139,24 @@ async function loadSessions(projectId: string): Promise<void> {
 	}
 }
 
-async function createSession(projectId: string): Promise<Session> {
+async function createSession(
+	projectId: string,
+	options: { mode?: SessionMode } = {},
+): Promise<Session> {
 	clearError();
 	try {
+		// Only forward `mode` when it was supplied — letting the server
+		// apply its own default keeps the wire payload minimal and the
+		// daemon's contract authoritative.
+		const body: Record<string, unknown> = {};
+		if (options.mode !== undefined) body.mode = options.mode;
+
 		const response = await fetch(
 			`${DAEMON_URL}/api/projects/${projectId}/sessions`,
 			{
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({}),
+				body: JSON.stringify(body),
 			}
 		);
 		if (!response.ok) {

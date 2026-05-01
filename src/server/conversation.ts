@@ -10,6 +10,7 @@ import { createToolRegistryForRun, type ToolRegistry } from '../tools/registry.t
 import { runAgentLoop } from './agent-loop.ts'
 import { formatSSEEvent, formatSSEKeepalive } from './sse.ts'
 import type { QuestionSsePayload } from '../tools/question/emitter.ts'
+import type { SliderSsePayload } from '../tools/interactive/types.ts'
 import { createMetadataEmitter, type ToolCallMetadataPayload } from '../tools/task/metadata-emitter.ts'
 import type { RunContext } from '../runs/types.ts'
 import { createRunContext } from '../runs/context.ts'
@@ -19,6 +20,7 @@ import type { SseManager } from '../transport/sse-manager.ts'
 import type { ConfigManager } from '../config/loader.ts'
 import type { MCPManager } from '../mcp/manager.ts'
 import { createMcpToolDefinitions } from '../mcp/adapter.ts'
+import { getSessionById } from '../db/repo/sessions.ts'
 
 const toolCallSchema = z.object({
 	id: z.string().min(1),
@@ -138,6 +140,25 @@ function toQuestionSSEChunk(payload: QuestionSsePayload): string {
 	})
 }
 
+function toSliderSSEChunk(payload: SliderSsePayload): string {
+	return formatSSEEvent('slider', {
+		sliderId: payload.sliderId,
+		label: payload.label,
+		min: payload.min,
+		max: payload.max,
+		step: payload.step,
+		default: payload.default,
+		unit: payload.unit,
+		conversationId: payload.conversationId,
+	})
+}
+
+function resolveSessionMode(db: Database | undefined, sessionId: string): 'spec' | 'quick' {
+	if (!db) return 'quick'
+	const session = getSessionById(db, sessionId)
+	return session.ok ? session.data.mode : 'quick'
+}
+
 function toToolCallMetadataSSEChunk(payload: ToolCallMetadataPayload): string {
 	return formatSSEEvent('tool_call_metadata', {
 		toolCallId: payload.toolCallId,
@@ -195,6 +216,9 @@ function createSSEStream(
 			const questionEmitter = (payload: QuestionSsePayload): void => {
 				encodeSSEChunk(controller, toQuestionSSEChunk(payload))
 			}
+			const sliderEmitter = (payload: SliderSsePayload): void => {
+				encodeSSEChunk(controller, toSliderSSEChunk(payload))
+			}
 
 			const metadataEmitter = createMetadataEmitter(runContext.runId, (payload) => {
 				encodeSSEChunk(controller, toToolCallMetadataSSEChunk(payload))
@@ -210,6 +234,7 @@ function createSSEStream(
 						providerRouter,
 						configManager: runDeps.configManager,
 						currentRun: runContext,
+						mode: resolveSessionMode(runDeps.database, request.sessionId ?? runContext.sessionId),
 						metadataEmitter,
 					})
 					: toolRegistry
@@ -253,8 +278,10 @@ function createSSEStream(
 						hookRegistry,
 						runContext: loopRunContext,
 						questionEmitter,
+						sliderEmitter,
 						metadataEmitter,
 						mcpManager,
+						state: { session: { mode: resolveSessionMode(runDeps?.database, request.sessionId ?? runContext.sessionId) } },
 						mcpTokenBudgetPercent,
 					})
 

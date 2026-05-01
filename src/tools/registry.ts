@@ -16,11 +16,11 @@ import { editTool } from './edit.js';
 import { globTool } from './glob.js';
 import { grepTool } from './grep.js';
 import { lspTool } from './lsp/index.js';
-import { questionTool } from './question/index.js';
+import { createInteractiveTools } from './interactive/index.js';
 import { readTool } from './read.js';
 import { bashTool } from './shell/index.js';
 import { skillTool } from './skill/index.js';
-import { createSpecToolContext, createSpecTools } from './spec/index.ts';
+import { createSpecToolContext, createSpecTools } from './workflow/index.ts';
 import { createTaskTool, type TaskToolDeps } from './task/index.js';
 import type { MetadataEmitter } from './task/metadata-emitter.js';
 import { todoreadTool, todowriteTool } from './todo/index.js';
@@ -348,7 +348,10 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 	registry.register(websearchTool);
 	registry.register(todowriteTool);
 	registry.register(todoreadTool);
-	registry.register(questionTool);
+	// Interactive tools (always registered regardless of session mode)
+	for (const tool of createInteractiveTools({})) {
+		registry.register(tool);
+	}
 	registry.register(skillTool);
 	registry.register(lspTool);
 	// tool_list is registered last so it reflects the complete set, including
@@ -366,6 +369,7 @@ export interface ToolRegistryRunDeps {
 	providerRouter: ProviderRouter
 	configManager: ConfigManager
 	currentRun: RunContext
+	mode?: 'spec' | 'quick'
 	mcpManager?: MCPManager
 	metadataEmitter?: MetadataEmitter
 }
@@ -385,7 +389,10 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	registry.register(websearchTool)
 	registry.register(todowriteTool)
 	registry.register(todoreadTool)
-	registry.register(questionTool)
+	// Interactive tools (always registered regardless of session mode)
+	for (const tool of createInteractiveTools({})) {
+		registry.register(tool)
+	}
 	registry.register(skillTool)
 	registry.register(lspTool)
 
@@ -412,14 +419,16 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	}
 	registry.register(createAgentSessionSearchTool(agentSessionSearchDeps))
 
-	const specCtx = createSpecToolContext({
-		database: deps.database,
-		projectId: deps.currentRun.projectId,
-		runId: deps.currentRun.runId,
-		hookRegistry: deps.hookRegistry,
-	})
-	for (const tool of createSpecTools(specCtx)) {
-		registry.register(tool)
+	if ((deps.mode ?? 'quick') === 'spec') {
+		const specCtx = createSpecToolContext({
+			database: deps.database,
+			projectId: deps.currentRun.projectId,
+			runId: deps.currentRun.runId,
+			hookRegistry: deps.hookRegistry,
+		})
+		for (const tool of createSpecTools(specCtx)) {
+			registry.register(tool)
+		}
 	}
 
 	if (deps.mcpManager) {

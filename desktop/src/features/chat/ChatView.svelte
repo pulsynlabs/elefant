@@ -185,14 +185,16 @@
 
 <style>
 	.chat-view {
+		position: absolute;
+		inset: 0;
 		display: grid;
-		grid-template-rows: auto 1fr auto auto;
-		height: 100%;
+		grid-template-rows: auto auto 1fr auto;
 		overflow: hidden;
 		background-color: var(--color-bg);
 	}
 
 	.chat-header {
+		grid-row: 2;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -209,13 +211,13 @@
 	}
 
 	.chat-messages {
-		overflow: hidden;
-		display: flex;
-		flex-direction: column;
+		grid-row: 3;
 		min-height: 0;
+		position: relative;
 	}
 
 	.chat-input-area {
+		grid-row: 4;
 		padding: var(--space-3) var(--space-5) var(--space-5);
 		border-top: 1px solid var(--color-border);
 		background-color: var(--color-surface);

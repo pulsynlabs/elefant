@@ -260,7 +260,8 @@
 		border-radius: var(--radius-lg);
 		display: flex;
 		flex-direction: column;
-		overflow: hidden;
+		min-height: 0;
+		overflow: clip;
 	}
 
 	.browser-header {

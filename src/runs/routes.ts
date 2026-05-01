@@ -146,6 +146,9 @@ export function mountAgentRunRoutes(
 			{ role: 'user' as const, content: parsedBody.data.prompt },
 		]
 
+		const sessionResult = getSessionById(deps.db, params.sessionId)
+		const sessionMode = sessionResult.ok ? sessionResult.data.mode : 'quick'
+
 		// Create per-run tool registry with task and agent_session_search tools
 		const runToolRegistry = createToolRegistryForRun({
 			hookRegistry: deps.hookRegistry,
@@ -155,6 +158,7 @@ export function mountAgentRunRoutes(
 			providerRouter: deps.providerRouter,
 			configManager: deps.configManager,
 			currentRun: runContext,
+			mode: sessionMode,
 			mcpManager: deps.mcpManager,
 		})
 
@@ -167,6 +171,7 @@ export function mountAgentRunRoutes(
 					runContext,
 					sseManager: deps.sseManager,
 					mcpManager: deps.mcpManager,
+					state: { session: { mode: sessionMode } },
 				})) {
 					// intentionally drained to execute background loop
 				}

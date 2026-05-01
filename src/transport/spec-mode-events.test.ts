@@ -7,7 +7,7 @@ import type { SseManager } from './sse-manager.ts';
 import type { ElefantWsServer } from './ws-server.ts';
 
 describe('registerSpecModeEventPublisher', () => {
-	it('publishes spec:locked events to SSE and WebSocket project channels', async () => {
+	it('publishes wf:locked events to SSE and WebSocket project channels', async () => {
 		const hooks = new HookRegistry();
 		const sseCalls: Array<{ projectId: string; sessionId: string; eventType: string; data: unknown }> = [];
 		const wsCalls: Array<{ room: string; message: unknown }> = [];
@@ -26,7 +26,7 @@ describe('registerSpecModeEventPublisher', () => {
 
 		registerSpecModeEventPublisher(hooks, sse, ws);
 
-		await emit(hooks, 'spec:locked', {
+		await emit(hooks, 'wf:locked', {
 			projectId: 'project-1',
 			workflowId: 'spec-mode',
 			lockedAt: '2026-04-29T00:00:00.000Z',
@@ -38,7 +38,7 @@ describe('registerSpecModeEventPublisher', () => {
 		expect(sseCalls[0].eventType).toBe('spec-mode:event');
 		expect(sseCalls[0].data).toMatchObject({
 			type: 'spec-mode:event',
-			event: 'spec:locked',
+			event: 'wf:locked',
 			projectId: 'project-1',
 			workflowId: 'spec-mode',
 			payload: {

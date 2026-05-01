@@ -5,7 +5,7 @@ import type { Database } from '../db/database.ts';
 import type { HookHandler } from '../hooks/types.ts';
 import type { StateManager } from '../state/manager.ts';
 import type { Message } from '../types/providers.ts';
-export { buildSpecModeBlock } from './spec-mode-block.ts';
+export { buildSpecModeBlock } from './wf-context-block.ts';
 
 export interface BlockBuilder {
 	readonly name: string;

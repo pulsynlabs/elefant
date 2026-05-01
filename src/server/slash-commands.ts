@@ -3,8 +3,8 @@ import path from 'node:path';
 import type { StateManager } from '../state/manager.ts';
 
 export interface SlashCommandDefinition {
-	name: string; // e.g., "spec-discuss"
-	trigger: string; // e.g., "/spec-discuss"
+	name: string; // e.g., "discuss"
+	trigger: string; // e.g., "/discuss"
 	description: string;
 	category: 'spec-mode' | 'utility';
 	args?: string; // e.g., "[session-name]"
@@ -23,7 +23,7 @@ function fuzzyScore(query: string, candidate: string): number {
 	// Only match if q's characters appear in order in c starting from position 0.
 	if (c.startsWith(q)) return q.length + 1;
 
-	// Allow one-character deviation for typo tolerance (e.g., /spec-plzn vs /spec-plan)
+	// Allow one-character deviation for typo tolerance (e.g., /plzn vs /plan)
 	if (q.length >= 4 && c.length >= q.length) {
 		let diffs = 0;
 		for (let i = 0; i < q.length && i < c.length; i++) {
@@ -133,14 +133,14 @@ export async function parseSlashCommand(
  * registered the next turn is primed with that command's prompt body so
  * the workflow advances without the user typing again.
  *
- * `/spec-accept` deliberately has no successor — acceptance is always a
+ * `/accept` deliberately has no successor — acceptance is always a
  * human gate even in lazy autopilot.
  */
 export const AUTO_PROGRESSION: Readonly<Record<string, string>> = Object.freeze({
-	'/spec-discuss': '/spec-plan',
-	'/spec-plan': '/spec-execute',
-	'/spec-execute': '/spec-audit',
-	'/spec-audit': '/spec-accept',
+	'/discuss': '/plan',
+	'/plan': '/execute',
+	'/execute': '/audit',
+	'/audit': '/accept',
 });
 
 export async function executeAutoProgression(

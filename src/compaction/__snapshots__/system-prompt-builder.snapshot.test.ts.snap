@@ -1,0 +1,31 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`system-prompt structure snapshot Quick Mode prompt structure matches snapshot: quick-mode-sections 1`] = `
+[
+  "## Identity",
+  "## Available Tools",
+  "### Interactive",
+  "### Filesystem",
+  "### Provider",
+  "### Other",
+  "## Slash Commands",
+  "### Workflow Commands",
+  "## Context Assembly",
+]
+`;
+
+exports[`system-prompt structure snapshot Spec Mode prompt structure matches snapshot: spec-mode-sections 1`] = `
+[
+  "## Identity",
+  "## Available Tools",
+  "### Workflow",
+  "### Interactive",
+  "### Filesystem",
+  "### Provider",
+  "### Other",
+  "## Workflow Mode: Spec (Phase: execute | Wave 3/6)",
+  "## Slash Commands",
+  "### Workflow Commands",
+  "## Context Assembly",
+]
+`;

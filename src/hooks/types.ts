@@ -150,10 +150,10 @@ export interface HookContextMap {
 		readonly tool: string;
 		readonly conversationId: string;
 	};
-	'spec:locked': { readonly workflowId: string; readonly projectId: string; readonly lockedAt: string };
-	'spec:unlocked': { readonly workflowId: string; readonly projectId: string };
-	'spec:amended': { readonly workflowId: string; readonly projectId: string; readonly version: number; readonly rationale: string };
-	'spec:phase_transitioned': { readonly workflowId: string; readonly projectId: string; readonly from: string; readonly to: string; readonly forced: boolean };
+	'wf:locked': { readonly workflowId: string; readonly projectId: string; readonly lockedAt: string };
+	'wf:unlocked': { readonly workflowId: string; readonly projectId: string };
+	'wf:amended': { readonly workflowId: string; readonly projectId: string; readonly version: number; readonly rationale: string };
+	'wf:phase_transitioned': { readonly workflowId: string; readonly projectId: string; readonly from: string; readonly to: string; readonly forced: boolean };
 	'blueprint:created': { readonly workflowId: string; readonly projectId: string };
 	'wave:started': { readonly workflowId: string; readonly projectId: string; readonly waveNumber: number; readonly taskCount: number };
 	'wave:completed': { readonly workflowId: string; readonly projectId: string; readonly waveNumber: number };
@@ -191,10 +191,10 @@ export const HOOK_EVENT_NAMES: readonly HookEventName[] = [
 	'permission:ask',
 	'tool:block',
 	'tool:allow',
-	'spec:locked',
-	'spec:unlocked',
-	'spec:amended',
-	'spec:phase_transitioned',
+	'wf:locked',
+	'wf:unlocked',
+	'wf:amended',
+	'wf:phase_transitioned',
 	'blueprint:created',
 	'wave:started',
 	'wave:completed',

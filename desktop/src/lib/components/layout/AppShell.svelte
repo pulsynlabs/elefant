@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import type { Snippet } from "svelte";
+	import { commandsStore } from "$lib/stores/commands.svelte.js";
 
 	type Props = {
 		sidebar?: Snippet;
@@ -14,6 +16,15 @@
 		children,
 		sidebarCollapsed = $bindable(false),
 	}: Props = $props();
+
+	// Pre-fetch slash commands so the completion overlay has data
+	// immediately when the user first types `/`. Without this the
+	// overlay mounts with an empty list and renders nothing on the
+	// initial keystroke. Fire-and-forget — the store deduplicates
+	// concurrent calls and never throws to the UI.
+	onMount(() => {
+		void commandsStore.load();
+	});
 </script>
 
 <div class="app-shell" class:sidebar-collapsed={sidebarCollapsed}>
@@ -149,11 +160,9 @@
 
 	.content {
 		grid-row: 2 / 3;
-		overflow-y: auto;
-		overflow-x: hidden;
-		/* Transparent to let the single AppShell gradient show through */
-		background: transparent;
 		position: relative;
+		overflow: hidden;
+		background: transparent;
 	}
 
 	@media (max-width: 900px) {

@@ -4,10 +4,10 @@ import { join } from 'node:path';
 
 import { Database } from '../db/database.ts';
 import { StateManager } from '../state/manager.ts';
-import { instantiateSpecTools } from '../tools/spec/index.ts';
+import { instantiateSpecTools } from '../tools/workflow/index.ts';
 import { emit } from './emit.ts';
 import { HookRegistry } from './registry.ts';
-import { createPhaseAllowListFromSpecTools, createSpecPhaseGateHandler } from './spec-phase-gate.ts';
+import { createPhaseAllowListFromSpecTools, createSpecPhaseGateHandler } from './wf-phase-gate.ts';
 
 type BenchCase = {
 	name: string;
@@ -67,7 +67,7 @@ await runCase({
 	name: 'tool:before — spec tool, correct phase',
 	run: async () => {
 		await emit(hooks, 'tool:before', {
-			toolName: 'spec_chronicle',
+			toolName: 'wf_chronicle',
 			args: { action: 'append', projectId, workflowId },
 			conversationId: 'bench',
 		});
@@ -89,7 +89,7 @@ await runCase({
 	name: 'tool:before — spec tool, wrong phase (veto)',
 	run: async () => {
 		await emit(hooks, 'tool:before', {
-			toolName: 'spec_requirements',
+			toolName: 'wf_requirements',
 			args: { action: 'write', projectId, workflowId, content: '# Requirements' },
 			conversationId: 'bench',
 		});

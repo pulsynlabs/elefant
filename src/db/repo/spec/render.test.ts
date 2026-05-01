@@ -215,7 +215,7 @@ describe('SpecRenderer', () => {
 		expect(unlocked).toContain('**Status:** Draft');
 
 		// Lock the workflow
-		database.db.run('UPDATE spec_workflows SET spec_locked = 1 WHERE id = ?', [workflowId]);
+		database.db.run('UPDATE spec_workflows SET locked = 1 WHERE id = ?', [workflowId]);
 
 		// Re-fetch because renderer creates new repo instances internally
 		const locked = renderer.renderSpec(workflowId);

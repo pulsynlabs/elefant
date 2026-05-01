@@ -52,14 +52,14 @@ describe('migration 0006_spec_idempotency', () => {
 		db.run(
 			`INSERT INTO spec_idempotency (workflow_id, tool_name, idempotency_key, result_payload)
 			 VALUES (?, ?, ?, ?)`,
-			['workflow-1', 'spec_chronicle', 'key-1', '{"ok":true}'],
+			['workflow-1', 'wf_chronicle', 'key-1', '{"ok":true}'],
 		);
 
 		expect(() =>
 			db.run(
 				`INSERT INTO spec_idempotency (workflow_id, tool_name, idempotency_key, result_payload)
 				 VALUES (?, ?, ?, ?)`,
-				['workflow-1', 'spec_chronicle', 'key-1', '{"ok":true}'],
+				['workflow-1', 'wf_chronicle', 'key-1', '{"ok":true}'],
 			),
 		).toThrow();
 

@@ -5,7 +5,7 @@ import type { ToolDefinition } from '../types/tools.ts'
 import { createToolRegistry, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all 15 tools', () => {
+	it('registers all 16 tools', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
@@ -19,6 +19,7 @@ describe('ToolRegistry', () => {
 			'question',
 			'read',
 			'skill',
+			'slider',
 			'todoread',
 			'todowrite',
 			'tool_list',
@@ -26,7 +27,7 @@ describe('ToolRegistry', () => {
 			'websearch',
 			'write',
 		])
-		expect(names.length).toBe(15)
+		expect(names.length).toBe(16)
 	})
 
 	it('execute() calls the matching tool', async () => {
