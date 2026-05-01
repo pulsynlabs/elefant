@@ -78,9 +78,9 @@
 	} as const;
 
 	const typeTiers = [
-		{ name: 'hero', family: 'DM Serif Display', sample: 'The quick brown fox' },
-		{ name: 'display', family: 'DM Serif Display', sample: 'The quick brown fox' },
-		{ name: 'title', family: 'DM Serif Display', sample: 'The quick brown fox jumps' },
+		{ name: 'hero', family: 'Bricolage Grotesque', sample: 'The quick brown fox' },
+		{ name: 'display', family: 'Bricolage Grotesque', sample: 'The quick brown fox' },
+		{ name: 'title', family: 'Bricolage Grotesque', sample: 'The quick brown fox jumps' },
 		{ name: 'prose', family: 'Geist Sans', sample: 'The quick brown fox jumps over the lazy dog.' },
 		{ name: 'body', family: 'Geist Sans', sample: 'The quick brown fox jumps over the lazy dog.' },
 		{ name: 'meta', family: 'Geist Mono', sample: 'the.quick.brown.fox' },

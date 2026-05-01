@@ -18,7 +18,7 @@
 		tier?: Tier;
 		/** Quire tone — preferred new prop. */
 		tone?: Tone;
-		/** Italic display variant (DM Serif Display italic). */
+		/** Italic display variant (Bricolage Grotesque italic). */
 		italic?: boolean;
 		/** Legacy: explicit size override. */
 		size?: HeadingSize;
