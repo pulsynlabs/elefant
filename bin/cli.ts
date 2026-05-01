@@ -1,3 +1,7 @@
+import os from 'node:os';
+import path from 'node:path';
+import { unlink } from 'node:fs/promises';
+
 import { daemonStatus, startDaemon, stopDaemon } from '../src/daemon/lifecycle.ts';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -108,15 +112,63 @@ async function runHelp(_args: string[]): Promise<number> {
 }
 
 async function runUpdate(_args: string[]): Promise<number> {
-	// Task 1.5: print rebuild/reinstall instructions
-	console.log('elefant update: not yet implemented');
+	console.log('elefant update\n');
+	console.log(`Current version: elefant ${pkg.version}`);
+	console.log(`Binary path: ${process.execPath}\n`);
+	console.log('To update to the latest version:\n');
+	console.log('  1. Pull the latest source:');
+	console.log('       git pull origin main\n');
+	console.log('  2. Rebuild the CLI binary:');
+	console.log('       bun run build:cli\n');
+	console.log('  3. Reinstall:');
+	console.log('       bash scripts/install.sh\n');
+	console.log('Auto-update (download from releases) is coming in a future version.');
 	return 0;
 }
 
+/**
+ * Check whether a binary path is under a known install directory.
+ * Only ~/.local/bin and /usr/local/bin are considered safe for removal.
+ */
+export function isAllowedInstallPath(binaryPath: string, homedir: string): boolean {
+	const allowedPrefixes = [
+		path.resolve(homedir, '.local', 'bin'),
+		'/usr/local/bin',
+	];
+	return allowedPrefixes.some(
+		(prefix) => binaryPath === prefix || binaryPath.startsWith(prefix + path.sep),
+	);
+}
+
 async function runUninstall(_args: string[]): Promise<number> {
-	// Task 1.6: stop daemon + remove binary from known install path
-	console.log('elefant uninstall: not yet implemented');
-	return 0;
+	const binaryPath = process.execPath;
+	const home = os.homedir();
+
+	if (!isAllowedInstallPath(binaryPath, home)) {
+		console.error(
+			`elefant uninstall: refusing to remove binary at '${binaryPath}'.\n` +
+				'Only binaries installed under ~/.local/bin or /usr/local/bin can be removed.\n' +
+				`To uninstall manually: rm '${binaryPath}'`,
+		);
+		return 1;
+	}
+
+	// Stop daemon first (tolerate "not running")
+	const stopResult = await stopDaemon();
+	if (!stopResult.ok && stopResult.error.code !== 'FILE_NOT_FOUND') {
+		console.error(`elefant uninstall: failed to stop daemon: ${stopResult.error.message}`);
+		// Continue anyway — don't block uninstall on a daemon stop failure
+	}
+
+	try {
+		await unlink(binaryPath);
+		console.log(`Removed elefant binary at ${binaryPath}`);
+		return 0;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`elefant uninstall: failed to remove binary: ${message}`);
+		return 1;
+	}
 }
 
 async function runServe(_args: string[]): Promise<number> {

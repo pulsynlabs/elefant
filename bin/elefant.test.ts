@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { handlers, isCommand } from './cli.ts';
+import { handlers, isAllowedInstallPath, isCommand } from './cli.ts';
 import type { Command } from './cli.ts';
 
 // ---------------------------------------------------------------------------
@@ -123,5 +123,42 @@ describe('handlers', () => {
 			expect(code).toBeNumber();
 			expect(code).toBeGreaterThanOrEqual(0);
 		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// isAllowedInstallPath — path allowlist for uninstall
+// ---------------------------------------------------------------------------
+
+describe('isAllowedInstallPath', () => {
+	const homedir = '/home/testuser';
+
+	it('allows a path under ~/.local/bin', () => {
+		expect(isAllowedInstallPath('/home/testuser/.local/bin/elefant', homedir)).toBe(true);
+	});
+
+	it('allows a path under /usr/local/bin', () => {
+		expect(isAllowedInstallPath('/usr/local/bin/elefant', homedir)).toBe(true);
+	});
+
+	it('rejects a path under /tmp', () => {
+		expect(isAllowedInstallPath('/tmp/evil', homedir)).toBe(false);
+	});
+
+	it('rejects a path under ~/Downloads', () => {
+		expect(isAllowedInstallPath('/home/testuser/Downloads/elefant', homedir)).toBe(false);
+	});
+
+	it('rejects a path under /opt', () => {
+		expect(isAllowedInstallPath('/opt/bin/elefant', homedir)).toBe(false);
+	});
+
+	it('rejects a bare filename (no directory prefix match)', () => {
+		expect(isAllowedInstallPath('elefant', homedir)).toBe(false);
+	});
+
+	it('rejects a path that is a substring but not a prefix match', () => {
+		// /usr/local/binaries/elefant should NOT match /usr/local/bin
+		expect(isAllowedInstallPath('/usr/local/binaries/elefant', homedir)).toBe(false);
 	});
 });
