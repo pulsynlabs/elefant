@@ -2,9 +2,9 @@
 
 /* ===== FONTS ===== */
 
-/* DM Serif Display — display serif (regular + italic, self-hosted via fontsource) */
-@import "@fontsource/dm-serif-display/400.css";
-@import "@fontsource/dm-serif-display/400-italic.css";
+/* Bricolage Grotesque Variable — display (wght + wdth + opsz axes) */
+@import "@fontsource-variable/bricolage-grotesque/index.css";
+@import "@fontsource-variable/bricolage-grotesque/index-italic.css";
 
 /* Geist Sans Variable — body (wght axis, 100-900 + italic) */
 @font-face {

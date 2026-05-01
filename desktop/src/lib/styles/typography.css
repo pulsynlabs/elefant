@@ -1,17 +1,17 @@
 /* =========================================
    QUIRE — TYPOGRAPHY
-   DM Serif Display (display) + Geist Sans (body) + Geist Mono (telemetry)
-   Clean neo-grotesque body paired with editorial display.
+   Bricolage Grotesque Variable (display) + Geist Sans (body) + Geist Mono (telemetry)
+   Mixed-width editorial grotesque display paired with a clean screen grotesque body.
 
    Variation axes:
-     • DM Serif Display — none (regular + italic only, weight 400)
-     • Geist Sans — wght, italic
+     • Bricolage Grotesque — wght (200-800), wdth (75-100), opsz (12-96), italic
+     • Geist Sans — wght (100-900), italic
      • Geist Mono — wght (no italic axis available)
    ========================================= */
 
 :root {
 	/* Font families */
-	--font-display: "DM Serif Display", Georgia, "Times New Roman", serif;
+	--font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
 	--font-body: "Geist Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--font-mono: "Geist Mono Variable", "Geist Mono", "JetBrains Mono", "SF Mono",
 		"Cascadia Code", monospace;
@@ -69,8 +69,8 @@
 /* =========================================
    SEVEN NAMED TIERS — canonical type tokens
    Each tier sets family, size, weight, and leading.
-   DM Serif Display ships at a single optical size (display);
-   no variation axes are exposed.
+   Bricolage Grotesque: use font-optical-sizing: auto so the opsz
+   axis self-corrects across the full scale (title → hero).
    ========================================= */
 
 .text-caption {
@@ -113,31 +113,34 @@
 .text-title {
 	font-family: var(--font-display);
 	font-size: var(--font-size-2xl);
-	font-weight: var(--font-weight-regular);
+	font-weight: var(--font-weight-semibold);
 	line-height: var(--leading-snug);
-	letter-spacing: var(--tracking-snug);
+	letter-spacing: var(--tracking-tight);
+	font-optical-sizing: auto;
 	color: var(--text-prose);
 }
 
 .text-display {
 	font-family: var(--font-display);
 	font-size: var(--font-size-4xl);
-	font-weight: var(--font-weight-regular);
+	font-weight: var(--font-weight-bold);
 	line-height: var(--leading-tight);
-	letter-spacing: var(--tracking-tight);
+	letter-spacing: var(--tracking-tighter);
+	font-optical-sizing: auto;
 	color: var(--text-prose);
 }
 
 .text-hero {
 	font-family: var(--font-display);
 	font-size: var(--font-size-hero);
-	font-weight: var(--font-weight-regular);
-	line-height: 1.05;
+	font-weight: var(--font-weight-bold);
+	line-height: 1.0;
 	letter-spacing: var(--tracking-tighter);
+	font-optical-sizing: auto;
 	color: var(--text-prose);
 }
 
-/* Italic display variants — DM Serif Display italic */
+/* Italic display variants — Bricolage Grotesque italic */
 .text-display-italic,
 .text-title-italic {
 	font-style: italic;
@@ -146,7 +149,7 @@
 /* =========================================
    BASE ELEMENT DEFAULTS
    body — Geist Sans at 14px/400
-   h1-h3 — DM Serif Display at 400 weight (single optical size)
+   h1-h3 — Bricolage Grotesque Variable, semibold→bold, opsz auto
    h4-h6 — Geist Sans semibold (body family at heading scale)
    code/pre/kbd — Geist Mono
    ========================================= */
@@ -171,9 +174,10 @@ h1,
 h2,
 h3 {
 	font-family: var(--font-display);
-	font-weight: var(--font-weight-regular);
+	font-weight: var(--font-weight-bold);
 	line-height: var(--leading-tight);
 	letter-spacing: var(--tracking-tight);
+	font-optical-sizing: auto;
 	color: var(--text-prose);
 }
 
@@ -183,10 +187,12 @@ h1 {
 
 h2 {
 	font-size: var(--font-size-2xl);
+	font-weight: var(--font-weight-semibold);
 }
 
 h3 {
 	font-size: var(--font-size-xl);
+	font-weight: var(--font-weight-semibold);
 }
 
 h4,
@@ -256,26 +262,29 @@ body {
 .heading-display {
 	font-family: var(--font-display);
 	font-size: var(--font-size-4xl);
-	font-weight: var(--font-weight-regular);
+	font-weight: var(--font-weight-bold);
 	font-style: italic;
 	line-height: var(--leading-tight);
-	letter-spacing: var(--tracking-tight);
+	letter-spacing: var(--tracking-tighter);
+	font-optical-sizing: auto;
 }
 
 .heading-lg {
 	font-family: var(--font-display);
 	font-size: var(--font-size-3xl);
-	font-weight: var(--font-weight-regular);
-	line-height: var(--leading-snug);
+	font-weight: var(--font-weight-bold);
+	line-height: var(--leading-tight);
 	letter-spacing: var(--tracking-tight);
+	font-optical-sizing: auto;
 }
 
 .heading-md {
 	font-family: var(--font-display);
 	font-size: var(--font-size-2xl);
-	font-weight: var(--font-weight-regular);
+	font-weight: var(--font-weight-semibold);
 	line-height: var(--leading-snug);
-	letter-spacing: var(--tracking-snug);
+	letter-spacing: var(--tracking-tight);
+	font-optical-sizing: auto;
 }
 
 /* =========================================
