@@ -47,9 +47,10 @@
 
 <style>
 	.tool-card-shell {
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background-color: var(--color-surface-elevated);
+		border: 1px solid var(--border-edge);
+		border-left: 3px solid var(--color-primary);
+		border-radius: var(--radius-lg);
+		background-color: var(--surface-plate);
 		overflow: hidden;
 	}
 
@@ -86,17 +87,9 @@
 		line-height: 1;
 	}
 
-	.status-indicator.running {
-		color: var(--color-primary);
-	}
-
-	.status-indicator.success {
-		color: var(--color-success);
-	}
-
-	.status-indicator.error {
-		color: var(--color-error);
-	}
+	.status-indicator.running { color: var(--color-primary); }
+	.status-indicator.success { color: var(--color-success); }
+	.status-indicator.error { color: var(--color-error); }
 
 	.pulse-dot {
 		display: block;
@@ -108,8 +101,8 @@
 	}
 
 	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.3; }
+		0%, 100% { opacity: 1; transform: scale(1); }
+		50% { opacity: 0.4; transform: scale(0.85); }
 	}
 
 	.shell-name-group {
@@ -121,15 +114,15 @@
 	.shell-tool-name {
 		font-family: var(--font-mono);
 		font-size: var(--font-size-sm);
-		font-weight: var(--font-weight-medium);
-		color: var(--color-text-primary);
+		font-weight: 500;
+		color: var(--text-prose);
 		line-height: 1.3;
 	}
 
 	.shell-subtitle {
 		font-family: var(--font-mono);
 		font-size: var(--font-size-xs);
-		color: var(--color-text-muted);
+		color: var(--text-muted);
 		overflow: hidden;
 		white-space: nowrap;
 		text-overflow: ellipsis;
@@ -143,9 +136,14 @@
 		white-space: nowrap;
 		text-overflow: ellipsis;
 		max-width: 300px;
+		font-family: var(--font-sans);
 	}
 
 	.shell-body {
-		border-top: 1px solid var(--color-border);
+		border-top: 1px solid var(--border-edge);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.pulse-dot { animation: none; }
 	}
 </style>

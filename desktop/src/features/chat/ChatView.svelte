@@ -1,8 +1,32 @@
 <script lang="ts">
+	/**
+	 * ChatView — the Quick Mode chat surface.
+	 *
+	 * Two visual states, exchanged via cross-fade:
+	 *
+	 *   1. Zero-state (no messages yet)
+	 *      The composer floats centred in the viewport with a serif
+	 *      heading above it. This is the "ChatGPT moment" that signals
+	 *      the surface is ready and waiting for the first prompt.
+	 *
+	 *   2. Active state (one or more messages)
+	 *      Messages occupy the scrollable area; the composer is
+	 *      pinned to the bottom with a constrained max-width for
+	 *      reading rhythm.
+	 *
+	 * The transition is purely CSS / Svelte transitions — no JS-driven
+	 * positioning. Durations are routed through Quire motion tokens
+	 * (`--duration-base`, `--duration-fast`) so the system stays
+	 * consistent and reduced-motion-aware.
+	 *
+	 * The chat header (title + ProviderSelector) was retired in this
+	 * rewrite: model selection now lives inside the unified composer
+	 * itself (see `UnifiedChatInput`), so a separate header bar is
+	 * redundant and visually noisy.
+	 */
 	import { chatStore } from './chat.svelte.js';
 	import MessageList from './MessageList.svelte';
-	import MessageInput from './MessageInput.svelte';
-	import ProviderSelector from './ProviderSelector.svelte';
+	import UnifiedChatInput from './UnifiedChatInput.svelte';
 	import ConnectionBanner from './ConnectionBanner.svelte';
 	import { getDaemonClient } from '$lib/daemon/client.js';
 	import type { MessageRole } from '$lib/daemon/types.js';
@@ -155,72 +179,187 @@
 		chatStore.finalizeMessage('stop');
 		abortController = null;
 	}
+
+	// --- Layout state ---------------------------------------------------
+	//
+	// The view picks one of two arrangements based on whether the
+	// conversation has any messages yet. We swap the entire branch via
+	// `{#if hasMessages}` so layout differences (centred vs bottom-pinned)
+	// don't fight each other inside a single grid.
+	const hasMessages = $derived(chatStore.messages.length > 0);
+
+
 </script>
 
 <div class="chat-view">
-	<!-- Connection status banner -->
+	<!-- Connection status banner (always visible, top-pinned) -->
 	<ConnectionBanner />
 
-	<!-- Header with provider selector -->
-	<div class="chat-header">
-		<h2 class="chat-title industrial-caps">Chat</h2>
-		<ProviderSelector />
-	</div>
+	<!--
+		Both layout branches are always in the DOM and stacked via
+		position:absolute so Svelte's overlapping in/out transitions
+		don't break the flex flow. Only the active branch is visible
+		at any time; opacity/pointer-events hide the inactive one.
+	-->
+	<div class="chat-layers">
+		<!-- ===== Zero-state: composer centred ===== -->
+		<section
+			class="chat-zero-state"
+			class:is-hidden={hasMessages}
+			aria-label="New chat"
+			aria-hidden={hasMessages}
+		>
+			<header class="zero-heading">
+				<h1 class="zero-title">What can I help you with?</h1>
+				<p class="zero-hint">Ask Elefant anything, or start with a /command</p>
+			</header>
 
-	<!-- Message list (scrollable area) -->
-	<div class="chat-messages">
-		<MessageList messages={chatStore.messages} />
-	</div>
+			<div class="zero-input">
+				<UnifiedChatInput
+					disabled={chatStore.isStreaming}
+					streaming={chatStore.isStreaming}
+					onSend={handleSend}
+					onStop={handleStop}
+				/>
+			</div>
+		</section>
 
-	<!-- Input area -->
-	<div class="chat-input-area">
-		<MessageInput
-			disabled={chatStore.isStreaming}
-			streaming={chatStore.isStreaming}
-			onSend={handleSend}
-			onStop={handleStop}
-		/>
+		<!-- ===== Active state: messages above, composer pinned below ===== -->
+		<section
+			class="chat-active-state"
+			class:is-hidden={!hasMessages}
+			aria-label="Chat conversation"
+			aria-hidden={!hasMessages}
+		>
+			<div class="chat-messages" aria-live="polite">
+				<MessageList messages={chatStore.messages} />
+			</div>
+
+			<div class="chat-active-input">
+				<UnifiedChatInput
+					disabled={chatStore.isStreaming}
+					streaming={chatStore.isStreaming}
+					onSend={handleSend}
+					onStop={handleStop}
+				/>
+			</div>
+		</section>
 	</div>
 </div>
 
 <style>
+	/* ----- Root ---------------------------------------------------------
+	 * Fills the content area. The banner sits at the top (auto height),
+	 * then .chat-layers claims all remaining space via flex:1.
+	 */
 	.chat-view {
 		position: absolute;
 		inset: 0;
-		display: grid;
-		grid-template-rows: auto auto 1fr auto;
-		overflow: hidden;
-		background-color: var(--color-bg);
-	}
-
-	.chat-header {
-		grid-row: 2;
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: var(--space-4) var(--space-5);
-		border-bottom: 1px solid var(--color-border);
-		background-color: var(--color-surface);
-		flex-shrink: 0;
+		flex-direction: column;
+		overflow: hidden;
+		background-color: var(--surface-substrate);
 	}
 
-	.chat-title {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-primary);
-		margin: 0;
-	}
-
-	.chat-messages {
-		grid-row: 3;
+	/* ----- Layers container --------------------------------------------
+	 * position:relative + flex:1 so it fills the space below the banner.
+	 * Both child sections are absolutely stacked inside so transitions
+	 * never disrupt the parent flex flow.
+	 */
+	.chat-layers {
+		flex: 1;
 		min-height: 0;
 		position: relative;
 	}
 
-	.chat-input-area {
-		grid-row: 4;
-		padding: var(--space-3) var(--space-5) var(--space-5);
-		border-top: 1px solid var(--color-border);
-		background-color: var(--color-surface);
-		flex-shrink: 0;
+	/* ----- Shared section base -----------------------------------------
+	 * Both branches fill the layers container absolutely and transition
+	 * their opacity. Using opacity+pointer-events instead of
+	 * display:none keeps both in the render tree (scroll positions,
+	 * focus, etc.) but only one is interactive/visible at a time.
+	 */
+	.chat-zero-state,
+	.chat-active-state {
+		position: absolute;
+		inset: 0;
+		transition: opacity var(--transition-base);
+	}
+
+	.chat-zero-state.is-hidden,
+	.chat-active-state.is-hidden {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	/* ----- Zero-state: centred composer -------------------------------- */
+	.chat-zero-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: var(--space-7) var(--space-5);
+		gap: var(--space-7);
+		overflow: hidden;
+	}
+
+	.zero-heading {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: var(--space-3);
+		text-align: center;
+		max-width: 640px;
+	}
+
+	.zero-title {
+		font-family: var(--font-display);
+		font-size: clamp(1.75rem, 4vw, 2.5rem);
+		font-weight: 400;
+		line-height: 1.15;
+		letter-spacing: -0.02em;
+		color: var(--text-prose);
+		margin: 0;
+	}
+
+	.zero-hint {
+		font-family: var(--font-sans);
+		font-size: var(--font-size-md);
+		line-height: 1.5;
+		color: var(--text-meta);
+		margin: 0;
+	}
+
+	.zero-input {
+		width: 100%;
+		max-width: 640px;
+	}
+
+	/* ----- Active state: messages + bottom-pinned composer ------------- */
+	.chat-active-state {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.chat-messages {
+		flex: 1;
+		min-height: 0;
+		position: relative;
+		overflow-y: auto;
+		overflow-x: hidden;
+	}
+
+	.chat-active-input {
+		flex: 0 0 auto;
+		width: 100%;
+		padding: var(--space-3) var(--space-4) var(--space-4);
+	}
+
+	/* ----- Reduced motion ---------------------------------------------- */
+	@media (prefers-reduced-motion: reduce) {
+		.chat-zero-state,
+		.chat-active-state {
+			transition: none;
+		}
 	}
 </style>

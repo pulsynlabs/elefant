@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { ChatMessage } from './types.js';
 	import MessageBubble from './MessageBubble.svelte';
-	import { HugeiconsIcon, ChatIcon } from '$lib/icons/index.js';
 	import { tick } from 'svelte';
 
 	type Props = {
@@ -30,21 +29,9 @@
 </script>
 
 <div class="message-list" bind:this={listEl}>
-	{#if messages.length === 0}
-		<div class="empty-state">
-			<div class="empty-icon" aria-hidden="true">
-				<HugeiconsIcon icon={ChatIcon} size={40} strokeWidth={1.5} />
-			</div>
-			<h3 class="empty-title">Start a conversation</h3>
-			<p class="empty-desc">
-				Ask Elefant to help with your code, explain concepts, or execute tasks.
-			</p>
-		</div>
-	{:else}
-		{#each messages as message (message.id)}
-			<MessageBubble {message} />
-		{/each}
-	{/if}
+	{#each messages as message (message.id)}
+		<MessageBubble {message} />
+	{/each}
 </div>
 
 <style>
@@ -53,45 +40,10 @@
 		inset: 0;
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-4);
+		gap: var(--space-5);
 		overflow-y: auto;
 		overflow-x: hidden;
-		padding: var(--space-4);
+		padding: var(--space-6) var(--space-5);
 		scrollbar-width: thin;
-	}
-
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: var(--space-10) var(--space-6);
-		text-align: center;
-		gap: var(--space-3);
-		color: var(--color-text-muted);
-		flex: 1;
-	}
-
-	.empty-icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		opacity: 0.7;
-	}
-
-	.empty-title {
-		font-size: var(--font-size-xl);
-		font-weight: var(--font-weight-semibold);
-		color: var(--color-text-primary);
-		letter-spacing: var(--tracking-snug);
-		margin: 0;
-	}
-
-	.empty-desc {
-		font-size: var(--font-size-md);
-		color: var(--color-text-muted);
-		max-width: 400px;
-		line-height: var(--line-height-relaxed);
-		margin: 0;
 	}
 </style>

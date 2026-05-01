@@ -16,91 +16,112 @@
 </script>
 
 <div
-	class="message-bubble"
-	class:user={isUser}
-	class:assistant={!isUser}
-	class:error={message.isError}
+	class="msg"
+	class:msg--user={isUser}
+	class:msg--assistant={!isUser}
+	class:msg--error={message.isError}
 >
-	<div class="message-header">
-		<span class="message-role">{isUser ? 'You' : 'Elefant'}</span>
-		<span class="message-time">{formattedTime}</span>
+	<div class="msg-meta">
+		<span class="msg-role">{isUser ? 'You' : 'Elefant'}</span>
+		<span class="msg-time">{formattedTime}</span>
 		{#if !isUser && !message.isStreaming}
 			<CopyButton content={message.content} />
 		{/if}
 	</div>
 
-	<div class="message-content">
-		{#if isUser}
-			<p class="user-text">{message.content}</p>
-		{:else}
+	{#if isUser}
+		<div class="msg-bubble">
+			<p class="msg-text">{message.content}</p>
+		</div>
+	{:else}
+		<div class="msg-prose" class:msg-prose--error={message.isError}>
 			<StreamingMessage {message} />
-		{/if}
-	</div>
+		</div>
+	{/if}
 </div>
 
 <style>
-	.message-bubble {
+	.msg {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-		max-width: 85%;
 	}
 
-	.message-bubble.user {
+	/* User: right-aligned */
+	.msg--user {
+		align-items: flex-end;
 		align-self: flex-end;
+		max-width: 72%;
 	}
 
-	.message-bubble.assistant {
-		align-self: flex-start;
+	/* Assistant: left-aligned, full width */
+	.msg--assistant {
+		align-items: flex-start;
+		align-self: stretch;
 	}
 
-	.message-header {
+	/* Meta row (label + time + copy) */
+	.msg-meta {
 		display: flex;
 		align-items: center;
 		gap: var(--space-2);
+		padding: 0 var(--space-1);
 	}
 
-	.message-role {
-		font-size: var(--font-size-sm);
-		font-weight: var(--font-weight-semibold);
-		color: var(--color-text-muted);
+	.msg-role {
+		font-family: var(--font-sans);
+		font-size: var(--font-size-xs);
+		font-weight: 600;
+		letter-spacing: 0.07em;
 		text-transform: uppercase;
-		letter-spacing: var(--tracking-wider);
+		color: var(--text-muted);
 	}
 
-	.message-bubble.user .message-role {
+	.msg--user .msg-role {
 		color: var(--color-primary);
 	}
 
-	.message-time {
+	.msg-time {
+		font-family: var(--font-sans);
 		font-size: var(--font-size-xs);
-		color: var(--color-text-disabled);
+		color: var(--text-disabled);
 	}
 
-	.message-content {
-		background-color: var(--color-surface);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
-		padding: var(--space-4);
-		width: 100%;
-	}
-
-	.message-bubble.user .message-content {
+	/* User bubble */
+	.msg-bubble {
 		background-color: var(--color-primary-subtle);
-		border-color: var(--color-primary-muted);
+		border: 1px solid var(--border-emphasis);
+		border-radius: var(--radius-fold);
+		padding: var(--space-3) var(--space-4);
+		box-shadow: var(--shadow-sm);
 	}
 
-	.message-bubble.error .message-content {
-		background-color: color-mix(in oklch, var(--color-error) 8%, transparent);
-		border-color: var(--color-error);
-	}
-
-	.user-text {
-		color: var(--color-text-primary);
+	.msg-text {
+		font-family: var(--font-sans);
 		font-size: var(--font-size-md);
-		line-height: var(--line-height-relaxed);
+		line-height: 1.65;
+		color: var(--text-prose);
 		white-space: pre-wrap;
 		word-break: break-word;
 		margin: 0;
+	}
+
+	/* Assistant card — subtle elevation, clear message boundary */
+	.msg-prose {
+		width: 100%;
+		background-color: var(--surface-plate);
+		border: 1px solid var(--border-hairline);
+		border-radius: var(--radius-lg);
+		padding: var(--space-4) var(--space-5);
+		font-family: var(--font-sans);
+		font-size: var(--font-size-md);
+		line-height: 1.75;
+		color: var(--text-prose);
+	}
+
+	/* Error: left accent border + tint */
+	.msg-prose--error {
+		border-left: 3px solid var(--color-error);
+		background-color: color-mix(in oklch, var(--color-error) 5%, var(--surface-plate));
 	}
 </style>

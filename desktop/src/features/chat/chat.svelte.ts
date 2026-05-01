@@ -28,6 +28,46 @@ let timeoutMs = $state(60000);
 let availableProviders = $state<string[]>([]);
 let defaultProvider = $state<string | null>(null);
 
+// Extended-thinking toggle state. The toggle lives in the chat input
+// (UnifiedChatInput) and is reset to false on session change so that a
+// new conversation starts in the "fast" default mode regardless of what
+// the previous session was using. REQ-004 mandates a disabled-by-default
+// fallback when capability is unknown — see currentModelSupportsThinking.
+let thinkingEnabled = $state(false);
+
+/**
+ * Best-effort, client-side heuristic for whether the currently selected
+ * model supports Anthropic-style extended thinking.
+ *
+ * The daemon does not (yet) expose a `supportsThinking` flag per model,
+ * so we infer it from known model-id patterns. Conservative by design:
+ * if the active provider/model is unknown or unrecognised we return
+ * false, which leaves the toggle visible-but-disabled per REQ-004.
+ *
+ * Models known to support extended thinking as of early 2026:
+ *   - Claude 3.7 family   (`claude-3-7-*`)
+ *   - Claude Sonnet 4.x   (`claude-sonnet-4-*`)
+ *   - Claude Opus 4.x     (`claude-opus-4-*`, `claude-4-*`)
+ *
+ * This is intentionally additive — it never blocks a send, only governs
+ * the toggle's `disabled` state. If we mis-classify a model the user
+ * still sends fine; they just see the toggle as disabled.
+ */
+const currentModelSupportsThinking = $derived.by(() => {
+	const provider = selectedProvider ?? defaultProvider ?? (availableProviders[0] ?? null);
+	if (!provider) return false;
+	const lower = provider.toLowerCase();
+	if (lower.includes('claude')) {
+		return (
+			lower.includes('3-7') ||
+			lower.includes('sonnet-4') ||
+			lower.includes('opus-4') ||
+			lower.includes('claude-4')
+		);
+	}
+	return false;
+});
+
 // Per-run agent override applied to the NEXT chat POST. Confirmed via
 // AgentOverrideDialog from the composer. Each field is optional so the
 // UI can clear individual slots without nuking the whole override.
@@ -376,6 +416,17 @@ export function hasAgentOverride(): boolean {
 	return Object.values(agentOverride).some((v) => v !== undefined);
 }
 
+/**
+ * Toggle or set extended-thinking mode for the active session.
+ *
+ * Pure setter — UnifiedChatInput calls this when the user clicks the
+ * ThinkingToggle pill. State is intentionally session-scoped: it resets
+ * to false whenever the active session changes (see setActiveSession).
+ */
+export function setThinkingEnabled(next: boolean): void {
+	thinkingEnabled = next;
+}
+
 export const chatStore = {
 	get messages() {
 		return messages;
@@ -413,8 +464,18 @@ export const chatStore = {
 	get hasAgentOverride() {
 		return hasAgentOverride();
 	},
+	get thinkingEnabled() {
+		return thinkingEnabled;
+	},
+	get currentModelSupportsThinking() {
+		return currentModelSupportsThinking;
+	},
 	setActiveSession: (id: string | null) => {
 		activeSessionId = id;
+		// Each session starts in "fast" mode — the toggle is opt-in per
+		// conversation. This avoids surprising users who turned thinking on
+		// in a previous session and then opened a fresh one.
+		thinkingEnabled = false;
 	},
 	setProvider: (p: string | null) => {
 		selectedProvider = p;
@@ -437,6 +498,7 @@ export const chatStore = {
 	setAgentOverride,
 	clearAgentOverride,
 	getAgentOverride,
+	setThinkingEnabled,
 	buildChatRequestFields,
 	loadSessionHistory,
 	addUserMessage,

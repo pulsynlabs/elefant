@@ -65,8 +65,10 @@ function transformRunes(source: string): string {
   result += code.slice(lastIndex);
   code = result;
 
-  // 2. Transform $derived(expr) into a getter object
-  const derivedRegex = /((?:let|const|var)\s+(\w+)\s*=\s*)\$derived\s*\(/g;
+  // 2. Transform $derived(expr) and $derived.by(fn) into a getter object.
+  //    For $derived(expr), `expr` is an expression evaluated lazily on read.
+  //    For $derived.by(fn), `fn` is a thunk we call on read.
+  const derivedRegex = /((?:let|const|var)\s+(\w+)\s*=\s*)\$derived(\.by)?\s*\(/g;
   result = "";
   lastIndex = 0;
 
@@ -74,6 +76,7 @@ function transformRunes(source: string): string {
     result += code.slice(lastIndex, match.index);
 
     const prefix = match[1];
+    const isByForm = match[3] === ".by";
     const startIdx = match.index + match[0].length;
 
     // Find matching closing paren
@@ -86,16 +89,24 @@ function transformRunes(source: string): string {
     }
 
     const content = code.slice(startIdx, i - 1);
+    // For $derived.by(fn), the body is a thunk we invoke; for $derived(expr)
+    // the body is a value-returning expression we splice directly.
+    const evalExpr = isByForm ? `(${content})()` : content;
 
     // Create a getter-based derived that properly returns null/undefined
     // when the expression evaluates to a falsy value, and forwards property
-    // access when it evaluates to an object.
+    // access when it evaluates to an object. For primitive-returning
+    // deriveds we expose Symbol.toPrimitive / valueOf so equality and
+    // truthiness checks behave like the underlying value.
     result += `${prefix}(function() {
-      const _get = () => ${content};
+      const _get = () => ${evalExpr};
       return new Proxy({}, {
         get(_t, prop) {
           if (prop === '__raw') return _get();
           if (prop === Symbol.toStringTag) return 'Derived';
+          if (prop === Symbol.toPrimitive) return () => _get();
+          if (prop === 'valueOf') return () => _get();
+          if (prop === 'toString') return () => String(_get());
           const val = _get();
           if (val && typeof val === 'object') return val[prop];
           return undefined;
