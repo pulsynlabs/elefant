@@ -140,7 +140,6 @@
 	{#if showQuickAdd}
 		<ProviderQuickAdd
 			onSelect={handleQuickAddSelect}
-			onCancel={handleQuickAddToggle}
 		/>
 	{/if}
 
