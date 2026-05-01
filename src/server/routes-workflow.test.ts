@@ -12,7 +12,7 @@ import { MustHavesRepo } from '../db/repo/spec/must-haves.ts';
 import { SpecTasksRepo } from '../db/repo/spec/tasks.ts';
 import { HookRegistry } from '../hooks/registry.ts';
 import { StateManager } from '../state/manager.ts';
-import { mountWorkflowRoutes } from './routes-spec.ts';
+import { mountWorkflowRoutes } from './routes-workflow.ts';
 
 type TestContext = {
 	app: Elysia;
@@ -114,7 +114,7 @@ function seedBlueprint(publicWorkflowId: string): { taskId: string } {
 		taskId: 'T1',
 		name: 'Create routes',
 		executor: 'goop-executor-medium',
-		files: ['src/server/routes-spec.ts'],
+		files: ['src/server/routes-workflow.ts'],
 		action: 'Implement route handlers.',
 		done: 'Routes respond.',
 		verify: 'bun test',

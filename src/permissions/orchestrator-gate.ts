@@ -7,7 +7,7 @@ export interface OrchestratorGateRequest {
 const WRITE_TOOLS = new Set(['write', 'edit', 'apply_patch']);
 
 // Source file paths that orchestrators ARE allowed to touch.
-const ALLOWED_PREFIXES = ['.elefant/', '.goopspec/', 'src/tools/spec/', 'src/agents/'];
+const ALLOWED_PREFIXES = ['.elefant/', '.goopspec/', 'src/tools/workflow/', 'src/agents/'];
 
 function normalizePath(path: string): string {
 	const withoutLeadingCurrentDir = path.startsWith('./') ? path.slice(2) : path;

@@ -21,7 +21,7 @@ import { join } from 'node:path';
 
 import { Database } from '../db/database.ts';
 import { StateManager } from '../state/manager.ts';
-import { buildSpecModeBlock } from '../compaction/spec-mode-block.ts';
+import { buildSpecModeBlock } from '../compaction/wf-context-block.ts';
 import { AUTO_PROGRESSION, executeAutoProgression } from '../server/slash-commands.ts';
 
 const tempDirs: string[] = [];

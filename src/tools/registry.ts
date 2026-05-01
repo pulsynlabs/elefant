@@ -20,7 +20,7 @@ import { questionTool } from './question/index.js';
 import { readTool } from './read.js';
 import { bashTool } from './shell/index.js';
 import { skillTool } from './skill/index.js';
-import { createSpecToolContext, createSpecTools } from './spec/index.ts';
+import { createSpecToolContext, createSpecTools } from './workflow/index.ts';
 import { createTaskTool, type TaskToolDeps } from './task/index.js';
 import type { MetadataEmitter } from './task/metadata-emitter.js';
 import { todoreadTool, todowriteTool } from './todo/index.js';

@@ -8,7 +8,7 @@ import {
 	type AuditReport,
 	type AuditRecommendation,
 	type VerificationResult,
-} from '../tools/spec/verifier-output.ts';
+} from '../tools/workflow/verifier-output.ts';
 
 export type AuditSeverity = 'minor' | 'moderate' | 'major';
 

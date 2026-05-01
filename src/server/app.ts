@@ -21,7 +21,7 @@ import type { MCPManager } from '../mcp/manager.ts'
 import { prefetchAnthropicRegistry } from '../mcp/registry/anthropic.ts'
 import { gracefulShutdown } from '../daemon/shutdown.ts'
 import type { StateManager } from '../state/manager.ts'
-import { mountWorkflowRoutes } from './routes-spec.ts'
+import { mountWorkflowRoutes } from './routes-workflow.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,

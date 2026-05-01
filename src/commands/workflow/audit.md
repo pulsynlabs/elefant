@@ -15,7 +15,7 @@ After all waves of `/execute` are complete. This is the quality gate before acce
 1. Read the locked SPEC's full validation contract (all per-MH VCs + aggregate AVCs) via `spec_spec({ action: "read", workflowId })` — pull every VC entry, not just the per-MH ones.
 2. Read the list of changed files from CHRONICLE via `spec_chronicle({ action: "read", workflowId, kind: "task_completed" })` and extract file paths from each entry payload.
 3. Dispatch the `verifier` agent via `task({ subagent_type: "verifier", contextMode: "none", input: { validationContract, changedFiles, perMhAcceptanceCriteria } })`. The `contextMode: "none"` is critical — the verifier must not inherit executor reasoning.
-4. Parse the verifier's response envelope. The `<verification>` block contains JSON matching `AuditReportSchema` from `src/tools/spec/verifier-output.ts` — `{ workflowId, auditedAt, results: [{ vcId, status, evidence, severity?, recommendation? }], summary, recommendation }`.
+4. Parse the verifier's response envelope. The `<verification>` block contains JSON matching `AuditReportSchema` from `src/tools/workflow/verifier-output.ts` — `{ workflowId, auditedAt, results: [{ vcId, status, evidence, severity?, recommendation? }], summary, recommendation }`.
 5. Persist the parsed report as a `spec_chronicle_entries` row with `kind: "audit_report"` and `payload: { auditReport }`.
 6. Route by `recommendation` (computed by `classifyAuditFailures` in `src/server/audit-router.ts`):
    - **`minor-fix`:** Dispatch `executor-medium` to patch the failing VCs. Re-run `/audit` after the patch lands.

@@ -1,6 +1,6 @@
 import type { StateManager } from '../state/manager.ts';
 import type { SpecWorkflowPhase } from '../state/schema.ts';
-import type { SpecTool } from '../tools/spec/base.ts';
+import type { SpecTool } from '../tools/workflow/base.ts';
 import type { HookHandler } from './types.ts';
 
 export type PhaseAllowList = Map<string, readonly SpecWorkflowPhase[]>;

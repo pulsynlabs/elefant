@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import type { AuditReport, VerificationResult } from '../tools/spec/verifier-output.ts';
+import type { AuditReport, VerificationResult } from '../tools/workflow/verifier-output.ts';
 import { classifyAuditFailures, routeAuditFailure } from './audit-router.ts';
 
 function makeReport(results: VerificationResult[]): AuditReport {

@@ -5,8 +5,8 @@ import { join } from 'node:path';
 
 import { Database } from '../db/database.ts';
 import { StateManager } from '../state/manager.ts';
-import { instantiateSpecTools } from '../tools/spec/index.ts';
-import { createPhaseAllowListFromSpecTools, createSpecPhaseGateHandler } from './spec-phase-gate.ts';
+import { instantiateSpecTools } from '../tools/workflow/index.ts';
+import { createPhaseAllowListFromSpecTools, createSpecPhaseGateHandler } from './wf-phase-gate.ts';
 
 function seedProject(db: Database, projectId: string, projectPath: string): void {
 	db.db.run(

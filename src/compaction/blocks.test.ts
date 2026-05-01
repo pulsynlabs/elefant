@@ -256,7 +256,7 @@ describe('compaction blocks', () => {
 	});
 
 	it('buildSpecModeBlock includes workflow, must-haves, and ADL details', async () => {
-		const directory = mkdtempSync(join(tmpdir(), 'elefant-spec-mode-block-'));
+		const directory = mkdtempSync(join(tmpdir(), 'elefant-wf-context-block-'));
 		tempDirs.push(directory);
 		mkdirSync(join(directory, '.elefant'), { recursive: true });
 		const db = new Database(join(directory, '.elefant', 'db.sqlite'));

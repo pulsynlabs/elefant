@@ -4,10 +4,10 @@ import { join } from 'node:path';
 
 import { Database } from '../db/database.ts';
 import { StateManager } from '../state/manager.ts';
-import { instantiateSpecTools } from '../tools/spec/index.ts';
+import { instantiateSpecTools } from '../tools/workflow/index.ts';
 import { emit } from './emit.ts';
 import { HookRegistry } from './registry.ts';
-import { createPhaseAllowListFromSpecTools, createSpecPhaseGateHandler } from './spec-phase-gate.ts';
+import { createPhaseAllowListFromSpecTools, createSpecPhaseGateHandler } from './wf-phase-gate.ts';
 
 type BenchCase = {
 	name: string;

@@ -7,8 +7,8 @@ import { Database } from '../db/database.ts';
 import { MustHavesRepo } from '../db/repo/spec/must-haves.ts';
 import { SpecTasksRepo } from '../db/repo/spec/tasks.ts';
 import { StateManager } from '../state/manager.ts';
-import { SpecBlueprintTool, SpecSpecTool } from '../tools/spec/document-tools.ts';
-import type { SpecToolContext } from '../tools/spec/base.ts';
+import { SpecBlueprintTool, SpecSpecTool } from '../tools/workflow/document-tools.ts';
+import type { SpecToolContext } from '../tools/workflow/base.ts';
 import { HookRegistry } from './registry.ts';
 import type { HookContextMap } from './types.ts';
 
