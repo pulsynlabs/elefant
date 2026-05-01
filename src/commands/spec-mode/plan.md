@@ -47,8 +47,8 @@ When `lazyAutopilot=true`:
 - [ ] SPEC contains at least one must-have with a traceable ID (MH1, MH2…).
 - [ ] Every must-have has at least one acceptance criterion and one validation contract assertion.
 - [ ] BLUEPRINT contains at least one wave with at least one task.
-- [ ] `spec_workflows.spec_locked` is `1` after the contract gate confirms.
-- [ ] SPEC lock writes a `spec:locked` event and a CHRONICLE entry.
+- [ ] `spec_workflows.locked` is `1` after the contract gate confirms.
+- [ ] SPEC lock writes a `wf:locked` event and a CHRONICLE entry.
 
 ## Anti-Patterns
 **DON'T:** Lock the spec before the user has reviewed the must-have list — the contract gate is the last human check before implementation starts.

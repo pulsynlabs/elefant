@@ -13,16 +13,16 @@ import { HookRegistry } from './registry.ts';
 import type { HookContextMap } from './types.ts';
 
 const typePayloads = {
-	'spec:locked': { workflowId: 'spec-mode', projectId: 'project-1', lockedAt: new Date().toISOString() },
-	'spec:unlocked': { workflowId: 'spec-mode', projectId: 'project-1' },
-	'spec:amended': { workflowId: 'spec-mode', projectId: 'project-1', version: 1, rationale: 'test' },
-	'spec:phase_transitioned': { workflowId: 'spec-mode', projectId: 'project-1', from: 'plan', to: 'execute', forced: false },
+	'wf:locked': { workflowId: 'spec-mode', projectId: 'project-1', lockedAt: new Date().toISOString() },
+	'wf:unlocked': { workflowId: 'spec-mode', projectId: 'project-1' },
+	'wf:amended': { workflowId: 'spec-mode', projectId: 'project-1', version: 1, rationale: 'test' },
+	'wf:phase_transitioned': { workflowId: 'spec-mode', projectId: 'project-1', from: 'plan', to: 'execute', forced: false },
 	'blueprint:created': { workflowId: 'spec-mode', projectId: 'project-1' },
 	'wave:started': { workflowId: 'spec-mode', projectId: 'project-1', waveNumber: 1, taskCount: 0 },
 	'wave:completed': { workflowId: 'spec-mode', projectId: 'project-1', waveNumber: 1 },
 	'task:assigned': { workflowId: 'spec-mode', projectId: 'project-1', taskId: 'T1', agentRunId: 'run-1' },
 	'task:completed': { workflowId: 'spec-mode', projectId: 'project-1', taskId: 'T1' },
-} satisfies Pick<HookContextMap, 'spec:locked' | 'spec:unlocked' | 'spec:amended' | 'spec:phase_transitioned' | 'blueprint:created' | 'wave:started' | 'wave:completed' | 'task:assigned' | 'task:completed'>;
+} satisfies Pick<HookContextMap, 'wf:locked' | 'wf:unlocked' | 'wf:amended' | 'wf:phase_transitioned' | 'blueprint:created' | 'wave:started' | 'wave:completed' | 'task:assigned' | 'task:completed'>;
 
 void typePayloads;
 
@@ -56,9 +56,9 @@ describe('spec hook event types and emissions', () => {
 
 		const state = new StateManager(projectPath, { id: projectId, name: projectId, path: projectPath, database: db, hookRegistry: hooks });
 		const workflow = await state.createSpecWorkflow({ projectId, workflowId, phase: 'plan', totalWaves: 2, isActive: true });
-		await state.lockSpec(projectId, workflowId);
-		await state.unlockSpec(projectId, workflowId);
-		await state.transitionSpecPhase(projectId, workflowId, 'execute');
+		await state.lock(projectId, workflowId);
+		await state.unlock(projectId, workflowId);
+		await state.transitionPhase(projectId, workflowId, 'execute');
 		await state.updateWave(projectId, workflowId, 1, 2);
 		await state.updateWave(projectId, workflowId, 2, 2);
 
@@ -79,9 +79,9 @@ describe('spec hook event types and emissions', () => {
 
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		expect(seen.some((entry) => entry.startsWith('spec:locked:'))).toBe(true);
+		expect(seen.some((entry) => entry.startsWith('wf:locked:'))).toBe(true);
 		expect(seen.some((entry) => entry.includes('"lockedAt"'))).toBe(true);
-		expect(seen.some((entry) => entry.startsWith('spec:unlocked:'))).toBe(true);
+		expect(seen.some((entry) => entry.startsWith('wf:unlocked:'))).toBe(true);
 		expect(seen.some((entry) => entry.includes('"from":"plan"'))).toBe(true);
 		expect(seen.some((entry) => entry.startsWith('wave:started:'))).toBe(true);
 		expect(seen.some((entry) => entry.startsWith('wave:completed:'))).toBe(true);

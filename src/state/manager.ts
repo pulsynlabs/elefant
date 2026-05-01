@@ -61,7 +61,7 @@ type SpecWorkflowRow = {
   status: string;
   autopilot: number;
   lazy_autopilot: number;
-  spec_locked: number;
+  locked: number;
   acceptance_confirmed: number;
   interview_complete: number;
   interview_completed_at: string | null;
@@ -189,7 +189,7 @@ export class StateManager {
       status: row.status,
       autopilot: row.autopilot === 1,
       lazyAutopilot: row.lazy_autopilot === 1,
-      specLocked: row.spec_locked === 1,
+      specLocked: row.locked === 1,
       acceptanceConfirmed: row.acceptance_confirmed === 1,
       interviewComplete: row.interview_complete === 1,
       interviewCompletedAt: row.interview_completed_at,
@@ -360,17 +360,80 @@ export class StateManager {
     return true;
   }
 
-  async transitionPhase(to: WorkflowPhase): Promise<boolean> {
-    const current = this.state.workflow.phase;
-    if (!VALID_PHASE_TRANSITIONS[current].includes(to)) {
-      return false;
+  // Legacy file-based transition (no DB, returns boolean)
+  async transitionPhase(to: WorkflowPhase): Promise<boolean>;
+  // Spec-mode DB-backed transition (requires DB, returns SpecWorkflow)
+  async transitionPhase(
+    projectId: string,
+    workflowId: string,
+    to: SpecWorkflowPhase,
+    opts?: TransitionSpecPhaseOptions,
+  ): Promise<SpecWorkflow>;
+  async transitionPhase(
+    toOrProjectId: WorkflowPhase | string,
+    workflowIdOrTo?: string | SpecWorkflowPhase,
+    toOrOpts?: SpecWorkflowPhase | TransitionSpecPhaseOptions,
+    opts?: TransitionSpecPhaseOptions,
+  ): Promise<boolean | SpecWorkflow> {
+    // Legacy path: single WorkflowPhase argument
+    if (typeof workflowIdOrTo === 'undefined') {
+      const to = toOrProjectId as WorkflowPhase;
+      const current = this.state.workflow.phase;
+      if (!VALID_PHASE_TRANSITIONS[current].includes(to)) {
+        return false;
+      }
+
+      await this.persist((state) => {
+        state.workflow.phase = to;
+      });
+
+      return true;
     }
 
-    await this.persist((state) => {
-      state.workflow.phase = to;
-    });
+    // Spec-mode path: projectId, workflowId, to, opts?
+    const projectId = toOrProjectId as string;
+    const workflowId = workflowIdOrTo as string;
+    const to = toOrOpts as SpecWorkflowPhase;
+    const transitionOpts = (typeof opts !== 'undefined' ? opts : toOrOpts) as TransitionSpecPhaseOptions;
 
-    return true;
+    const db = this.requireDb();
+    const mutex = this.getSpecMutex(projectId, workflowId);
+
+    return mutex.withLock(async () => {
+      const current = this.getSpecWorkflowOrThrow(db, projectId, workflowId);
+      const allowed = SPEC_PHASE_TRANSITIONS[current.phase];
+
+      if (!allowed.includes(to) && transitionOpts.force !== true) {
+        throw new InvalidTransitionError({
+          code: 'INVALID_TRANSITION',
+          from: current.phase,
+          to,
+          allowed,
+        });
+      }
+
+      if (!allowed.includes(to)) {
+        await this.appendAdlForced(projectId, workflowId, {
+          from: current.phase,
+          to,
+          reason: transitionOpts.reason ?? null,
+          allowed,
+        });
+      }
+
+      const updated = db.transaction(() =>
+        this.updateSpecWorkflowFields(db, projectId, workflowId, { phase: to }),
+      )();
+
+      this.emitHook('wf:phase_transitioned', {
+        workflowId,
+        projectId,
+        from: current.phase,
+        to,
+        forced: transitionOpts.force === true && !allowed.includes(to),
+      });
+      return updated;
+    });
   }
 
   async listSpecWorkflows(projectId: string): Promise<SpecWorkflow[]> {
@@ -412,7 +475,7 @@ export class StateManager {
           status,
           autopilot,
           lazy_autopilot,
-          spec_locked,
+          locked,
           acceptance_confirmed,
           interview_complete,
           interview_completed_at,
@@ -485,55 +548,9 @@ export class StateManager {
     return this.getSpecWorkflowOrThrow(db, projectId, workflowId);
   }
 
-  async transitionSpecPhase(
-    projectId: string,
-    workflowId: string,
-    to: SpecWorkflowPhase,
-    opts: TransitionSpecPhaseOptions = {},
-  ): Promise<SpecWorkflow> {
-    const db = this.requireDb();
-    const mutex = this.getSpecMutex(projectId, workflowId);
-
-    return mutex.withLock(async () => {
-      const current = this.getSpecWorkflowOrThrow(db, projectId, workflowId);
-      const allowed = SPEC_PHASE_TRANSITIONS[current.phase];
-
-      if (!allowed.includes(to) && opts.force !== true) {
-        throw new InvalidTransitionError({
-          code: 'INVALID_TRANSITION',
-          from: current.phase,
-          to,
-          allowed,
-        });
-      }
-
-      if (!allowed.includes(to)) {
-        await this.appendAdlForced(projectId, workflowId, {
-          from: current.phase,
-          to,
-          reason: opts.reason ?? null,
-          allowed,
-        });
-      }
-
-      const updated = db.transaction(() =>
-        this.updateSpecWorkflowFields(db, projectId, workflowId, { phase: to }),
-      )();
-
-      this.emitHook('spec:phase_transitioned', {
-        workflowId,
-        projectId,
-        from: current.phase,
-        to,
-        forced: opts.force === true && !allowed.includes(to),
-      });
-      return updated;
-    });
-  }
-
-  async lockSpec(): Promise<void>;
-  async lockSpec(projectId: string, workflowId: string): Promise<SpecWorkflow>;
-  async lockSpec(
+  async lock(): Promise<void>;
+  async lock(projectId: string, workflowId: string): Promise<SpecWorkflow>;
+  async lock(
     projectId?: string,
     workflowId?: string,
   ): Promise<void | SpecWorkflow> {
@@ -542,9 +559,9 @@ export class StateManager {
       const mutex = this.getSpecMutex(projectId, workflowId);
       return mutex.withLock(async () => {
         const updated = db.transaction(() =>
-          this.updateSpecWorkflowFields(db, projectId, workflowId, { spec_locked: 1 }),
+          this.updateSpecWorkflowFields(db, projectId, workflowId, { locked: 1 }),
         )();
-        this.emitHook('spec:locked', {
+        this.emitHook('wf:locked', {
           workflowId,
           projectId,
           lockedAt: updated.updatedAt,
@@ -558,9 +575,9 @@ export class StateManager {
     });
   }
 
-  async unlockSpec(): Promise<void>;
-  async unlockSpec(projectId: string, workflowId: string): Promise<SpecWorkflow>;
-  async unlockSpec(
+  async unlock(): Promise<void>;
+  async unlock(projectId: string, workflowId: string): Promise<SpecWorkflow>;
+  async unlock(
     projectId?: string,
     workflowId?: string,
   ): Promise<void | SpecWorkflow> {
@@ -569,9 +586,9 @@ export class StateManager {
       const mutex = this.getSpecMutex(projectId, workflowId);
       return mutex.withLock(async () => {
         const updated = db.transaction(() =>
-          this.updateSpecWorkflowFields(db, projectId, workflowId, { spec_locked: 0 }),
+          this.updateSpecWorkflowFields(db, projectId, workflowId, { locked: 0 }),
         )();
-        this.emitHook('spec:unlocked', { workflowId, projectId });
+        this.emitHook('wf:unlocked', { workflowId, projectId });
         return updated;
       });
     }
@@ -827,14 +844,14 @@ export class StateManager {
 
         db.query(
           `UPDATE spec_workflows
-           SET spec_locked = 0, last_activity = datetime('now'), updated_at = datetime('now')
+           SET locked = 0, last_activity = datetime('now'), updated_at = datetime('now')
            WHERE project_id = ? AND workflow_id = ?`,
         ).run(projectId, workflowId);
 
         // Extension point: Wave 1/2 document mutation and amendment persistence run here.
 
         return this.updateSpecWorkflowFields(db, projectId, workflowId, {
-          spec_locked: 1,
+          locked: 1,
         });
       })();
 

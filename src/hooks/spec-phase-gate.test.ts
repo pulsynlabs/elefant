@@ -76,8 +76,8 @@ describe('spec phase gate', () => {
 		const { db, state, handler, projectId, workflowId } = await setup('discuss');
 		const first = await handler({ toolName: 'wf_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
 		expect(first).toMatchObject({ veto: true });
-		await state.transitionSpecPhase(projectId, workflowId, 'plan');
-		await state.transitionSpecPhase(projectId, workflowId, 'execute');
+		await state.transitionPhase(projectId, workflowId, 'plan');
+		await state.transitionPhase(projectId, workflowId, 'execute');
 		const second = await handler({ toolName: 'wf_chronicle', args: { action: 'append', projectId, workflowId }, conversationId: 'conv-1' });
 		expect(second).toBeUndefined();
 		db.close();

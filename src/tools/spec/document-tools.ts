@@ -67,7 +67,7 @@ export class SpecSpecTool extends SpecTool<SpecArgs, unknown> {
 		if (args.action === 'lock') {
 			const missing = mh.list(workflow.id).filter((item) => mh.listValidationContracts(item.id).length === 0);
 			if (missing.length > 0) return new SpecToolError('VALIDATION_CONTRACT_INCOMPLETE', 'Every must-have requires at least one validation contract before lock', { missing: missing.map((item) => item.mhId) });
-			return ctx.stateManager.lockSpec(args.projectId, args.workflowId);
+			return ctx.stateManager.lock(args.projectId, args.workflowId);
 		}
 		const result = docs.applyAmendment(workflow.id, {
 			rationale: args.rationale,
@@ -77,12 +77,12 @@ export class SpecSpecTool extends SpecTool<SpecArgs, unknown> {
 			},
 		});
 		if (ctx.hookRegistry) {
-			void emit(ctx.hookRegistry, 'spec:amended', {
+			void emit(ctx.hookRegistry, 'wf:amended', {
 				workflowId: args.workflowId,
 				projectId: args.projectId,
 				version: result.version,
 				rationale: args.rationale,
-			}).catch((error) => console.error('[elefant] Failed to emit spec:amended:', error));
+			}).catch((error) => console.error('[elefant] Failed to emit wf:amended:', error));
 		}
 		return result;
 	}

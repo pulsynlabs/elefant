@@ -25,7 +25,7 @@ When the SPEC is locked but a must-have, acceptance criterion, or out-of-scope i
    - Applies the change.
    - Re-asserts `spec_locked`.
    - Inserts a `spec_amendments` row with prior_state and new_state JSON.
-   - Emits `spec:amended` event.
+    - Emits `wf:amended` event.
 5. Show the diff of the change to the user: old state vs new state.
 6. Log the amendment to CHRONICLE and ADL.
 
@@ -50,7 +50,7 @@ When `lazyAutopilot=true`:
 ## Success Criteria
 - [ ] Amendment is applied atomically — partial changes never persist.
 - [ ] `spec_amendments` row contains both prior_state and new_state JSON.
-- [ ] `spec:amended` event is emitted and consumable by listeners.
+- [ ] `wf:amended` event is emitted and consumable by listeners.
 - [ ] The spec lock is re-asserted after the amendment completes.
 
 ## Anti-Patterns

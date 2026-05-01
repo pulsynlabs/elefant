@@ -116,10 +116,10 @@ async function transitionPhase(workflowId: string, to: string, force?: boolean):
 	}
 }
 
-async function lockSpec(workflowId: string): Promise<void> {
+async function lock(workflowId: string): Promise<void> {
 	clearError();
 	try {
-		await specModeApi.lockSpec(workflowId);
+		await specModeApi.lock(workflowId);
 		// Optimistic update: reflect lock immediately, then reload the row
 		workflows = workflows.map((w) =>
 			w.id === workflowId || w.workflowId === workflowId ? { ...w, specLocked: true } : w,
@@ -210,10 +210,10 @@ function subscribeToSpecEvents(projectId: string): () => void {
 			if (!envelope.workflowId) return;
 			// Phase / lock / amend events change the workflow row — reload list
 			if (
-				envelope.event === 'spec:locked' ||
-				envelope.event === 'spec:unlocked' ||
-				envelope.event === 'spec:amended' ||
-				envelope.event === 'spec:phase_transitioned' ||
+				envelope.event === 'wf:locked' ||
+				envelope.event === 'wf:unlocked' ||
+				envelope.event === 'wf:amended' ||
+				envelope.event === 'wf:phase_transitioned' ||
 				envelope.event === 'blueprint:created'
 			) {
 				void loadWorkflows(projectId);
@@ -296,7 +296,7 @@ export const specModeStore = {
 	createWorkflow,
 	setActiveWorkflow,
 	transitionPhase,
-	lockSpec,
+	lock,
 	loadSpec,
 	loadRendered,
 	loadTasks,

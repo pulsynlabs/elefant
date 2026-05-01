@@ -87,9 +87,9 @@ export class SpecStateTool extends SpecTool<SpecStateArgs, SpecWorkflow | null> 
 	protected async execute(ctx: SpecToolContext, args: SpecStateArgs): Promise<SpecWorkflow | null> {
 		switch (args.action) {
 			case 'get': return ctx.stateManager.getSpecWorkflow(args.projectId, args.workflowId);
-			case 'transition': return ctx.stateManager.transitionSpecPhase(args.projectId, args.workflowId, args.to, { force: args.force });
-			case 'lock-spec': return ctx.stateManager.lockSpec(args.projectId, args.workflowId);
-			case 'unlock-spec': return ctx.stateManager.unlockSpec(args.projectId, args.workflowId);
+			case 'transition': return ctx.stateManager.transitionPhase(args.projectId, args.workflowId, args.to, { force: args.force });
+			case 'lock-spec': return ctx.stateManager.lock(args.projectId, args.workflowId);
+			case 'unlock-spec': return ctx.stateManager.unlock(args.projectId, args.workflowId);
 			case 'set-mode': return ctx.stateManager.setMode(args.projectId, args.workflowId, args.mode);
 			case 'set-depth': return ctx.stateManager.setDepth(args.projectId, args.workflowId, args.depth);
 			case 'set-autopilot': return ctx.stateManager.setAutopilot(args.projectId, args.workflowId, args.autopilot, args.lazy);
