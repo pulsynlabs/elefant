@@ -48,6 +48,12 @@
 	import type { IconSvgElement } from '$lib/icons/index.js';
 	import ProjectAvatar from '../../../features/projects/ProjectAvatar.svelte';
 	import SidebarProjectRow from './SidebarProjectRow.svelte';
+	import NewSessionDialog from '../../../features/chat/mode-picker/NewSessionDialog.svelte';
+	import {
+		getLastMode,
+		setLastMode,
+	} from '../../../features/chat/mode-picker/last-mode.js';
+	import type { SessionMode } from '../../../features/chat/mode-picker/mode-picker-state.js';
 	import {
 		computeRollupVariant,
 		computeSidebarChildRunChain,
@@ -67,6 +73,12 @@
 	// Which project rows are currently expanded. Keyed by project id; a project
 	// is expanded iff its id maps to `true` here.
 	let expandedProjectIds = $state<Record<string, boolean>>({});
+
+	// New-session dialog state. `pendingProject` doubles as the visibility
+	// flag — when non-null, the dialog is mounted for that project.
+	let pendingProject = $state<Project | null>(null);
+	let pendingDefaultMode = $state<SessionMode>('quick');
+	let isCreatingSession = $state(false);
 
 	// Derived: the list of runs in the active session. Used to find the
 	// session's root run (the ancestor of `currentChildRunId`) so we can
@@ -204,14 +216,37 @@
 		navigationStore.navigate('chat');
 	}
 
-	async function createNewSession(project: Project): Promise<void> {
+	function openNewSessionDialog(project: Project): void {
+		// Pre-select the user's most recent mode for this project so the
+		// dialog defaults to their personal preference rather than the
+		// global fallback. First-time users get the spec-defined default.
+		pendingDefaultMode = getLastMode(project.id);
+		pendingProject = project;
+		isCreatingSession = false;
+	}
+
+	function closeNewSessionDialog(): void {
+		pendingProject = null;
+		isCreatingSession = false;
+	}
+
+	async function confirmNewSession(mode: SessionMode): Promise<void> {
+		const project = pendingProject;
+		if (!project || isCreatingSession) return;
+		isCreatingSession = true;
+
 		// Ensure the newly-created session lands under the correct active
 		// project, then navigate into chat.
 		if (projectsStore.activeProjectId !== project.id) {
 			await projectsStore.selectProject(project.id);
 		}
+
 		try {
-			await projectsStore.createSession(project.id);
+			await projectsStore.createSession(project.id, { mode });
+			// Persist the chosen mode so the next dialog opens on the same
+			// preference. Done after a successful create so a failed POST
+			// doesn't poison the next attempt.
+			setLastMode(project.id, mode);
 			// Clear chat so the new session starts with an empty message list.
 			clearConversation();
 			// Make sure the project row is expanded so the user sees the new
@@ -220,8 +255,11 @@
 				expandedProjectIds = { ...expandedProjectIds, [project.id]: true };
 			}
 			navigationStore.navigate('chat');
+			closeNewSessionDialog();
 		} catch {
-			// Errors are surfaced via projectsStore.lastError; no-op here.
+			// Errors are surfaced via projectsStore.lastError. Keep the
+			// dialog open so the user can retry or cancel.
+			isCreatingSession = false;
 		}
 	}
 
@@ -291,7 +329,7 @@
 								activeSessionId={projectsStore.activeSessionId}
 								onToggle={toggleProject}
 								onSelectSession={openSession}
-								onNewSession={(p) => void createNewSession(p)}
+								onNewSession={openNewSessionDialog}
 								childRunChainRows={projectsStore.activeProjectId === project.id
 									? activeChildChainRows
 									: []}
@@ -359,6 +397,16 @@
 		{/each}
 	</ul>
 </nav>
+
+{#if pendingProject}
+	<NewSessionDialog
+		projectName={pendingProject.name}
+		defaultMode={pendingDefaultMode}
+		isCreating={isCreatingSession}
+		onCreate={confirmNewSession}
+		onCancel={closeNewSessionDialog}
+	/>
+{/if}
 
 <style>
 	/* ── Sidebar nav shell ────────────────────────────────────────── */
