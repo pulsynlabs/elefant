@@ -1,5 +1,6 @@
 import { Elysia, t } from 'elysia';
 
+import commandsRegistry from '../commands/workflow/COMMANDS_REGISTRY.json' with { type: 'json' };
 import type { Database } from '../db/database.ts';
 import { SpecAdlRepo, SpecAdlEntryTypeSchema } from '../db/repo/spec/adl.ts';
 import { SpecChronicleRepo } from '../db/repo/spec/chronicle.ts';
@@ -17,6 +18,21 @@ type SpecRouteDeps = {
 	stateManager: StateManager;
 	hookRegistry?: HookRegistry;
 };
+
+type CommandEntry = {
+	trigger: string;
+	description: string;
+	agent?: string;
+	phase?: string;
+};
+
+// In-memory cache of commands loaded at module initialization
+const cachedCommands: CommandEntry[] = commandsRegistry.map((cmd) => ({
+	trigger: cmd.trigger,
+	description: cmd.description,
+	agent: cmd.agent,
+	phase: cmd.phase,
+}));
 
 type ErrorBody = { error: { code: string; message: string; details?: unknown } };
 type DataBody<T> = { data: T };
@@ -275,6 +291,10 @@ function createSpecRoutes(deps: SpecRouteDeps) {
 	const { db, stateManager, hookRegistry } = deps;
 
 	return new Elysia({ prefix: '/api/wf' })
+		.get('/commands', () => {
+			// Return cached command list for frontend completions overlay
+			return data({ commands: cachedCommands });
+		})
 		.get('/projects/:projectId/workflows', async ({ params, set }) => {
 			try {
 				return data(await stateManager.listSpecWorkflows(params.projectId));

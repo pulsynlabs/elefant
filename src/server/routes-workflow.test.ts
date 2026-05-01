@@ -369,3 +369,45 @@ describe('spec wave and task routes', () => {
 		expect('data' in response.body && response.body.data.status).toBe('pending');
 	});
 });
+
+describe('GET /api/wf/commands endpoint', () => {
+	it('returns 200 with correct shape', async () => {
+		const response = await request<{ commands: unknown[] }>('/api/wf/commands');
+		expect(response.status).toBe(200);
+		expect('data' in response.body).toBe(true);
+		expect(response.body.data).toHaveProperty('commands');
+		expect(Array.isArray(response.body.data.commands)).toBe(true);
+	});
+
+	it('returns at least 15 commands', async () => {
+		const response = await request<{ commands: unknown[] }>('/api/wf/commands');
+		expect(response.status).toBe(200);
+		expect('data' in response.body).toBe(true);
+		expect(response.body.data.commands.length).toBeGreaterThanOrEqual(15);
+	});
+
+	it('each command has trigger starting with / and description', async () => {
+		const response = await request<{ commands: Array<{ trigger: string; description: string }> }>('/api/wf/commands');
+		expect(response.status).toBe(200);
+		expect('data' in response.body).toBe(true);
+		const { commands } = response.body.data;
+		for (const cmd of commands) {
+			expect(cmd).toHaveProperty('trigger');
+			expect(cmd).toHaveProperty('description');
+			expect(typeof cmd.trigger).toBe('string');
+			expect(typeof cmd.description).toBe('string');
+			expect(cmd.trigger.startsWith('/')).toBe(true);
+			expect(cmd.description.length).toBeGreaterThan(0);
+		}
+	});
+
+	it('includes /discuss, /plan, and /execute commands', async () => {
+		const response = await request<{ commands: Array<{ trigger: string }> }>('/api/wf/commands');
+		expect(response.status).toBe(200);
+		expect('data' in response.body).toBe(true);
+		const triggers = response.body.data.commands.map((cmd) => cmd.trigger);
+		expect(triggers).toContain('/discuss');
+		expect(triggers).toContain('/plan');
+		expect(triggers).toContain('/execute');
+	});
+});
