@@ -4,11 +4,11 @@
  * Composes the base Elefant system prompt from independent section generators.
  *
  * Section ordering (stable for prompt caching):
- * 1. Identity — What Elefant is and the agent's role
- * 2. Tool Inventory — Categorized tool list with names and descriptions
- * 3. Workflow Section — Conditional (Spec Mode only): phase, allowed tools, workflow commands
- * 4. Commands — Available slash commands with triggers and descriptions
- * 5. Context Note — Brief explanation of how context is assembled
+ * 1. Identity         — What Elefant is and the agent's role
+ * 2. Tool Inventory   — Categorized tool list with names and descriptions
+ * 3. Workflow Section — Conditional (Spec Mode only): phase guidance, relevant tools/commands
+ * 4. Slash Commands   — Available slash commands with triggers and descriptions
+ * 5. Context Note     — Brief explanation of how context is assembled
  *
  * Token budget:
  * - Quick Mode baseline: ≤2000 tokens
@@ -16,6 +16,9 @@
  */
 
 import type { ToolRegistry } from '../tools/registry.ts'
+import { buildToolInventorySection } from './system-prompt/tool-inventory.ts'
+import { buildWorkflowSection } from './system-prompt/workflow-section.ts'
+import { buildCommandsSection, type CommandEntry } from './system-prompt/command-listing.ts'
 
 export interface WorkflowPromptState {
 	readonly phase: string
@@ -23,16 +26,14 @@ export interface WorkflowPromptState {
 	readonly totalWaves?: number
 }
 
-export interface SystemPromptCommand {
-	readonly trigger: string
-	readonly description: string
-}
+/** @deprecated Use CommandEntry from './system-prompt/command-listing.ts' instead. */
+export type SystemPromptCommand = CommandEntry
 
 export interface SystemPromptContext {
 	readonly toolRegistry: Pick<ToolRegistry, 'getAll'>
 	readonly sessionMode: 'spec' | 'quick'
 	readonly workflowState?: WorkflowPromptState
-	readonly commands: readonly SystemPromptCommand[]
+	readonly commands: readonly CommandEntry[]
 }
 
 function joinSections(sections: readonly string[]): string {
@@ -63,50 +64,6 @@ export function buildIdentitySection(): string {
 	].join('\n')
 }
 
-export function buildToolInventorySection(registry: Pick<ToolRegistry, 'getAll'>): string {
-	const tools = registry.getAll()
-	if (tools.length === 0) {
-		return ['## Tool Inventory', '- No tools are currently registered.'].join('\n')
-	}
-
-	const lines = ['## Tool Inventory']
-	for (const tool of tools) {
-		lines.push(`- ${tool.name} — ${tool.description}`)
-	}
-	return lines.join('\n')
-}
-
-export function buildWorkflowSection(
-	ctx: Pick<SystemPromptContext, 'sessionMode' | 'workflowState'>,
-): string {
-	if (ctx.sessionMode !== 'spec' || !ctx.workflowState) {
-		return ''
-	}
-
-	const wave =
-		ctx.workflowState.currentWave !== undefined && ctx.workflowState.totalWaves !== undefined
-			? ` | Wave: ${ctx.workflowState.currentWave}/${ctx.workflowState.totalWaves}`
-			: ''
-
-	return [
-		'## Workflow',
-		`- Spec Mode active. Phase: ${ctx.workflowState.phase}${wave}`,
-		'- Follow phase gates and prefer workflow tools/commands for workflow state changes.',
-	].join('\n')
-}
-
-export function buildCommandsSection(commands: SystemPromptContext['commands']): string {
-	if (commands.length === 0) {
-		return ['## Commands', '- No slash commands are currently registered.'].join('\n')
-	}
-
-	const lines = ['## Commands']
-	for (const command of commands) {
-		lines.push(`- ${command.trigger} — ${command.description}`)
-	}
-	return lines.join('\n')
-}
-
 export function buildContextNoteSection(): string {
 	return [
 		'## Context Assembly',
@@ -114,3 +71,6 @@ export function buildContextNoteSection(): string {
 		'- Treat injected context as authoritative when it is more specific than general instructions.',
 	].join('\n')
 }
+
+// Re-export section builders for isolated testing and backward compatibility.
+export { buildToolInventorySection, buildWorkflowSection, buildCommandsSection, type CommandEntry }

@@ -43,8 +43,8 @@ describe('system-prompt-builder', () => {
 
 		expect(prompt.length).toBeGreaterThan(0)
 		expect(prompt).toContain('## Identity')
-		expect(prompt).toContain('## Tool Inventory')
-		expect(prompt).toContain('## Commands')
+		expect(prompt).toContain('## Available Tools')
+		expect(prompt).toContain('## Slash Commands')
 		expect(prompt).toContain('## Context Assembly')
 	})
 
@@ -55,9 +55,9 @@ describe('system-prompt-builder', () => {
 		}))
 
 		const identity = prompt.indexOf('## Identity')
-		const tools = prompt.indexOf('## Tool Inventory')
-		const workflow = prompt.indexOf('## Workflow')
-		const commands = prompt.indexOf('## Commands')
+		const tools = prompt.indexOf('## Available Tools')
+		const workflow = prompt.indexOf('## Workflow Mode:')
+		const commands = prompt.indexOf('## Slash Commands')
 		const context = prompt.indexOf('## Context Assembly')
 
 		expect(identity).toBeGreaterThanOrEqual(0)
@@ -73,7 +73,7 @@ describe('system-prompt-builder', () => {
 			workflowState: { phase: 'execute', currentWave: 5, totalWaves: 6 },
 		}))
 
-		expect(prompt).not.toContain('## Workflow')
+		expect(prompt).not.toContain('## Workflow Mode:')
 	})
 
 	it('includes workflow section in Spec Mode with active workflow', () => {
@@ -82,13 +82,12 @@ describe('system-prompt-builder', () => {
 			workflowState: { phase: 'execute', currentWave: 5, totalWaves: 6 },
 		}))
 
-		expect(prompt).toContain('## Workflow')
-		expect(prompt).toContain('Phase: execute | Wave: 5/6')
+		expect(prompt).toContain('## Workflow Mode: Spec (Phase: execute | Wave 5/6)')
 	})
 
 	it('exposes each section generator for isolated testing', () => {
 		expect(buildIdentitySection()).toContain('## Identity')
-		expect(buildToolInventorySection(createContext().toolRegistry)).toContain('read — Read a file')
+		expect(buildToolInventorySection(createContext().toolRegistry)).toContain('**read** — Read a file')
 		expect(buildWorkflowSection({ sessionMode: 'quick' })).toBe('')
 		expect(buildCommandsSection(createContext().commands)).toContain('/status — Show current workflow state')
 		expect(buildContextNoteSection()).toContain('## Context Assembly')
