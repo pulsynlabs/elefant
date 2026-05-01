@@ -9,7 +9,7 @@ interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-	daemonUrl: 'http://localhost:1337',
+	daemonUrl: '',
 	autoStartDaemon: false,
 };
 
