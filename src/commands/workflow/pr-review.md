@@ -17,7 +17,7 @@ When a PR is ready for review and you want it checked against the spec's accepta
    - PR title, description, author, changed files, diff.
    - CI status and test results (if available).
    - Review comments already posted.
-3. Read the locked SPEC's validation contract via `spec_spec.read({ workflowId, section: "validation-contract" })`.
+3. Read the locked SPEC's validation contract via `wf_spec.read({ workflowId, section: "validation-contract" })`.
 4. Dispatch the `verifier` agent via `task({ subagent_type: "verifier", contextMode: "none", input: { validationContract, prDiff, prDescription } })`.
 5. The verifier checks:
    - Does the PR address every must-have it claims to?
@@ -32,12 +32,12 @@ When a PR is ready for review and you want it checked against the spec's accepta
    - Approve with comments (minor issues only)
    - Request changes (moderate issues)
    - Block merge (major issues)
-8. Log the review to ADL: `spec_adl.append({ type: "observation", title: "PR reviewed", body: "PR <url> reviewed. N findings: X minor, Y moderate, Z major." })`.
+8. Log the review to ADL: `wf_adl.append({ type: "observation", title: "PR reviewed", body: "PR <url> reviewed. N findings: X minor, Y moderate, Z major." })`.
 
 ## Tools Used
 - `task` — dispatch researcher and verifier agents
-- `spec_spec.read` — read the validation contract
-- `spec_adl.append` — log the review decision
+- `wf_spec.read` — read the validation contract
+- `wf_adl.append` — log the review decision
 
 ## Autopilot Behavior
 When `autopilot=true`:

@@ -65,6 +65,16 @@ function createFixture(): CompactionFixture {
     hooks,
     db,
     state,
+    project: {
+      projectId,
+      projectPath: tempDir,
+      elefantDir: join(tempDir, '.elefant'),
+      dbPath: join(tempDir, 'db.sqlite'),
+      statePath: join(tempDir, '.elefant', 'state.json'),
+      logsDir: join(tempDir, '.elefant', 'logs'),
+      checkpointsDir: join(tempDir, '.elefant', 'checkpoints'),
+      memoryDir: join(tempDir, '.elefant', 'memory'),
+    },
     tools: {
       getAll: () => [{ name: 'read' }, { name: 'write' }],
     },

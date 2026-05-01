@@ -86,7 +86,7 @@ describe('SpecDocumentsRepo document writes', () => {
 	it('writeSpec on locked workflow throws SpecLockedError and does not update content', () => {
 		const { database, workflowId, documents } = setup();
 		documents.writeSpec(workflowId, 'old');
-		database.db.run('UPDATE spec_workflows SET spec_locked = 1 WHERE id = ?', [workflowId]);
+		database.db.run('UPDATE spec_workflows SET locked = 1 WHERE id = ?', [workflowId]);
 		expect(() => documents.writeSpec(workflowId, 'new')).toThrow(SpecLockedError);
 		expect(documents.getSpec(workflowId)!.contentMd).toBe('old');
 	});
@@ -135,7 +135,7 @@ describe('SpecDocumentsRepo.applyAmendment', () => {
 		const { database, workflowId, documents, mustHaves } = setup();
 		const mh = mustHaves.create({ workflowId, mhId: 'MH1', title: 'Old', description: 'Desc', ordinal: 1 });
 		documents.writeSpec(workflowId, 'old spec');
-		database.db.run('UPDATE spec_workflows SET spec_locked = 1 WHERE id = ?', [workflowId]);
+		database.db.run('UPDATE spec_workflows SET locked = 1 WHERE id = ?', [workflowId]);
 
 		const result = documents.applyAmendment(workflowId, {
 			rationale: 'rename must-have',
@@ -146,7 +146,7 @@ describe('SpecDocumentsRepo.applyAmendment', () => {
 
 		expect(result.version).toBe(1);
 		expect(mustHaves.getById(mh.id)!.title).toBe('New');
-		expect((database.db.query('SELECT spec_locked FROM spec_workflows WHERE id = ?').get(workflowId) as { spec_locked: number }).spec_locked).toBe(1);
+		expect((database.db.query('SELECT locked FROM spec_workflows WHERE id = ?').get(workflowId) as { locked: number }).locked).toBe(1);
 		const rows = amendmentRows(database, workflowId);
 		expect(rows).toHaveLength(1);
 		expect(rows[0]!.rationale).toBe('rename must-have');
@@ -168,7 +168,7 @@ describe('SpecDocumentsRepo.applyAmendment', () => {
 	it('rolls back mutation, lock change, and amendment row on failure', () => {
 		const { database, workflowId, documents, mustHaves } = setup();
 		const mh = mustHaves.create({ workflowId, mhId: 'MH1', title: 'Old', description: 'Desc', ordinal: 1 });
-		database.db.run('UPDATE spec_workflows SET spec_locked = 1 WHERE id = ?', [workflowId]);
+		database.db.run('UPDATE spec_workflows SET locked = 1 WHERE id = ?', [workflowId]);
 
 		expect(() => documents.applyAmendment(workflowId, {
 			rationale: 'bad',
@@ -179,7 +179,7 @@ describe('SpecDocumentsRepo.applyAmendment', () => {
 		})).toThrow('boom');
 
 		expect(mustHaves.getById(mh.id)!.title).toBe('Old');
-		expect((database.db.query('SELECT spec_locked FROM spec_workflows WHERE id = ?').get(workflowId) as { spec_locked: number }).spec_locked).toBe(1);
+		expect((database.db.query('SELECT locked FROM spec_workflows WHERE id = ?').get(workflowId) as { locked: number }).locked).toBe(1);
 		expect(amendmentRows(database, workflowId)).toHaveLength(0);
 	});
 
@@ -187,7 +187,7 @@ describe('SpecDocumentsRepo.applyAmendment', () => {
 		const { database, workflowId, documents, mustHaves } = setup(false);
 		const mh = mustHaves.create({ workflowId, mhId: 'MH1', title: 'Old', description: 'Desc', ordinal: 1 });
 		documents.applyAmendment(workflowId, { rationale: 'unlocked amend', mutate: (ctx) => ctx.mustHaves.update(mh.id, { title: 'New' }, { amend: true }) });
-		expect((database.db.query('SELECT spec_locked FROM spec_workflows WHERE id = ?').get(workflowId) as { spec_locked: number }).spec_locked).toBe(0);
+		expect((database.db.query('SELECT locked FROM spec_workflows WHERE id = ?').get(workflowId) as { locked: number }).locked).toBe(0);
 	});
 
 	it('missing workflow throws WorkflowNotFoundError', () => {
@@ -205,7 +205,7 @@ describe('SpecDocumentsRepo.applyAmendment', () => {
 			},
 		});
 		expect(mustHaves.get(workflowId, 'MH1')).not.toBeNull();
-		expect((database.db.query('SELECT spec_locked FROM spec_workflows WHERE id = ?').get(workflowId) as { spec_locked: number }).spec_locked).toBe(1);
+		expect((database.db.query('SELECT locked FROM spec_workflows WHERE id = ?').get(workflowId) as { locked: number }).locked).toBe(1);
 		expect(amendmentRows(database, workflowId)).toHaveLength(1);
 	});
 });

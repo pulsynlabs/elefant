@@ -51,7 +51,7 @@ type WorkflowLockRow = {
 	id: string;
 	project_id: string;
 	workflow_id: string;
-	spec_locked: number;
+	locked: number;
 };
 
 type AmendmentVersionRow = { v: number };
@@ -259,13 +259,13 @@ export class SpecDocumentsRepo extends BaseRepo {
 	): { version: number; amendmentId: string } {
 		return this.withTransaction(() => {
 			const workflow = this.db
-				.query('SELECT id, project_id, workflow_id, spec_locked FROM spec_workflows WHERE id = ?')
+				.query('SELECT id, project_id, workflow_id, locked FROM spec_workflows WHERE id = ?')
 				.get(workflowId) as WorkflowLockRow | null;
 			if (!workflow) {
 				throw new WorkflowNotFoundError({ code: 'WORKFLOW_NOT_FOUND', projectId: 'unknown', workflowId });
 			}
 
-			const wasLocked = workflow.spec_locked === 1;
+			const wasLocked = workflow.locked === 1;
 			const priorState = this.snapshotProtectedState(workflowId);
 			const versionRow = this.db
 				.query('SELECT COALESCE(MAX(version), 0) AS v FROM spec_amendments WHERE workflow_id = ?')
@@ -273,7 +273,7 @@ export class SpecDocumentsRepo extends BaseRepo {
 			const nextVersion = versionRow.v + 1;
 
 			if (wasLocked) {
-				this.db.run('UPDATE spec_workflows SET spec_locked = 0, updated_at = ?, last_activity = ? WHERE id = ?', [
+				this.db.run('UPDATE spec_workflows SET locked = 0, updated_at = ?, last_activity = ? WHERE id = ?', [
 					new Date().toISOString(),
 					new Date().toISOString(),
 					workflowId,
@@ -288,7 +288,7 @@ export class SpecDocumentsRepo extends BaseRepo {
 
 			if (wasLocked) {
 				const now = new Date().toISOString();
-				this.db.run('UPDATE spec_workflows SET spec_locked = 1, updated_at = ?, last_activity = ? WHERE id = ?', [now, now, workflowId]);
+				this.db.run('UPDATE spec_workflows SET locked = 1, updated_at = ?, last_activity = ? WHERE id = ?', [now, now, workflowId]);
 			}
 
 			const newState = this.snapshotProtectedState(workflowId);

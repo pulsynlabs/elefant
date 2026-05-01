@@ -190,7 +190,7 @@ export class BaseRepo {
 	/**
 	 * Assert that a protected write can proceed for a workflow.
 	 *
-	 * This helper reads `spec_workflows.spec_locked` and throws `SpecLockedError`
+	 * This helper reads `spec_workflows.locked` and throws `SpecLockedError`
 	 * when the workflow is locked and the caller is not running an amendment.
 	 * Outside a transaction, the read+subsequent write would be a TOCTOU window;
 	 * therefore every lock-protected public write MUST call this from inside
@@ -208,8 +208,8 @@ export class BaseRepo {
 		if (opts?.amend) return;
 
 		const row = this.db
-			.query('SELECT project_id, workflow_id, spec_locked FROM spec_workflows WHERE id = ?')
-			.get(workflowId) as { project_id: string; workflow_id: string; spec_locked: number } | null;
+			.query('SELECT project_id, workflow_id, locked FROM spec_workflows WHERE id = ?')
+			.get(workflowId) as { project_id: string; workflow_id: string; locked: number } | null;
 
 		if (!row) {
 			throw new WorkflowNotFoundError({
@@ -219,7 +219,7 @@ export class BaseRepo {
 			});
 		}
 
-		if (row.spec_locked === 1) {
+		if (row.locked === 1) {
 			throw new SpecLockedError({
 				workflowId,
 				attempted,

@@ -50,6 +50,8 @@ describe('runMigrations', () => {
 			{ version: 6 },
 			{ version: 7 },
 			{ version: 8 },
+			{ version: 9 },
+			{ version: 10 },
 		]);
 	});
 
@@ -63,7 +65,7 @@ describe('runMigrations', () => {
 
 		db.close();
 
-		expect(count.count).toBe(8);
+		expect(count.count).toBe(10);
 	});
 
 	it('rolls back a failing migration and keeps existing schema intact', () => {

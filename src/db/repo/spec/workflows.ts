@@ -33,7 +33,7 @@ type SpecWorkflowRow = {
 	status: string;
 	autopilot: number;
 	lazy_autopilot: number;
-	spec_locked: number;
+	locked: number;
 	acceptance_confirmed: number;
 	interview_complete: number;
 	interview_completed_at: string | null;
@@ -105,7 +105,7 @@ function rowToSpecWorkflow(row: SpecWorkflowRow): SpecWorkflow {
 		status: row.status,
 		autopilot: row.autopilot === 1,
 		lazyAutopilot: row.lazy_autopilot === 1,
-		specLocked: row.spec_locked === 1,
+		specLocked: row.locked === 1,
 		acceptanceConfirmed: row.acceptance_confirmed === 1,
 		interviewComplete: row.interview_complete === 1,
 		interviewCompletedAt: row.interview_completed_at,
@@ -135,7 +135,7 @@ function buildUpdate(
 		status: 'status',
 		autopilot: 'autopilot',
 		lazyAutopilot: 'lazy_autopilot',
-		specLocked: 'spec_locked',
+		specLocked: 'locked',
 		acceptanceConfirmed: 'acceptance_confirmed',
 		interviewComplete: 'interview_complete',
 		interviewCompletedAt: 'interview_completed_at',
@@ -223,7 +223,7 @@ export class SpecWorkflowsRepo extends BaseRepo {
 			this.db.run(
 				`INSERT INTO spec_workflows (
 					id, project_id, workflow_id, mode, depth, phase, status,
-					autopilot, lazy_autopilot, spec_locked, acceptance_confirmed,
+					autopilot, lazy_autopilot, locked, acceptance_confirmed,
 					interview_complete, interview_completed_at, current_wave, total_waves,
 					is_active, last_activity, created_at, updated_at
 				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

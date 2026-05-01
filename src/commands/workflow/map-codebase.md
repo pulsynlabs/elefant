@@ -20,12 +20,12 @@ When starting work on an existing project where you need to understand the codeb
    - Notes **concerns:** known gotchas, tech debt indicators, missing tests.
 3. The explorer writes findings to `PROJECT_KNOWLEDGE_BASE.md` in the project root.
 4. The explorer saves structured observations to memory with concepts: `["codebase", projectId, "exploration"]`.
-5. Log the exploration to ADL: `spec_adl.append({ type: "observation", title: "Codebase mapped", body: "Explorer produced PKB with N sections covering stack, patterns, and concerns." })`.
+5. Log the exploration to ADL: `wf_adl.append({ type: "observation", title: "Codebase mapped", body: "Explorer produced PKB with N sections covering stack, patterns, and concerns." })`.
 6. Present a summary of the top 5 findings to the user.
 
 ## Tools Used
 - `task` — dispatch explorer agent
-- `spec_adl.append` — log exploration observation
+- `wf_adl.append` — log exploration observation
 - `memory_save` — persist structured findings for future retrieval
 
 ## Autopilot Behavior

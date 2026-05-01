@@ -66,7 +66,7 @@ describe('MustHavesRepo', () => {
 	it('update on locked workflow throws SpecLockedError', () => {
 		const { database, workflowId, repo } = setup();
 		const created = repo.create({ workflowId, mhId: 'MH1', title: 'A', description: 'A', ordinal: 1 });
-		database.db.run('UPDATE spec_workflows SET spec_locked = 1 WHERE id = ?', [workflowId]);
+		database.db.run('UPDATE spec_workflows SET locked = 1 WHERE id = ?', [workflowId]);
 		expect(() => repo.update(created.id, { title: 'B' })).toThrow(SpecLockedError);
 		expect(repo.getById(created.id)!.title).toBe('A');
 	});
@@ -81,7 +81,7 @@ describe('MustHavesRepo', () => {
 	it('delete on locked workflow throws SpecLockedError', () => {
 		const { database, workflowId, repo } = setup();
 		const created = repo.create({ workflowId, mhId: 'MH1', title: 'A', description: 'A', ordinal: 1 });
-		database.db.run('UPDATE spec_workflows SET spec_locked = 1 WHERE id = ?', [workflowId]);
+		database.db.run('UPDATE spec_workflows SET locked = 1 WHERE id = ?', [workflowId]);
 		expect(() => repo.delete(created.id)).toThrow(SpecLockedError);
 		expect(repo.getById(created.id)).not.toBeNull();
 	});
@@ -105,7 +105,7 @@ describe('MustHavesRepo', () => {
 		const mh = repo.create({ workflowId, mhId: 'MH1', title: 'A', description: 'A', ordinal: 1 });
 		const ac = repo.addAcceptanceCriterion({ mustHaveId: mh.id, acId: 'AC1.1', text: 'Works', ordinal: 1 });
 		expect(ac.acId).toBe('AC1.1');
-		database.db.run('UPDATE spec_workflows SET spec_locked = 1 WHERE id = ?', [workflowId]);
+		database.db.run('UPDATE spec_workflows SET locked = 1 WHERE id = ?', [workflowId]);
 		expect(() => repo.addAcceptanceCriterion({ mustHaveId: mh.id, acId: 'AC1.2', text: 'Locked', ordinal: 2 })).toThrow(SpecLockedError);
 	});
 
@@ -136,7 +136,7 @@ describe('MustHavesRepo', () => {
 	it('addValidationContract on locked workflow throws SpecLockedError', () => {
 		const { database, workflowId, repo } = setup();
 		const mh = repo.create({ workflowId, mhId: 'MH1', title: 'A', description: 'A', ordinal: 1 });
-		database.db.run('UPDATE spec_workflows SET spec_locked = 1 WHERE id = ?', [workflowId]);
+		database.db.run('UPDATE spec_workflows SET locked = 1 WHERE id = ?', [workflowId]);
 		expect(() => repo.addValidationContract({ mustHaveId: mh.id, vcId: 'VC1.A', text: 'Must', ordinal: 1 })).toThrow(SpecLockedError);
 	});
 
