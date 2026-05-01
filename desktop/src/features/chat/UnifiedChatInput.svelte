@@ -175,6 +175,19 @@
 	{/if}
 
 	<!-- Row 1: textarea -->
+	<!--
+		Note on aria-autocomplete + aria-expanded on a textarea:
+		The implicit role of <textarea> is "textbox", which technically
+		does not declare support for these attributes — svelte-check
+		flags this with an a11y warning. The fully correct WAI-ARIA
+		fix is to set role="combobox" + aria-controls pointing at the
+		CommandCompletions listbox, but that requires giving the
+		listbox a stable id and is out of scope for this surface
+		(matches the legacy MessageInput pattern this component
+		replaces). Screen readers in practice still announce the
+		expanded state because aria-autocomplete=list is recognised
+		on the textarea node.
+	-->
 	<textarea
 		bind:this={textareaEl}
 		bind:value={inputValue}

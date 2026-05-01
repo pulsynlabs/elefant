@@ -244,6 +244,30 @@
 		for (let i = 0; i < groupIdx; i++) n += groups[i].options.length;
 		return n + optionIdx;
 	}
+
+	// --- Motion ---------------------------------------------------------
+	//
+	// Svelte's `scale` / `fade` directives are JS-driven, so a CSS
+	// `@media (prefers-reduced-motion: reduce)` rule cannot disable them.
+	// Mirror the helper used in ChatView / SpecModeView: read the media
+	// query at call time and zero the duration when the user has opted
+	// out. The base values below are aligned with Quire motion tokens
+	// (`--duration-fast` ≈ 150ms, `--duration-instant` ≈ 50ms — we use
+	// 100ms for the exit fade as a midpoint that feels brisk without
+	// being abrupt) and the constants are mirrored at call sites with
+	// comments tying them back to the tokens.
+	function motionDuration(base: number): number {
+		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+			return base;
+		}
+		return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : base;
+	}
+
+	// Mirrors --duration-fast (150ms) for the popover entrance scale.
+	const POPOVER_IN_MS = 150;
+	// Slightly faster than entrance (~midpoint of --duration-instant 50ms
+	// and --duration-fast 150ms) — the popover should disappear briskly.
+	const POPOVER_OUT_MS = 100;
 </script>
 
 <div class="model-selector">
@@ -286,8 +310,8 @@
 			style:left="{popoverRect.left}px"
 			style:min-width="{popoverRect.width}px"
 			onkeydown={onPopoverKeydown}
-			in:scale={{ duration: 150, start: 0.96, easing: quintOut }}
-			out:fade={{ duration: 100 }}
+			in:scale={{ duration: motionDuration(POPOVER_IN_MS), start: 0.96, easing: quintOut }}
+			out:fade={{ duration: motionDuration(POPOVER_OUT_MS) }}
 		>
 			{#each groups as group, gi (group.label ?? `__flat-${gi}`)}
 				<div class="group" role="group" aria-label={group.label ?? 'Models'}>
