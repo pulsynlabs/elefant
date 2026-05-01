@@ -12,7 +12,7 @@ import { MustHavesRepo } from '../db/repo/spec/must-haves.ts';
 import { SpecTasksRepo } from '../db/repo/spec/tasks.ts';
 import { HookRegistry } from '../hooks/registry.ts';
 import { StateManager } from '../state/manager.ts';
-import { mountSpecRoutes } from './routes-spec.ts';
+import { mountWorkflowRoutes } from './routes-spec.ts';
 
 type TestContext = {
 	app: Elysia;
@@ -47,7 +47,7 @@ beforeEach(async () => {
 		hookRegistry: hooks,
 	});
 	const app = new Elysia();
-	mountSpecRoutes(app, { db, stateManager, hookRegistry: hooks });
+	mountWorkflowRoutes(app, { db, stateManager, hookRegistry: hooks });
 
 	ctx = { app, db, hooks, projectId, projectPath };
 });
@@ -63,7 +63,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<{ status: n
 }
 
 async function createWorkflow(workflowId = `workflow-${crypto.randomUUID().slice(0, 8)}`) {
-	const created = await request<Record<string, unknown>>(`/api/spec/projects/${ctx.projectId}/workflows`, {
+	const created = await request<Record<string, unknown>>(`/api/wf/projects/${ctx.projectId}/workflows`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ workflowId, totalWaves: 2 }),
@@ -124,28 +124,28 @@ function seedBlueprint(publicWorkflowId: string): { taskId: string } {
 }
 
 describe('spec workflow and document routes', () => {
-	it('GET /api/spec/projects/:id/workflows returns workflow list', async () => {
+	it('GET /api/wf/projects/:id/workflows returns workflow list', async () => {
 		await createWorkflow('alpha');
-		const response = await request<unknown[]>(`/api/spec/projects/${ctx.projectId}/workflows`);
+		const response = await request<unknown[]>(`/api/wf/projects/${ctx.projectId}/workflows`);
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data).toHaveLength(1);
 	});
 
-	it('POST /api/spec/projects/:id/workflows creates a workflow', async () => {
+	it('POST /api/wf/projects/:id/workflows creates a workflow', async () => {
 		const response = await createWorkflow('created-workflow');
 		expect(response.workflowId).toBe('created-workflow');
 	});
 
-	it('GET /api/spec/workflows/:id returns a workflow', async () => {
+	it('GET /api/wf/workflows/:id returns a workflow', async () => {
 		await createWorkflow('fetchable');
-		const response = await request<Record<string, unknown>>('/api/spec/workflows/fetchable');
+		const response = await request<Record<string, unknown>>('/api/wf/workflows/fetchable');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data.workflowId).toBe('fetchable');
 	});
 
-	it('PATCH /api/spec/workflows/:id/phase transitions phase', async () => {
+	it('PATCH /api/wf/workflows/:id/phase transitions phase', async () => {
 		await createWorkflow('phaseful');
-		const response = await request<Record<string, unknown>>('/api/spec/workflows/phaseful/phase', {
+		const response = await request<Record<string, unknown>>('/api/wf/workflows/phaseful/phase', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ to: 'discuss' }),
@@ -154,26 +154,26 @@ describe('spec workflow and document routes', () => {
 		expect('data' in response.body && response.body.data.phase).toBe('discuss');
 	});
 
-	it('POST /api/spec/workflows/:id/lock locks spec and is idempotent', async () => {
+	it('POST /api/wf/workflows/:id/lock locks spec and is idempotent', async () => {
 		await createWorkflow('lockable');
-		const first = await request<Record<string, unknown>>('/api/spec/workflows/lockable/lock', { method: 'POST' });
-		const second = await request<Record<string, unknown>>('/api/spec/workflows/lockable/lock', { method: 'POST' });
+		const first = await request<Record<string, unknown>>('/api/wf/workflows/lockable/lock', { method: 'POST' });
+		const second = await request<Record<string, unknown>>('/api/wf/workflows/lockable/lock', { method: 'POST' });
 		expect(first.status).toBe(200);
 		expect(second.status).toBe(200);
 		expect('data' in second.body && second.body.data.specLocked).toBe(true);
 	});
 
-	it('POST /api/spec/workflows/:id/unlock unlocks spec', async () => {
+	it('POST /api/wf/workflows/:id/unlock unlocks spec', async () => {
 		await createWorkflow('unlockable');
-		await request('/api/spec/workflows/unlockable/lock', { method: 'POST' });
-		const response = await request<Record<string, unknown>>('/api/spec/workflows/unlockable/unlock', { method: 'POST' });
+		await request('/api/wf/workflows/unlockable/lock', { method: 'POST' });
+		const response = await request<Record<string, unknown>>('/api/wf/workflows/unlockable/unlock', { method: 'POST' });
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data.specLocked).toBe(false);
 	});
 
-	it('POST /api/spec/workflows/:id/amend triggers amendment flow', async () => {
+	it('POST /api/wf/workflows/:id/amend triggers amendment flow', async () => {
 		await createWorkflow('amendable');
-		const response = await request<Record<string, unknown>>('/api/spec/workflows/amendable/amend', {
+		const response = await request<Record<string, unknown>>('/api/wf/workflows/amendable/amend', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ rationale: 'Clarify scope' }),
@@ -182,9 +182,9 @@ describe('spec workflow and document routes', () => {
 		expect('data' in response.body && response.body.data.specLocked).toBe(true);
 	});
 
-	it('POST /api/spec/projects/:id/workflows/active sets active workflow', async () => {
+	it('POST /api/wf/projects/:id/workflows/active sets active workflow', async () => {
 		await createWorkflow('active-one');
-		const response = await request<Record<string, unknown>>(`/api/spec/projects/${ctx.projectId}/workflows/active`, {
+		const response = await request<Record<string, unknown>>(`/api/wf/projects/${ctx.projectId}/workflows/active`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ workflowId: 'active-one' }),
@@ -193,57 +193,57 @@ describe('spec workflow and document routes', () => {
 		expect('data' in response.body && response.body.data.isActive).toBe(true);
 	});
 
-	it('GET /api/spec/workflows/:id/spec returns structured spec content', async () => {
+	it('GET /api/wf/workflows/:id/spec returns structured spec content', async () => {
 		await createWorkflow('structured');
 		seedDocuments('structured');
-		const response = await request<{ mustHaves: unknown[] }>('/api/spec/workflows/structured/spec');
+		const response = await request<{ mustHaves: unknown[] }>('/api/wf/workflows/structured/spec');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data.mustHaves).toHaveLength(1);
 	});
 
-	it('GET /api/spec/workflows/:id/requirements returns requirements document', async () => {
+	it('GET /api/wf/workflows/:id/requirements returns requirements document', async () => {
 		await createWorkflow('requirements');
 		seedDocuments('requirements');
-		const response = await request<Record<string, unknown>>('/api/spec/workflows/requirements/requirements');
+		const response = await request<Record<string, unknown>>('/api/wf/workflows/requirements/requirements');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data?.docType).toBe('REQUIREMENTS');
 	});
 
-	it('GET /api/spec/workflows/:id/blueprint returns blueprint document', async () => {
+	it('GET /api/wf/workflows/:id/blueprint returns blueprint document', async () => {
 		await createWorkflow('blueprint-doc');
 		seedDocuments('blueprint-doc');
-		const response = await request<Record<string, unknown>>('/api/spec/workflows/blueprint-doc/blueprint');
+		const response = await request<Record<string, unknown>>('/api/wf/workflows/blueprint-doc/blueprint');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data?.docType).toBe('BLUEPRINT');
 	});
 
-	it('GET /api/spec/workflows/:id/chronicle lists chronicle entries', async () => {
+	it('GET /api/wf/workflows/:id/chronicle lists chronicle entries', async () => {
 		await createWorkflow('chronicle-doc');
 		seedDocuments('chronicle-doc');
-		const response = await request<unknown[]>('/api/spec/workflows/chronicle-doc/chronicle');
+		const response = await request<unknown[]>('/api/wf/workflows/chronicle-doc/chronicle');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data).toHaveLength(1);
 	});
 
-	it('GET /api/spec/workflows/:id/adl lists ADL entries', async () => {
+	it('GET /api/wf/workflows/:id/adl lists ADL entries', async () => {
 		await createWorkflow('adl-doc');
 		seedDocuments('adl-doc');
-		const response = await request<unknown[]>('/api/spec/workflows/adl-doc/adl');
+		const response = await request<unknown[]>('/api/wf/workflows/adl-doc/adl');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data).toHaveLength(1);
 	});
 
-	it('GET /api/spec/workflows/:id/render/requirements returns rendered markdown', async () => {
+	it('GET /api/wf/workflows/:id/render/requirements returns rendered markdown', async () => {
 		await createWorkflow('rendered');
 		seedDocuments('rendered');
-		const response = await request<{ content: string }>('/api/spec/workflows/rendered/render/requirements');
+		const response = await request<{ content: string }>('/api/wf/workflows/rendered/render/requirements');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data.content).toContain('# REQUIREMENTS: rendered');
 	});
 
 	it('returns 400 on invalid phase transition', async () => {
 		await createWorkflow('invalid-phase');
-		const response = await request('/api/spec/workflows/invalid-phase/phase', {
+		const response = await request('/api/wf/workflows/invalid-phase/phase', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ to: 'audit' }),
@@ -253,14 +253,14 @@ describe('spec workflow and document routes', () => {
 	});
 
 	it('returns 404 on unknown workflowId', async () => {
-		const response = await request('/api/spec/workflows/missing');
+		const response = await request('/api/wf/workflows/missing');
 		expect(response.status).toBe(404);
 		expect('error' in response.body && response.body.error.code).toBe('WORKFLOW_NOT_FOUND');
 	});
 
 	it('returns 409 on duplicate workflow creation', async () => {
 		await createWorkflow('duplicate');
-		const response = await request(`/api/spec/projects/${ctx.projectId}/workflows`, {
+		const response = await request(`/api/wf/projects/${ctx.projectId}/workflows`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ workflowId: 'duplicate' }),
@@ -271,59 +271,59 @@ describe('spec workflow and document routes', () => {
 });
 
 describe('spec wave and task routes', () => {
-	it('GET /api/spec/workflows/:id/blueprint/waves lists waves with task counts', async () => {
+	it('GET /api/wf/workflows/:id/blueprint/waves lists waves with task counts', async () => {
 		await createWorkflow('waves-list');
 		seedBlueprint('waves-list');
-		const response = await request<Array<{ taskCount: number }>>('/api/spec/workflows/waves-list/blueprint/waves');
+		const response = await request<Array<{ taskCount: number }>>('/api/wf/workflows/waves-list/blueprint/waves');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data[0].taskCount).toBe(1);
 	});
 
-	it('POST /api/spec/workflows/:id/waves/:n/start starts a wave', async () => {
+	it('POST /api/wf/workflows/:id/waves/:n/start starts a wave', async () => {
 		await createWorkflow('wave-start');
 		seedBlueprint('wave-start');
-		const response = await request<Record<string, unknown>>('/api/spec/workflows/wave-start/waves/1/start', { method: 'POST' });
+		const response = await request<Record<string, unknown>>('/api/wf/workflows/wave-start/waves/1/start', { method: 'POST' });
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data.currentWave).toBe(1);
 	});
 
-	it('POST /api/spec/workflows/:id/waves/:n/complete completes a wave', async () => {
+	it('POST /api/wf/workflows/:id/waves/:n/complete completes a wave', async () => {
 		await createWorkflow('wave-complete');
 		seedBlueprint('wave-complete');
-		await request('/api/spec/workflows/wave-complete/waves/1/start', { method: 'POST' });
-		const response = await request<Record<string, unknown>>('/api/spec/workflows/wave-complete/waves/1/complete', { method: 'POST' });
+		await request('/api/wf/workflows/wave-complete/waves/1/start', { method: 'POST' });
+		const response = await request<Record<string, unknown>>('/api/wf/workflows/wave-complete/waves/1/complete', { method: 'POST' });
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data.currentWave).toBe(2);
 	});
 
-	it('GET /api/spec/workflows/:id/tasks lists tasks', async () => {
+	it('GET /api/wf/workflows/:id/tasks lists tasks', async () => {
 		await createWorkflow('tasks-list');
 		seedBlueprint('tasks-list');
-		const response = await request<unknown[]>('/api/spec/workflows/tasks-list/tasks');
+		const response = await request<unknown[]>('/api/wf/workflows/tasks-list/tasks');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data).toHaveLength(1);
 	});
 
-	it('GET /api/spec/workflows/:id/tasks filters tasks by status and wave', async () => {
+	it('GET /api/wf/workflows/:id/tasks filters tasks by status and wave', async () => {
 		await createWorkflow('tasks-filter');
 		seedBlueprint('tasks-filter');
-		const response = await request<unknown[]>('/api/spec/workflows/tasks-filter/tasks?status=pending&wave=1');
+		const response = await request<unknown[]>('/api/wf/workflows/tasks-filter/tasks?status=pending&wave=1');
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data).toHaveLength(1);
 	});
 
-	it('GET /api/spec/tasks/:taskId returns a task', async () => {
+	it('GET /api/wf/tasks/:taskId returns a task', async () => {
 		await createWorkflow('task-get');
 		const { taskId } = seedBlueprint('task-get');
-		const response = await request<Record<string, unknown>>(`/api/spec/tasks/${taskId}`);
+		const response = await request<Record<string, unknown>>(`/api/wf/tasks/${taskId}`);
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data.id).toBe(taskId);
 	});
 
-	it('POST /api/spec/tasks/:taskId/assign assigns a task', async () => {
+	it('POST /api/wf/tasks/:taskId/assign assigns a task', async () => {
 		await createWorkflow('task-assign');
 		const { taskId } = seedBlueprint('task-assign');
-		const response = await request<Record<string, unknown>>(`/api/spec/tasks/${taskId}/assign`, {
+		const response = await request<Record<string, unknown>>(`/api/wf/tasks/${taskId}/assign`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ agentRunId: 'run-1' }),
@@ -332,10 +332,10 @@ describe('spec wave and task routes', () => {
 		expect('data' in response.body && response.body.data.status).toBe('in_progress');
 	});
 
-	it('POST /api/spec/tasks/:taskId/complete completes a task', async () => {
+	it('POST /api/wf/tasks/:taskId/complete completes a task', async () => {
 		await createWorkflow('task-complete');
 		const { taskId } = seedBlueprint('task-complete');
-		const response = await request<Record<string, unknown>>(`/api/spec/tasks/${taskId}/complete`, {
+		const response = await request<Record<string, unknown>>(`/api/wf/tasks/${taskId}/complete`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ outputs: 'done' }),
@@ -344,10 +344,10 @@ describe('spec wave and task routes', () => {
 		expect('data' in response.body && response.body.data.status).toBe('complete');
 	});
 
-	it('POST /api/spec/tasks/:taskId/block blocks a task', async () => {
+	it('POST /api/wf/tasks/:taskId/block blocks a task', async () => {
 		await createWorkflow('task-block');
 		const { taskId } = seedBlueprint('task-block');
-		const response = await request<Record<string, unknown>>(`/api/spec/tasks/${taskId}/block`, {
+		const response = await request<Record<string, unknown>>(`/api/wf/tasks/${taskId}/block`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ reason: 'blocked by dependency' }),
@@ -356,15 +356,15 @@ describe('spec wave and task routes', () => {
 		expect('data' in response.body && response.body.data.status).toBe('blocked');
 	});
 
-	it('POST /api/spec/tasks/:taskId/reset resets a task', async () => {
+	it('POST /api/wf/tasks/:taskId/reset resets a task', async () => {
 		await createWorkflow('task-reset');
 		const { taskId } = seedBlueprint('task-reset');
-		await request(`/api/spec/tasks/${taskId}/assign`, {
+		await request(`/api/wf/tasks/${taskId}/assign`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ agentRunId: 'run-2' }),
 		});
-		const response = await request<Record<string, unknown>>(`/api/spec/tasks/${taskId}/reset`, { method: 'POST' });
+		const response = await request<Record<string, unknown>>(`/api/wf/tasks/${taskId}/reset`, { method: 'POST' });
 		expect(response.status).toBe(200);
 		expect('data' in response.body && response.body.data.status).toBe('pending');
 	});

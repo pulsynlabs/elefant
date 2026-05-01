@@ -274,7 +274,7 @@ function renderDocument(db: Database, workflowPk: string, docType: string): stri
 function createSpecRoutes(deps: SpecRouteDeps) {
 	const { db, stateManager, hookRegistry } = deps;
 
-	return new Elysia({ prefix: '/api/spec' })
+	return new Elysia({ prefix: '/api/wf' })
 		.get('/projects/:projectId/workflows', async ({ params, set }) => {
 			try {
 				return data(await stateManager.listSpecWorkflows(params.projectId));
@@ -331,7 +331,7 @@ function createSpecRoutes(deps: SpecRouteDeps) {
 			async ({ params, body, set }) => {
 				try {
 					const lookup = requireWorkflow(db, params.workflowId);
-					return data(await stateManager.transitionSpecPhase(lookup.projectId, lookup.workflowId, SpecWorkflowPhase.parse(body.to), {
+					return data(await stateManager.transitionPhase(lookup.projectId, lookup.workflowId, SpecWorkflowPhase.parse(body.to), {
 						force: body.force,
 						reason: body.reason,
 					}));
@@ -350,7 +350,7 @@ function createSpecRoutes(deps: SpecRouteDeps) {
 		.post('/workflows/:workflowId/lock', async ({ params, set }) => {
 			try {
 				const lookup = requireWorkflow(db, params.workflowId);
-				return data(await stateManager.lockSpec(lookup.projectId, lookup.workflowId));
+				return data(await stateManager.lock(lookup.projectId, lookup.workflowId));
 			} catch (caught) {
 				return respondError(set, caught);
 			}
@@ -358,7 +358,7 @@ function createSpecRoutes(deps: SpecRouteDeps) {
 		.post('/workflows/:workflowId/unlock', async ({ params, set }) => {
 			try {
 				const lookup = requireWorkflow(db, params.workflowId);
-				return data(await stateManager.unlockSpec(lookup.projectId, lookup.workflowId));
+				return data(await stateManager.unlock(lookup.projectId, lookup.workflowId));
 			} catch (caught) {
 				return respondError(set, caught);
 			}
@@ -567,9 +567,9 @@ function createSpecRoutes(deps: SpecRouteDeps) {
 		});
 }
 
-export const specRoutes = createSpecRoutes;
+export const workflowRoutes = createSpecRoutes;
 
-export function mountSpecRoutes(app: Elysia, deps: SpecRouteDeps): Elysia {
+export function mountWorkflowRoutes(app: Elysia, deps: SpecRouteDeps): Elysia {
 	app.use(createSpecRoutes(deps));
 	return app;
 }

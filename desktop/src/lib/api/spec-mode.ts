@@ -80,71 +80,71 @@ async function request<T>(
 
 export const specModeApi = {
 	async listWorkflows(projectId: string): Promise<SpecWorkflowSummary[]> {
-		return request(`/api/spec/projects/${encodeURIComponent(projectId)}/workflows`);
+		return request(`/api/wf/projects/${encodeURIComponent(projectId)}/workflows`);
 	},
 
 	async createWorkflow(
 		projectId: string,
 		input: { workflowId: string; mode?: string },
 	): Promise<SpecWorkflowSummary> {
-		return request(`/api/spec/projects/${encodeURIComponent(projectId)}/workflows`, {
+		return request(`/api/wf/projects/${encodeURIComponent(projectId)}/workflows`, {
 			method: 'POST',
 			body: JSON.stringify(input),
 		});
 	},
 
 	async getWorkflow(workflowId: string): Promise<SpecWorkflowSummary> {
-		return request(`/api/spec/workflows/${encodeURIComponent(workflowId)}`);
+		return request(`/api/wf/workflows/${encodeURIComponent(workflowId)}`);
 	},
 
 	async transitionPhase(workflowId: string, to: string, force?: boolean): Promise<SpecWorkflowSummary> {
-		return request(`/api/spec/workflows/${encodeURIComponent(workflowId)}/phase`, {
+		return request(`/api/wf/workflows/${encodeURIComponent(workflowId)}/phase`, {
 			method: 'PATCH',
 			body: JSON.stringify({ to, force }),
 		});
 	},
 
-	async lockSpec(workflowId: string): Promise<void> {
-		await request<SpecWorkflowSummary>(`/api/spec/workflows/${encodeURIComponent(workflowId)}/lock`, {
+	async lock(workflowId: string): Promise<void> {
+		await request<SpecWorkflowSummary>(`/api/wf/workflows/${encodeURIComponent(workflowId)}/lock`, {
 			method: 'POST',
 		});
 	},
 
 	async getSpec(workflowId: string): Promise<{ contentMd: string; mustHaves: unknown[] }> {
-		const spec = await request<StructuredSpecResponse>(`/api/spec/workflows/${encodeURIComponent(workflowId)}/spec`);
+		const spec = await request<StructuredSpecResponse>(`/api/wf/workflows/${encodeURIComponent(workflowId)}/spec`);
 		return { contentMd: spec.document?.contentMd ?? '', mustHaves: spec.mustHaves };
 	},
 
 	async getRendererd(workflowId: string, docType: string): Promise<{ content: string }> {
-		return request(`/api/spec/workflows/${encodeURIComponent(workflowId)}/render/${encodeURIComponent(docType)}`);
+		return request(`/api/wf/workflows/${encodeURIComponent(workflowId)}/render/${encodeURIComponent(docType)}`);
 	},
 
 	async listTasks(workflowId: string, opts?: { status?: string; wave?: number }): Promise<unknown[]> {
-		return request(`/api/spec/workflows/${encodeURIComponent(workflowId)}/tasks`, { query: opts });
+		return request(`/api/wf/workflows/${encodeURIComponent(workflowId)}/tasks`, { query: opts });
 	},
 
 	async assignTask(taskId: string, agentRunId: string): Promise<void> {
-		await request(`/api/spec/tasks/${encodeURIComponent(taskId)}/assign`, {
+		await request(`/api/wf/tasks/${encodeURIComponent(taskId)}/assign`, {
 			method: 'POST',
 			body: JSON.stringify({ agentRunId }),
 		});
 	},
 
 	async completeTask(taskId: string): Promise<void> {
-		await request(`/api/spec/tasks/${encodeURIComponent(taskId)}/complete`, {
+		await request(`/api/wf/tasks/${encodeURIComponent(taskId)}/complete`, {
 			method: 'POST',
 			body: JSON.stringify({}),
 		});
 	},
 
 	async startWave(workflowId: string, waveNumber: number): Promise<void> {
-		await request(`/api/spec/workflows/${encodeURIComponent(workflowId)}/waves/${waveNumber}/start`, {
+		await request(`/api/wf/workflows/${encodeURIComponent(workflowId)}/waves/${waveNumber}/start`, {
 			method: 'POST',
 		});
 	},
 
 	async completeWave(workflowId: string, waveNumber: number): Promise<void> {
-		await request(`/api/spec/workflows/${encodeURIComponent(workflowId)}/waves/${waveNumber}/complete`, {
+		await request(`/api/wf/workflows/${encodeURIComponent(workflowId)}/waves/${waveNumber}/complete`, {
 			method: 'POST',
 		});
 	},
