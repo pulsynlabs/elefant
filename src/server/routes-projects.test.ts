@@ -179,18 +179,19 @@ describe('mountProjectsSessionsRoutes', () => {
 			// Insert a session directly
 			const sessionId = crypto.randomUUID();
 			db.db.run(
-				'INSERT INTO sessions (id, project_id, workflow_id, phase, status, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+				"INSERT INTO sessions (id, project_id, workflow_id, mode, phase, status, started_at, completed_at) VALUES (?, ?, ?, 'spec', ?, ?, ?, ?)",
 				[sessionId, testProjectId, null, 'idle', 'pending', new Date().toISOString(), null],
 			);
 
 			const response = await app.handle(
 				new Request(`http://localhost/api/projects/${testProjectId}/sessions`),
 			);
-			const payload = (await response.json()) as { ok: boolean; data: unknown[] };
+			const payload = (await response.json()) as { ok: boolean; data: { mode: string }[] };
 
 			expect(response.status).toBe(200);
 			expect(payload.ok).toBe(true);
 			expect(payload.data).toHaveLength(1);
+			expect(payload.data[0].mode).toBe('spec');
 		});
 
 		it('returns 404 for missing project', async () => {
@@ -216,13 +217,65 @@ describe('mountProjectsSessionsRoutes', () => {
 			);
 			const payload = (await response.json()) as {
 				ok: boolean;
-				data: { id: string; projectId: string };
+				data: { id: string; projectId: string; mode: string };
 			};
 
 			expect(response.status).toBe(201);
 			expect(payload.ok).toBe(true);
 			expect(typeof payload.data.id).toBe('string');
 			expect(payload.data.projectId).toBe(testProjectId);
+			expect(payload.data.mode).toBe('quick');
+		});
+
+		it('returns 201 with mode=spec when requested', async () => {
+			const response = await app.handle(
+				new Request(`http://localhost/api/projects/${testProjectId}/sessions`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ mode: 'spec' }),
+				}),
+			);
+			const payload = (await response.json()) as {
+				ok: boolean;
+				data: { id: string; mode: string };
+			};
+
+			expect(response.status).toBe(201);
+			expect(payload.ok).toBe(true);
+			expect(payload.data.mode).toBe('spec');
+		});
+
+		it('returns 201 with mode=quick when requested', async () => {
+			const response = await app.handle(
+				new Request(`http://localhost/api/projects/${testProjectId}/sessions`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ mode: 'quick' }),
+				}),
+			);
+			const payload = (await response.json()) as {
+				ok: boolean;
+				data: { id: string; mode: string };
+			};
+
+			expect(response.status).toBe(201);
+			expect(payload.ok).toBe(true);
+			expect(payload.data.mode).toBe('quick');
+		});
+
+		it('returns 400 when mode is invalid', async () => {
+			const response = await app.handle(
+				new Request(`http://localhost/api/projects/${testProjectId}/sessions`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ mode: 'invalid' }),
+				}),
+			);
+			const payload = (await response.json()) as { error: string; message: string };
+
+			expect(response.status).toBe(400);
+			expect(payload.error).toBe('VALIDATION_ERROR');
+			expect(typeof payload.message).toBe('string');
 		});
 
 		it('returns 400 when title is not a string', async () => {

@@ -34,10 +34,13 @@ export const SessionStatusSchema = z.enum([
   'cancelled',
 ]);
 
+export const SessionModeSchema = z.enum(['spec', 'quick']);
+
 export const SessionRowSchema = z.object({
   id: z.string().uuid(),
   project_id: z.string().uuid(),
   workflow_id: z.string().nullable(),
+  mode: SessionModeSchema,
   phase: z.string().default('idle'),
   status: SessionStatusSchema,
   started_at: z.string(),
@@ -49,6 +52,7 @@ export type SessionRow = z.infer<typeof SessionRowSchema>;
 export const InsertSessionSchema = SessionRowSchema.extend({
   id: z.string().uuid().optional().default(() => crypto.randomUUID()),
   workflow_id: z.string().nullable().optional(),
+  mode: SessionModeSchema.optional().default('quick'),
   phase: z.string().optional(),
   status: SessionStatusSchema.optional(),
   started_at: z.string().optional(),

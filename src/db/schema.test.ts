@@ -38,6 +38,7 @@ function validSessionRow() {
     id: crypto.randomUUID(),
     project_id: crypto.randomUUID(),
     workflow_id: 'wf-123',
+    mode: 'quick' as const,
     phase: 'execute',
     status: 'running' as const,
     started_at: '2026-04-18T00:00:00Z',

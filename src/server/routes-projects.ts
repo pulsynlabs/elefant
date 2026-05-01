@@ -14,7 +14,7 @@ import {
 } from '../db/repo/projects.ts';
 import { insertSession, listSessionsByProject } from '../db/repo/sessions.ts';
 import type { ProjectRow } from '../db/schema.ts';
-import type { SessionRow } from '../db/schema.ts';
+import { SessionModeSchema, type SessionRow } from '../db/schema.ts';
 import type { ElefantError } from '../types/errors.ts';
 
 // ─── Response Mappers ────────────────────────────────────────────────────────
@@ -38,6 +38,7 @@ export function toSessionResponse(row: SessionRow) {
 		id: row.id,
 		projectId: row.project_id,
 		workflowId: row.workflow_id ?? null,
+		mode: row.mode,
 		phase: row.phase,
 		status: row.status,
 		startedAt: row.started_at,
@@ -53,6 +54,7 @@ const ProjectCreateBodySchema = z.object({
 
 const SessionCreateBodySchema = z.object({
 	title: z.string().optional(),
+	mode: SessionModeSchema.optional().default('quick'),
 });
 
 function mapErrorToStatus(error: ElefantError): number {
@@ -233,6 +235,7 @@ export function mountProjectsSessionsRoutes(app: Elysia, db: Database) {
 			const session = insertSession(db, {
 				id: crypto.randomUUID(),
 				project_id: params.id,
+				mode: parsed.data.mode,
 			});
 
 			if (!session.ok) {

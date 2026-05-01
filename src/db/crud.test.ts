@@ -144,6 +144,7 @@ describe('sessions repo', () => {
     expect(session.project_id).toBe(projectId);
     expect(session.status).toBe('running');
     expect(session.phase).toBe('idle');
+    expect(session.mode).toBe('quick');
 
     // Get by ID
     const byId = getSessionById(db, session.id);
@@ -159,6 +160,17 @@ describe('sessions repo', () => {
     expect(updated.ok).toBe(true);
     if (!updated.ok) return;
     expect(updated.data.status).toBe('completed');
+
+    // Update should reject mode changes (mode is immutable)
+    const rejectModeUpdate = updateSession(db, {
+      id: session.id,
+      mode: 'spec',
+    });
+    expect(rejectModeUpdate.ok).toBe(false);
+    if (!rejectModeUpdate.ok) {
+      expect(rejectModeUpdate.error.code).toBe('VALIDATION_ERROR');
+      expect(rejectModeUpdate.error.message).toContain('mode is immutable');
+    }
 
     // List by project
     const listed = listSessionsByProject(db, projectId);
