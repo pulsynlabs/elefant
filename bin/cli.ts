@@ -6,7 +6,8 @@ import type { ElefantError } from '../src/types/errors.ts';
 import type { Result } from '../src/types/result.ts';
 
 import { daemonStatus, startDaemon, stopDaemon } from '../src/daemon/lifecycle.ts';
-import { createBrowserServer } from '../src/commands/serve/index.ts';
+import { createBrowserServer, type BindMode } from '../src/commands/serve/index.ts';
+import { clearServeAuth, loadServeAuth, writeServeAuth } from '../src/commands/serve/serve-auth.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 // ---------------------------------------------------------------------------
@@ -21,6 +22,7 @@ export type Command =
 	| 'update'
 	| 'uninstall'
 	| 'serve'
+	| 'auth'
 	| '--version'
 	| '-v'
 	| '--help'
@@ -35,6 +37,7 @@ export function isCommand(value: string | undefined): value is Command {
 		value === 'update' ||
 		value === 'uninstall' ||
 		value === 'serve' ||
+		value === 'auth' ||
 		value === '--version' ||
 		value === '-v' ||
 		value === '--help' ||
@@ -55,6 +58,9 @@ Commands:
   restart     Stop then start the daemon
   status      Show daemon status
   serve       Serve the desktop UI in a browser (browser mode)
+              Options: --port <n>  --daemon-port <n>  --dist <path>
+                       --network   --tailscale[=detect]
+  auth        Manage browser-mode authentication credentials
   update      Print self-update instructions
   uninstall   Stop daemon and remove the installed binary
   --version   Print the installed version
@@ -204,51 +210,148 @@ async function runUninstall(_args: string[]): Promise<number> {
 	}
 }
 
-export function parseServeArgs(args: string[]): { port: number; daemonPort: number; distPath?: string } {
-	let port = Number(process.env.ELEFANT_UI_PORT) || 3000;
-	let daemonPort = Number(process.env.ELEFANT_DAEMON_PORT) || 1337;
-	let distPath: string | undefined;
+export function parseServeArgs(args: string[]): {
+  port: number;
+  daemonPort: number;
+  distPath?: string;
+  bindMode: BindMode;
+  tailscaleDetectOnly: boolean;
+} {
+  let port = Number(process.env.ELEFANT_UI_PORT) || 3000;
+  let daemonPort = Number(process.env.ELEFANT_DAEMON_PORT) || 1337;
+  let distPath: string | undefined;
+  let bindMode: BindMode = 'localhost';
+  let tailscaleDetectOnly = false;
 
-	for (let i = 0; i < args.length; i++) {
-		if (args[i] === '--port' && args[i + 1]) {
-			port = Number(args[++i]);
-		} else if (args[i] === '--daemon-port' && args[i + 1]) {
-			daemonPort = Number(args[++i]);
-		} else if (args[i] === '--dist' && args[i + 1]) {
-			distPath = args[++i];
-		}
-	}
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--port' && args[i + 1]) {
+      port = Number(args[++i]);
+    } else if (args[i] === '--daemon-port' && args[i + 1]) {
+      daemonPort = Number(args[++i]);
+    } else if (args[i] === '--dist' && args[i + 1]) {
+      distPath = args[++i];
+    } else if (args[i] === '--network') {
+      bindMode = 'network';
+    } else if (args[i] === '--tailscale') {
+      bindMode = 'tailscale';
+      tailscaleDetectOnly = false;
+    } else if (args[i]?.startsWith('--tailscale=')) {
+      bindMode = 'tailscale';
+      tailscaleDetectOnly = args[i].split('=', 2)[1] === 'detect';
+    }
+  }
 
-	return { port, daemonPort, distPath };
+  return { port, daemonPort, distPath, bindMode, tailscaleDetectOnly };
 }
 
 async function runServe(args: string[]): Promise<number> {
-	const { port, daemonPort, distPath } = parseServeArgs(args);
+  const { port, daemonPort, distPath, bindMode, tailscaleDetectOnly } = parseServeArgs(args);
 
-	const result = await createBrowserServer({ port, daemonPort, distPath });
-	if (!result.ok) {
-		console.error(`elefant serve: ${result.error.message}`);
-		return 1;
-	}
+  const result = await createBrowserServer({
+    port,
+    daemonPort,
+    distPath,
+    bindMode,
+    tailscaleDetectOnly,
+  });
+  if (!result.ok) {
+    console.error(`elefant serve: ${result.error.message}`);
+    return 1;
+  }
 
-	const { url } = result.data;
-	console.log(`Elefant UI:  ${url}`);
-	console.log(`Daemon:      http://localhost:${daemonPort}`);
-	console.log('Press Ctrl+C to stop.');
+  const { url } = result.data;
+  const tsIp = result.data.tailscaleIp;
 
-	// Keep alive until SIGINT/SIGTERM
-	await new Promise<void>((resolve) => {
-		process.on('SIGINT', () => {
-			result.data.server.stop();
-			resolve();
-		});
-		process.on('SIGTERM', () => {
-			result.data.server.stop();
-			resolve();
-		});
-	});
+  // Bind-mode-aware startup message
+  switch (bindMode) {
+    case 'network':
+      console.log(`Elefant UI:  ${url}  (network-accessible)`);
+      console.log(`Daemon:      http://localhost:${daemonPort}`);
+      break;
+    case 'tailscale':
+      console.log(`Elefant UI (Tailscale): ${tsIp ? `http://${tsIp}:${port}` : url}`);
+      console.log(`Daemon:                 http://localhost:${daemonPort}`);
+      break;
+    case 'localhost':
+    default:
+      console.log(`Elefant UI:  ${url}`);
+      console.log(`Daemon:      http://localhost:${daemonPort}`);
+      break;
+  }
+  console.log('Press Ctrl+C to stop.');
 
-	return 0;
+  // Keep alive until SIGINT/SIGTERM
+  await new Promise<void>((resolve) => {
+    process.on('SIGINT', () => {
+      result.data.server.stop();
+      resolve();
+    });
+    process.on('SIGTERM', () => {
+      result.data.server.stop();
+      resolve();
+    });
+  });
+
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Auth subcommand handlers
+// ---------------------------------------------------------------------------
+
+export async function runAuthSet(username: string | undefined, password: string | undefined): Promise<number> {
+  if (!username || !password) {
+    console.log('Usage: elefant auth set <user> <pass>');
+    return 1;
+  }
+
+  const result = await writeServeAuth(username, password);
+  if (!result.ok) {
+    console.error(result.error.message);
+    return 1;
+  }
+
+  console.log(`Auth credentials set for user: ${username}`);
+  return 0;
+}
+
+export async function runAuthStatus(): Promise<number> {
+  const result = await loadServeAuth();
+
+  if (!result.ok) {
+    if (result.error.code === 'FILE_NOT_FOUND') {
+      console.log('No auth credentials configured. Run: elefant auth set <user> <pass>');
+      return 0;
+    }
+    console.error(result.error.message);
+    return 1;
+  }
+
+  console.log(`Auth credentials configured for user: ${result.data.username}`);
+  return 0;
+}
+
+export async function runAuthClear(): Promise<number> {
+  const result = await clearServeAuth();
+
+  if (!result.ok) {
+    console.error(result.error.message);
+    return 1;
+  }
+
+  console.log('Auth credentials cleared.');
+  return 0;
+}
+
+export async function runAuth(args: string[]): Promise<number> {
+  const sub = args[0];
+
+  if (sub === 'set') return runAuthSet(args[1], args[2]);
+  if (sub === 'status') return runAuthStatus();
+  if (sub === 'clear') return runAuthClear();
+
+  console.log('Usage: elefant auth <set <user> <pass>|status|clear>');
+  return 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +366,7 @@ export const handlers: Record<Command, (args: string[]) => Promise<number>> = {
 	update: runUpdate,
 	uninstall: runUninstall,
 	serve: runServe,
+	auth: runAuth,
 	'--version': runVersion,
 	'-v': runVersion,
 	'--help': runHelp,

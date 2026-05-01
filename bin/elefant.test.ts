@@ -1,6 +1,7 @@
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
-import { handlers, isAllowedInstallPath, isCommand, parseServeArgs, restartDaemon } from './cli.ts';
+import { handlers, isAllowedInstallPath, isCommand, parseServeArgs, restartDaemon, runAuthSet } from './cli.ts';
 import type { Command } from './cli.ts';
+import { clearServeAuth } from '../src/commands/serve/serve-auth.ts';
 
 // ---------------------------------------------------------------------------
 // isCommand type guard
@@ -15,6 +16,7 @@ describe('isCommand', () => {
 		'update',
 		'uninstall',
 		'serve',
+		'auth',
 		'--version',
 		'-v',
 		'--help',
@@ -62,14 +64,15 @@ describe('handlers', () => {
 		'update',
 		'uninstall',
 		'serve',
+		'auth',
 		'--version',
 		'-v',
 		'--help',
 		'-h',
 	];
 
-	it('has exactly 11 entries (one per command string)', () => {
-		expect(Object.keys(handlers)).toHaveLength(11);
+	it('has exactly 12 entries (one per command string)', () => {
+		expect(Object.keys(handlers)).toHaveLength(12);
 	});
 
 	for (const cmd of expectedCommands) {
@@ -97,6 +100,7 @@ describe('handlers', () => {
 			'-h',
 			'update',
 			'uninstall',
+			'auth',
 		];
 		for (const cmd of stubCommands) {
 			const result = handlers[cmd]([]);
@@ -114,6 +118,7 @@ describe('handlers', () => {
 			'-h',
 			'update',
 			'uninstall',
+			'auth',
 		];
 		for (const cmd of safeCommands) {
 			const code = await handlers[cmd]([]);
@@ -335,3 +340,99 @@ describe('parseServeArgs env var defaults', () => {
 // (above), and manual end-to-end verification.  Unit-testing runServe
 // directly starts a real Bun.serve server which blocks on SIGINT/SIGTERM
 // — unsuitable for a unit test.
+
+// ---------------------------------------------------------------------------
+// parseServeArgs — bindMode flag parsing
+// ---------------------------------------------------------------------------
+
+describe('parseServeArgs bindMode flags', () => {
+  it('defaults to localhost bindMode with no flags', () => {
+    const result = parseServeArgs([]);
+    expect(result.bindMode).toBe('localhost');
+    expect(result.tailscaleDetectOnly).toBe(false);
+  });
+
+  it('--network sets bindMode to network', () => {
+    const result = parseServeArgs(['--network']);
+    expect(result.bindMode).toBe('network');
+    expect(result.tailscaleDetectOnly).toBe(false);
+  });
+
+  it('--tailscale sets bindMode to tailscale with detectOnly false', () => {
+    const result = parseServeArgs(['--tailscale']);
+    expect(result.bindMode).toBe('tailscale');
+    expect(result.tailscaleDetectOnly).toBe(false);
+  });
+
+  it('--tailscale=detect sets bindMode to tailscale with detectOnly true', () => {
+    const result = parseServeArgs(['--tailscale=detect']);
+    expect(result.bindMode).toBe('tailscale');
+    expect(result.tailscaleDetectOnly).toBe(true);
+  });
+
+  it('--tailscale=bind sets bindMode to tailscale with detectOnly false', () => {
+    const result = parseServeArgs(['--tailscale=bind']);
+    expect(result.bindMode).toBe('tailscale');
+    expect(result.tailscaleDetectOnly).toBe(false);
+  });
+
+  it('combines --network with other flags', () => {
+    const result = parseServeArgs(['--port', '8080', '--network', '--daemon-port', '9999']);
+    expect(result.port).toBe(8080);
+    expect(result.daemonPort).toBe(9999);
+    expect(result.bindMode).toBe('network');
+  });
+
+  it('combines --tailscale with other flags', () => {
+    const result = parseServeArgs(['--tailscale', '--port', '4000', '--dist', '/tmp/ui']);
+    expect(result.port).toBe(4000);
+    expect(result.bindMode).toBe('tailscale');
+    expect(result.distPath).toBe('/tmp/ui');
+  });
+
+  it('last bind flag wins (--network overrides --tailscale)', () => {
+    const result = parseServeArgs(['--tailscale', '--network']);
+    expect(result.bindMode).toBe('network');
+  });
+
+  it('--tailscale=detect overrides earlier --tailscale', () => {
+    const result = parseServeArgs(['--tailscale', '--tailscale=detect']);
+    expect(result.bindMode).toBe('tailscale');
+    expect(result.tailscaleDetectOnly).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runAuthSet — argument validation
+// ---------------------------------------------------------------------------
+
+describe('runAuthSet', () => {
+  afterEach(async () => {
+    await clearServeAuth();
+  });
+
+  it('exits 1 when username is undefined', async () => {
+    const code = await runAuthSet(undefined, 'password');
+    expect(code).toBe(1);
+  });
+
+  it('exits 1 when username is empty string', async () => {
+    const code = await runAuthSet('', 'password');
+    expect(code).toBe(1);
+  });
+
+  it('exits 1 when password is undefined', async () => {
+    const code = await runAuthSet('user', undefined);
+    expect(code).toBe(1);
+  });
+
+  it('exits 1 when password is empty string', async () => {
+    const code = await runAuthSet('user', '');
+    expect(code).toBe(1);
+  });
+
+  it('exits 0 when both username and password are provided', async () => {
+    const code = await runAuthSet('bob', 'hunter2');
+    expect(code).toBe(0);
+  });
+});
