@@ -6,6 +6,7 @@ import type { ElefantError } from '../src/types/errors.ts';
 import type { Result } from '../src/types/result.ts';
 
 import { daemonStatus, startDaemon, stopDaemon } from '../src/daemon/lifecycle.ts';
+import { createBrowserServer } from '../src/commands/serve/index.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 // ---------------------------------------------------------------------------
@@ -203,9 +204,50 @@ async function runUninstall(_args: string[]): Promise<number> {
 	}
 }
 
-async function runServe(_args: string[]): Promise<number> {
-	// Wave 2, Task 2.3: browser-mode static server
-	console.log('elefant serve: not yet implemented');
+export function parseServeArgs(args: string[]): { port: number; daemonPort: number; distPath?: string } {
+	let port = Number(process.env.ELEFANT_UI_PORT) || 3000;
+	let daemonPort = Number(process.env.ELEFANT_DAEMON_PORT) || 1337;
+	let distPath: string | undefined;
+
+	for (let i = 0; i < args.length; i++) {
+		if (args[i] === '--port' && args[i + 1]) {
+			port = Number(args[++i]);
+		} else if (args[i] === '--daemon-port' && args[i + 1]) {
+			daemonPort = Number(args[++i]);
+		} else if (args[i] === '--dist' && args[i + 1]) {
+			distPath = args[++i];
+		}
+	}
+
+	return { port, daemonPort, distPath };
+}
+
+async function runServe(args: string[]): Promise<number> {
+	const { port, daemonPort, distPath } = parseServeArgs(args);
+
+	const result = await createBrowserServer({ port, daemonPort, distPath });
+	if (!result.ok) {
+		console.error(`elefant serve: ${result.error.message}`);
+		return 1;
+	}
+
+	const { url } = result.data;
+	console.log(`Elefant UI:  ${url}`);
+	console.log(`Daemon:      http://localhost:${daemonPort}`);
+	console.log('Press Ctrl+C to stop.');
+
+	// Keep alive until SIGINT/SIGTERM
+	await new Promise<void>((resolve) => {
+		process.on('SIGINT', () => {
+			result.data.server.stop();
+			resolve();
+		});
+		process.on('SIGTERM', () => {
+			result.data.server.stop();
+			resolve();
+		});
+	});
+
 	return 0;
 }
 

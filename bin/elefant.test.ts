@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { handlers, isAllowedInstallPath, isCommand, restartDaemon } from './cli.ts';
+import { handlers, isAllowedInstallPath, isCommand, parseServeArgs, restartDaemon } from './cli.ts';
 import type { Command } from './cli.ts';
 
 // ---------------------------------------------------------------------------
@@ -88,7 +88,8 @@ describe('handlers', () => {
 
 	it('safe stub handlers return Promise<number> without side effects', () => {
 		// Only call stub handlers — the lifecycle handlers (start/stop/status/restart)
-		// have real side effects and should not be invoked in unit tests.
+		// and serve (which starts a real server) have real side effects and should
+		// not be invoked in unit tests.
 		const stubCommands: Command[] = [
 			'--version',
 			'-v',
@@ -96,7 +97,6 @@ describe('handlers', () => {
 			'-h',
 			'update',
 			'uninstall',
-			'serve',
 		];
 		for (const cmd of stubCommands) {
 			const result = handlers[cmd]([]);
@@ -106,7 +106,7 @@ describe('handlers', () => {
 	});
 
 	it('safe commands resolve to a number exit code', async () => {
-		// Only test handlers that don't touch the daemon (stubs + version/help)
+		// Only test handlers that don't touch the daemon or start servers
 		const safeCommands: Command[] = [
 			'--version',
 			'-v',
@@ -114,7 +114,6 @@ describe('handlers', () => {
 			'-h',
 			'update',
 			'uninstall',
-			'serve',
 		];
 		for (const cmd of safeCommands) {
 			const code = await handlers[cmd]([]);
@@ -201,3 +200,61 @@ describe('restartDaemon', () => {
 		expect(code).toBe(1);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// parseServeArgs — flag parsing with env-var defaults
+// ---------------------------------------------------------------------------
+
+describe('parseServeArgs', () => {
+	it('returns defaults when no flags or env vars are set', () => {
+		const result = parseServeArgs([]);
+		expect(result.port).toBe(3000);
+		expect(result.daemonPort).toBe(1337);
+		expect(result.distPath).toBeUndefined();
+	});
+
+	it('parses --port flag', () => {
+		const result = parseServeArgs(['--port', '8080']);
+		expect(result.port).toBe(8080);
+	});
+
+	it('parses --daemon-port flag', () => {
+		const result = parseServeArgs(['--daemon-port', '9999']);
+		expect(result.daemonPort).toBe(9999);
+	});
+
+	it('parses --dist flag', () => {
+		const result = parseServeArgs(['--dist', '/custom/dist/path']);
+		expect(result.distPath).toBe('/custom/dist/path');
+	});
+
+	it('parses all flags together', () => {
+		const result = parseServeArgs(['--port', '4000', '--daemon-port', '5555', '--dist', '/tmp/elefant-ui']);
+		expect(result.port).toBe(4000);
+		expect(result.daemonPort).toBe(5555);
+		expect(result.distPath).toBe('/tmp/elefant-ui');
+	});
+
+	it('silently coerces non-numeric port to NaN (caller handles)', () => {
+		const result = parseServeArgs(['--port', 'not-a-number']);
+		expect(isNaN(result.port)).toBe(true);
+	});
+
+	it('ignores flags without values (no next arg)', () => {
+		const result = parseServeArgs(['--port']);
+		expect(result.port).toBe(3000); // default preserved
+	});
+
+	it('--port consumes the next token even when it looks like a flag', () => {
+		// --port greedily consumes the next arg as its value.
+		// '--daemon-port' becomes the (NaN) port; '7777' is a dangling arg.
+		const result = parseServeArgs(['--port', '--daemon-port', '7777']);
+		expect(isNaN(result.port)).toBe(true); // Number('--daemon-port') → NaN
+		expect(result.daemonPort).toBe(1337);  // 7777 was not preceded by --daemon-port
+	});
+});
+
+// runServe is covered by handler existence (line 77), parseServeArgs
+// (above), and manual end-to-end verification.  Unit-testing runServe
+// directly starts a real Bun.serve server which blocks on SIGINT/SIGTERM
+// — unsuitable for a unit test.
