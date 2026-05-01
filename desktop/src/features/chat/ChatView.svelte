@@ -32,8 +32,6 @@
 	import type { MessageRole } from '$lib/daemon/types.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
-	import { fade } from 'svelte/transition';
-	import { quintOut } from 'svelte/easing';
 
 	let abortController: AbortController | null = null;
 
@@ -190,47 +188,26 @@
 	// don't fight each other inside a single grid.
 	const hasMessages = $derived(chatStore.messages.length > 0);
 
-	// `prefers-reduced-motion`-aware duration helper.
-	//
-	// Svelte's `fade` directive can't be disabled by CSS — `transition:none`
-	// in @media (prefers-reduced-motion: reduce) doesn't apply because the
-	// directive drives style updates via JS, not CSS transition. The clean
-	// fix is to inspect the media query at call time and zero the duration
-	// when the user has opted out of motion. We also guard `window` so SSR
-	// / non-browser test environments don't crash.
-	//
-	// The `base` values passed by callers below are aligned with the Quire
-	// duration scale (--duration-fast = 150ms, --duration-base = 250ms).
-	// We can't `var(--duration-base)` directly into a JS number, so the
-	// scale is mirrored at call sites with comments tying them back to the
-	// tokens.
-	function motionDuration(base: number): number {
-		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-			return base;
-		}
-		return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : base;
-	}
 
-	// Mirror Quire motion tokens (typography.css / tokens.css):
-	//   FADE_IN_MS  → matches `--duration-base` (250ms) — slightly
-	//                 trimmed to 200ms so the swap feels brisk, not heavy.
-	//   FADE_OUT_MS → matches `--duration-fast`  (150ms) exactly — we
-	//                 always exit faster than we enter.
-	const FADE_IN_MS = 200;
-	const FADE_OUT_MS = 150;
 </script>
 
 <div class="chat-view">
 	<!-- Connection status banner (always visible, top-pinned) -->
 	<ConnectionBanner />
 
-	{#if !hasMessages}
-		<!-- ===== Zero-state: composer centred in the viewport ===== -->
+	<!--
+		Both layout branches are always in the DOM and stacked via
+		position:absolute so Svelte's overlapping in/out transitions
+		don't break the flex flow. Only the active branch is visible
+		at any time; opacity/pointer-events hide the inactive one.
+	-->
+	<div class="chat-layers">
+		<!-- ===== Zero-state: composer centred ===== -->
 		<section
 			class="chat-zero-state"
+			class:is-hidden={hasMessages}
 			aria-label="New chat"
-			in:fade={{ duration: motionDuration(FADE_IN_MS), easing: quintOut }}
-			out:fade={{ duration: motionDuration(FADE_OUT_MS), easing: quintOut }}
+			aria-hidden={hasMessages}
 		>
 			<header class="zero-heading">
 				<h1 class="zero-title">What can I help you with?</h1>
@@ -246,12 +223,13 @@
 				/>
 			</div>
 		</section>
-	{:else}
+
 		<!-- ===== Active state: messages above, composer pinned below ===== -->
 		<section
 			class="chat-active-state"
+			class:is-hidden={!hasMessages}
 			aria-label="Chat conversation"
-			in:fade={{ duration: motionDuration(FADE_IN_MS), easing: quintOut }}
+			aria-hidden={!hasMessages}
 		>
 			<div class="chat-messages" aria-live="polite">
 				<MessageList messages={chatStore.messages} />
@@ -266,15 +244,13 @@
 				/>
 			</div>
 		</section>
-	{/if}
+	</div>
 </div>
 
 <style>
 	/* ----- Root ---------------------------------------------------------
-	 * The view fills its container as a vertical flex column. The banner
-	 * sits at the top; the active branch (zero-state OR active-state)
-	 * fills the remaining space. Overflow is hidden so internal scroll
-	 * regions own scrolling, not the viewport.
+	 * Fills the content area. The banner sits at the top (auto height),
+	 * then .chat-layers claims all remaining space via flex:1.
 	 */
 	.chat-view {
 		position: absolute;
@@ -285,21 +261,45 @@
 		background-color: var(--surface-substrate);
 	}
 
-	/* ----- Zero-state: centred composer --------------------------------
-	 * `flex: 1` claims the remaining height below the banner, then the
-	 * inner flex column centres its children both axes. The hint heading
-	 * gets generous space above the composer to feel deliberate, not
-	 * cramped.
+	/* ----- Layers container --------------------------------------------
+	 * position:relative + flex:1 so it fills the space below the banner.
+	 * Both child sections are absolutely stacked inside so transitions
+	 * never disrupt the parent flex flow.
 	 */
-	.chat-zero-state {
+	.chat-layers {
 		flex: 1;
 		min-height: 0;
+		position: relative;
+	}
+
+	/* ----- Shared section base -----------------------------------------
+	 * Both branches fill the layers container absolutely and transition
+	 * their opacity. Using opacity+pointer-events instead of
+	 * display:none keeps both in the render tree (scroll positions,
+	 * focus, etc.) but only one is interactive/visible at a time.
+	 */
+	.chat-zero-state,
+	.chat-active-state {
+		position: absolute;
+		inset: 0;
+		transition: opacity var(--transition-base);
+	}
+
+	.chat-zero-state.is-hidden,
+	.chat-active-state.is-hidden {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	/* ----- Zero-state: centred composer -------------------------------- */
+	.chat-zero-state {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		padding: var(--space-7) var(--space-5);
 		gap: var(--space-7);
+		overflow: hidden;
 	}
 
 	.zero-heading {
@@ -311,9 +311,6 @@
 		max-width: 640px;
 	}
 
-	/* DM Serif Display — the editorial voice that signals "this is a
-	 * fresh page". Matches the typographic system documented in
-	 * styles/typography.css. */
 	.zero-title {
 		font-family: var(--font-display);
 		font-size: clamp(1.75rem, 4vw, 2.5rem);
@@ -337,16 +334,8 @@
 		max-width: 640px;
 	}
 
-	/* ----- Active state: messages + bottom-pinned composer -------------
-	 * Vertical flex column: messages take the elastic middle, composer
-	 * is auto-sized at the bottom. We constrain composer width and
-	 * centre it horizontally so long-form viewports don't stretch the
-	 * input edge-to-edge — better reading rhythm and aligns with the
-	 * messages column above.
-	 */
+	/* ----- Active state: messages + bottom-pinned composer ------------- */
 	.chat-active-state {
-		flex: 1;
-		min-height: 0;
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
@@ -363,17 +352,10 @@
 	.chat-active-input {
 		flex: 0 0 auto;
 		width: 100%;
-		max-width: 800px;
-		margin: 0 auto;
-		padding: var(--space-3) var(--space-5) var(--space-5);
+		padding: var(--space-3) var(--space-4) var(--space-4);
 	}
 
-	/* ----- Reduced motion ----------------------------------------------
-	 * The Svelte `fade` directive is JS-driven, so we zero its duration
-	 * at the call site (see `motionDuration()`). The CSS reset below is
-	 * defensive belt-and-braces in case future contributors add
-	 * CSS-driven transitions to either branch.
-	 */
+	/* ----- Reduced motion ---------------------------------------------- */
 	@media (prefers-reduced-motion: reduce) {
 		.chat-zero-state,
 		.chat-active-state {
