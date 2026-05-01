@@ -1,20 +1,12 @@
 <script lang="ts">
 	import { HugeiconsIcon, MenuIcon } from "$lib/icons/index.js";
-	import { projectsStore } from "$lib/stores/projects.svelte.js";
-	import { navigationStore } from "$lib/stores/navigation.svelte.js";
-import WindowControls from "./WindowControls.svelte";
+	import WindowControls from "./WindowControls.svelte";
 	type Props = {
 		onToggleSidebar?: () => void;
 		children?: import("svelte").Snippet;
 	};
 
 	let { onToggleSidebar, children }: Props = $props();
-
-	const activeProject = $derived(projectsStore.activeProject);
-
-	function handleSwitchProject(): void {
-		navigationStore.goToProjectPicker();
-	}
 
 	let isDesktop = $state(false);
 
@@ -32,18 +24,6 @@ import WindowControls from "./WindowControls.svelte";
 	>
 		<HugeiconsIcon icon={MenuIcon} size={16} strokeWidth={1.5} />
 	</button>
-
-	{#if activeProject}
-		<button
-			type="button"
-			class="project-pill"
-			onclick={handleSwitchProject}
-			title={activeProject.path}
-			aria-label={`Switch project — currently ${activeProject.name}`}
-		>
-			<span class="project-pill-name">{activeProject.name}</span>
-		</button>
-	{/if}
 
 	<div class="topbar-spacer"></div>
 
@@ -91,45 +71,7 @@ import WindowControls from "./WindowControls.svelte";
 		box-shadow: var(--glow-focus);
 	}
 
-	.project-pill {
-		display: inline-flex;
-		align-items: center;
-		max-width: 240px;
-		font-size: 11px;
-		font-family: var(--font-mono);
-		color: var(--color-text-muted);
-		padding: 2px 8px;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-full);
-		background: transparent;
-		cursor: pointer;
-		white-space: nowrap;
-		transition:
-			color var(--duration-fast) var(--ease-out-expo),
-			border-color var(--duration-fast) var(--ease-out-expo),
-			background-color var(--duration-fast) var(--ease-out-expo),
-			box-shadow var(--duration-fast) var(--ease-out-expo);
-	}
-
-	.project-pill-name {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.project-pill:hover {
-		color: var(--color-primary);
-		border-color: var(--color-primary);
-		background-color: var(--color-primary-subtle);
-	}
-
-	.project-pill:focus-visible {
-		outline: none;
-		color: var(--color-primary);
-		border-color: var(--color-primary);
-		box-shadow: var(--glow-focus);
-	}
-
+	/* Spacer to push action buttons to the right */
 	.topbar-spacer {
 		flex: 1;
 	}

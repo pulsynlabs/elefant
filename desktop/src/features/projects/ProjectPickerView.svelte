@@ -312,6 +312,7 @@
 		position: absolute;
 		inset: 0;
 		overflow-y: auto;
+		overflow-x: hidden;
 	}
 
 	/* --- Hero ----------------------------------------------------------- */
@@ -409,6 +410,7 @@
 		width: 100%;
 		max-width: 960px;
 		padding: 0 var(--space-7) var(--space-9);
+		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-7);

@@ -186,11 +186,6 @@
 		{#snippet topbar()}
 			<TopBar onToggleSidebar={toggleSidebar}>
 				<ConnectionStatus />
-				{#if chatStore.selectedProvider ?? chatStore.defaultProvider}
-					<span class="topbar-provider">
-						{chatStore.selectedProvider ?? chatStore.defaultProvider}
-					</span>
-				{/if}
 				<ThemeToggle />
 			</TopBar>
 		{/snippet}
@@ -258,16 +253,6 @@
 {/if}
 
 <style>
-	.topbar-provider {
-		font-size: 11px;
-		font-family: var(--font-mono);
-		color: var(--color-text-muted);
-		padding: 2px 8px;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-full);
-		white-space: nowrap;
-	}
-
 	.unknown-view {
 		display: flex;
 		align-items: center;
