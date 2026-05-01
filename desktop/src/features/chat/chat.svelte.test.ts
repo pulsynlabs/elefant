@@ -35,6 +35,7 @@ function resetStore(): void {
 	chatStore.setTemperature(1.0);
 	chatStore.setTopP(1.0);
 	chatStore.setTimeoutMs(60_000);
+	chatStore.setThinkingEnabled(false);
 	clearAgentOverride();
 }
 
@@ -155,6 +156,68 @@ describe('buildChatRequestFields — AgentOverride precedence', () => {
 		expect(hasAgentOverride()).toBe(true);
 		clearAgentOverride();
 		expect(hasAgentOverride()).toBe(false);
+	});
+});
+
+describe('thinking-mode state', () => {
+	beforeEach(resetStore);
+
+	// `chatStore.currentModelSupportsThinking` is a Svelte $derived. The
+	// test shim (test-setup.ts) wraps deriveds in a Proxy, so we read the
+	// underlying value via `.__raw` for direct equality assertions.
+	const derivedSupportsThinking = (): boolean => {
+		const v = chatStore.currentModelSupportsThinking as unknown as { __raw?: boolean };
+		return v?.__raw ?? Boolean(v);
+	};
+
+	it('thinkingEnabled defaults to false', () => {
+		expect(chatStore.thinkingEnabled).toBe(false);
+	});
+
+	it('setThinkingEnabled(true) flips the flag', () => {
+		chatStore.setThinkingEnabled(true);
+		expect(chatStore.thinkingEnabled).toBe(true);
+		chatStore.setThinkingEnabled(false);
+		expect(chatStore.thinkingEnabled).toBe(false);
+	});
+
+	it('currentModelSupportsThinking is false for non-thinking providers', () => {
+		chatStore.setProvider('openai/gpt-4o');
+		expect(derivedSupportsThinking()).toBe(false);
+
+		chatStore.setProvider('groq/llama-3-70b');
+		expect(derivedSupportsThinking()).toBe(false);
+
+		// Older Claude generations do not support extended thinking.
+		chatStore.setProvider('anthropic/claude-3-5-sonnet-latest');
+		expect(derivedSupportsThinking()).toBe(false);
+
+		// Null/empty provider -> conservative false (REQ-004 fallback).
+		chatStore.setProvider(null);
+		expect(derivedSupportsThinking()).toBe(false);
+	});
+
+	it('currentModelSupportsThinking is true for known thinking-capable Claude models', () => {
+		chatStore.setProvider('anthropic/claude-3-7-sonnet-20250219');
+		expect(derivedSupportsThinking()).toBe(true);
+
+		chatStore.setProvider('anthropic/claude-sonnet-4-5');
+		expect(derivedSupportsThinking()).toBe(true);
+
+		chatStore.setProvider('anthropic/claude-opus-4-1');
+		expect(derivedSupportsThinking()).toBe(true);
+	});
+
+	it('thinkingEnabled resets to false on session change', () => {
+		chatStore.setThinkingEnabled(true);
+		expect(chatStore.thinkingEnabled).toBe(true);
+
+		chatStore.setActiveSession('session-abc');
+		expect(chatStore.thinkingEnabled).toBe(false);
+
+		chatStore.setThinkingEnabled(true);
+		chatStore.setActiveSession(null);
+		expect(chatStore.thinkingEnabled).toBe(false);
 	});
 });
 

@@ -28,6 +28,7 @@
 	} from './command-completions/input-state.js';
 	import ModelSelector from './ModelSelector.svelte';
 	import ThinkingToggle from './ThinkingToggle.svelte';
+	import { chatStore } from './chat.svelte.js';
 
 	type Props = {
 		disabled?: boolean;
@@ -55,17 +56,20 @@
 	const overlayOpen = $derived(shouldOpenOverlay(inputValue, isComposing));
 	const query = $derived(overlayOpen ? extractQuery(inputValue) : '');
 
-	// --- Thinking toggle (local until chatStore exposes it) -------------
+	// --- Thinking toggle ------------------------------------------------
 	//
-	// W2-T2 will lift this onto chatStore alongside model-capability
-	// metadata. Until then, the toggle is rendered for visual continuity
-	// but disabled with an explanatory tooltip — REQ-004 mandates the
-	// disabled-by-default fallback when capability is unknown.
-
-	let localThinkingEnabled = $state(false);
+	// State and capability detection live on `chatStore`:
+	//   - `chatStore.thinkingEnabled` — whether the next turn should run
+	//     in extended-thinking mode (resets per session).
+	//   - `chatStore.currentModelSupportsThinking` — derived from the
+	//     active provider/model id; a best-effort heuristic that falls
+	//     back to `false` for unknown models (REQ-004 disabled-by-default).
+	//
+	// The component itself stays purely presentational: it reads the two
+	// flags and routes the click back through `setThinkingEnabled`.
 
 	function onThinkingToggle(): void {
-		localThinkingEnabled = !localThinkingEnabled;
+		chatStore.setThinkingEnabled(!chatStore.thinkingEnabled);
 	}
 
 	// --- Send / handlers ------------------------------------------------
@@ -192,9 +196,11 @@
 		<div class="toolbar-left">
 			<ModelSelector />
 			<ThinkingToggle
-				pressed={localThinkingEnabled}
-				disabled={true}
-				disabledReason="Model doesn't support thinking"
+				pressed={chatStore.thinkingEnabled}
+				disabled={!chatStore.currentModelSupportsThinking}
+				disabledReason={!chatStore.currentModelSupportsThinking
+					? "Model doesn't support extended thinking"
+					: undefined}
 				onToggle={onThinkingToggle}
 			/>
 		</div>
