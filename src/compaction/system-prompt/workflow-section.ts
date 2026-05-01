@@ -29,7 +29,7 @@ const PHASE_GUIDES: Record<string, PhaseGuide> = {
 	research: {
 		action: 'Research unknowns, compare alternatives, and document tradeoffs',
 		command: '/research',
-		tools: ['wf_skill'],
+		tools: ['skill'],
 	},
 	specify: {
 		action: 'Lock the specification contract so execution can begin',

@@ -6,7 +6,7 @@ import type { HookRegistry } from '../../hooks/registry.ts';
 import { SpecTool, type SpecToolContext } from './base.ts';
 import { SpecStatusTool, SpecStateTool, SpecWorkflowTool } from './state-tools.ts';
 import { SpecBlueprintTool, SpecRequirementsTool, SpecSpecTool } from './document-tools.ts';
-import { SpecAdlTool, SpecCheckpointTool, SpecChronicleTool, SpecReferenceTool, SpecSkillTool } from './log-tools.ts';
+import { SpecAdlTool, SpecCheckpointTool, SpecChronicleTool, SpecReferenceTool } from './log-tools.ts';
 
 export {
 	SpecTool,
@@ -19,7 +19,6 @@ export {
 	SpecChronicleTool,
 	SpecAdlTool,
 	SpecCheckpointTool,
-	SpecSkillTool,
 	SpecReferenceTool,
 };
 export type { SpecToolContext } from './base.ts';
@@ -35,7 +34,6 @@ export function instantiateSpecTools(): SpecTool[] {
 		new SpecChronicleTool(),
 		new SpecAdlTool(),
 		new SpecCheckpointTool(),
-		new SpecSkillTool(),
 		new SpecReferenceTool(),
 	];
 }

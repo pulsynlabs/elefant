@@ -16,50 +16,78 @@ interface RegistryEntry {
 	args?: string;
 }
 
+/** Maximum number of skill command entries rendered before truncation. */
+const SKILL_COMMAND_CAP = 50;
+
 /**
  * Build a well-formatted slash command listing for the system prompt.
  * Uses a concise bullet-list format optimised for low token budget.
  *
  * If commands have phase metadata they are grouped by phase;
  * otherwise all commands are presented as a flat list.
+ *
+ * When `skillCommands` is provided and non-empty, a separate
+ * `### Skill Commands` group is appended after workflow commands.
  */
-export function buildCommandsSection(commands: readonly CommandEntry[]): string {
-	if (commands.length === 0) {
+export function buildCommandsSection(
+	commands: readonly CommandEntry[],
+	skillCommands?: readonly CommandEntry[],
+): string {
+	if (commands.length === 0 && (!skillCommands || skillCommands.length === 0)) {
 		return ['## Slash Commands', '- No slash commands are currently registered.'].join('\n');
 	}
 
 	const lines = ['## Slash Commands'];
 
-	// Group by phase if every command has phase metadata
-	const allHavePhase = commands.every((c) => c.phase !== undefined);
-	if (allHavePhase) {
-		const groups = new Map<string, CommandEntry[]>();
-		for (const cmd of commands) {
-			const phase = cmd.phase!;
-			const group = groups.get(phase);
-			if (group) {
-				group.push(cmd);
-			} else {
-				groups.set(phase, [cmd]);
+	// Render workflow commands
+	if (commands.length > 0) {
+		// Group by phase if every command has phase metadata
+		const allHavePhase = commands.every((c) => c.phase !== undefined);
+		if (allHavePhase) {
+			const groups = new Map<string, CommandEntry[]>();
+			for (const cmd of commands) {
+				const phase = cmd.phase!;
+				const group = groups.get(phase);
+				if (group) {
+					group.push(cmd);
+				} else {
+					groups.set(phase, [cmd]);
+				}
 			}
-		}
 
-		for (const [phase, cmds] of groups) {
-			const label = phaseLabel(phase);
-			lines.push(`### ${label}`);
-			for (const cmd of cmds) {
+			for (const [phase, cmds] of groups) {
+				const label = phaseLabel(phase);
+				lines.push(`### ${label}`);
+				for (const cmd of cmds) {
+					lines.push(`- ${cmd.trigger} — ${cmd.description}`);
+				}
+				lines.push('');
+			}
+
+			// Remove trailing empty line
+			if (lines[lines.length - 1] === '') {
+				lines.pop();
+			}
+		} else {
+			for (const cmd of commands) {
 				lines.push(`- ${cmd.trigger} — ${cmd.description}`);
 			}
-			lines.push('');
+		}
+	}
+
+	// Render skill commands as a separate group
+	if (skillCommands && skillCommands.length > 0) {
+		lines.push('');
+		lines.push('### Skill Commands');
+
+		const capped = skillCommands.slice(0, SKILL_COMMAND_CAP);
+		for (const cmd of capped) {
+			lines.push(`- ${cmd.trigger} — ${cmd.description}`);
 		}
 
-		// Remove trailing empty line
-		if (lines[lines.length - 1] === '') {
-			lines.pop();
-		}
-	} else {
-		for (const cmd of commands) {
-			lines.push(`- ${cmd.trigger} — ${cmd.description}`);
+		const overflow = skillCommands.length - SKILL_COMMAND_CAP;
+		if (overflow > 0) {
+			lines.push(`- ... [${overflow} more skills]`);
 		}
 	}
 
@@ -75,6 +103,7 @@ function phaseLabel(phase: string): string {
 		execute: 'Execution',
 		audit: 'Audit',
 		'utility': 'Utilities',
+		'skill': 'Skill Commands',
 	};
 	return labels[phase] ?? phase;
 }

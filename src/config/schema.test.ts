@@ -13,6 +13,8 @@ import {
 	mcpServerSchema,
 	mcpStdioConfigSchema,
 	mcpRemoteConfigSchema,
+	registryConfigSchema,
+	skillsConfigSchema,
 } from "./schema.ts";
 import { ConfigManager } from './loader.ts';
 
@@ -855,6 +857,404 @@ describe('configSchema with MCP fields', () => {
 		if (loaded.ok) {
 			expect(loaded.data.mcp).toEqual([]);
 			expect(loaded.data.tokenBudgetPercent).toBe(10);
+			expect(loaded.data.port).toBe(1555);
+		}
+	});
+});
+
+describe('registryConfigSchema (discriminated union)', () => {
+	it('accepts valid native registry', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'native',
+			url: 'https://example.com/skills/index.json',
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.enabled).toBe(true);
+		}
+	});
+
+	it('accepts valid clawhub registry with default URL', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'clawhub',
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.url).toBe('https://clawhub.com');
+			expect(result.data.enabled).toBe(true);
+		}
+	});
+
+	it('accepts clawhub registry with custom URL', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'clawhub',
+			url: 'https://custom-clawhub.example.com',
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.url).toBe('https://custom-clawhub.example.com');
+		}
+	});
+
+	it('accepts valid github-registry', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'github-registry',
+			url: 'https://raw.githubusercontent.com/user/repo/main/registry.json',
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.enabled).toBe(true);
+		}
+	});
+
+	it('accepts disabled registry entry', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'clawhub',
+			enabled: false,
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.enabled).toBe(false);
+		}
+	});
+
+	it('accepts disabled native registry entry', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'native',
+			url: 'https://example.com/index.json',
+			enabled: false,
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.enabled).toBe(false);
+		}
+	});
+
+	it('rejects invalid URL in native registry', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'native',
+			url: 'not-a-valid-url',
+		});
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some(i => i.path.includes('url'))).toBe(true);
+		}
+	});
+
+	it('rejects invalid URL in github-registry', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'github-registry',
+			url: 'invalid-url',
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it('rejects unknown registry type', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'unknown-type',
+			url: 'https://example.com',
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it('rejects native registry missing url', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'native',
+		});
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some(i => i.path.includes('url'))).toBe(true);
+		}
+	});
+
+	it('rejects github-registry missing url', () => {
+		const result = registryConfigSchema.safeParse({
+			type: 'github-registry',
+		});
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some(i => i.path.includes('url'))).toBe(true);
+		}
+	});
+
+	it('rejects non-object input', () => {
+		const result = registryConfigSchema.safeParse('not-an-object');
+		expect(result.success).toBe(false);
+	});
+
+	it('parses an array of mixed registry types', () => {
+		const arraySchema = registryConfigSchema.array();
+		const result = arraySchema.safeParse([
+			{ type: 'clawhub' as const },
+			{ type: 'native' as const, url: 'https://example.com/index.json' },
+			{ type: 'github-registry' as const, url: 'https://raw.githubusercontent.com/user/repo/main/registry.json' },
+		]);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data).toHaveLength(3);
+		}
+	});
+});
+
+describe('skillsConfigSchema', () => {
+	it('defaults registries to two bundled entries and cacheTtlHours to 24', () => {
+		const result = skillsConfigSchema.safeParse({});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.registries).toHaveLength(2);
+			expect(result.data.registries[0].type).toBe('clawhub');
+			expect(result.data.registries[1].type).toBe('github-registry');
+			expect(result.data.cacheTtlHours).toBe(24);
+		}
+	});
+
+	it('defaults registries to bundled entries when skills object is empty', () => {
+		const result = skillsConfigSchema.safeParse(undefined);
+		expect(result.success).toBe(false); // zod requires input for parse; .default() only works via configSchema
+	});
+
+	it('accepts user override with empty registries array', () => {
+		const result = skillsConfigSchema.safeParse({
+			registries: [],
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.registries).toEqual([]);
+			expect(result.data.cacheTtlHours).toBe(24);
+		}
+	});
+
+	it('accepts user adding a native registry alongside defaults', () => {
+		const result = skillsConfigSchema.safeParse({
+			registries: [
+				{ type: 'native' as const, url: 'https://example.com/index.json' },
+			],
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.registries).toHaveLength(1);
+			expect(result.data.registries[0].type).toBe('native');
+		}
+	});
+
+	it('accepts cacheTtlHours: 48', () => {
+		const result = skillsConfigSchema.safeParse({
+			cacheTtlHours: 48,
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.cacheTtlHours).toBe(48);
+		}
+	});
+
+	it('rejects cacheTtlHours: 0 (min is 1)', () => {
+		const result = skillsConfigSchema.safeParse({
+			cacheTtlHours: 0,
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it('rejects cacheTtlHours: -1', () => {
+		const result = skillsConfigSchema.safeParse({
+			cacheTtlHours: -1,
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it('rejects non-integer cacheTtlHours', () => {
+		const result = skillsConfigSchema.safeParse({
+			cacheTtlHours: 3.5,
+		});
+		expect(result.success).toBe(false);
+	});
+});
+
+describe('configSchema with skills field', () => {
+	it('defaults skills to bundled registries when field is absent', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.skills.registries).toHaveLength(2);
+			expect(result.data.skills.registries[0].type).toBe('clawhub');
+			expect(result.data.skills.registries[0].enabled).toBe(true);
+			expect(result.data.skills.registries[1].type).toBe('github-registry');
+			expect(result.data.skills.registries[1].enabled).toBe(true);
+			expect(result.data.skills.cacheTtlHours).toBe(24);
+		}
+	});
+
+	it('accepts user-provided empty registries array in skills', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			skills: {
+				registries: [],
+			},
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.skills.registries).toEqual([]);
+			expect(result.data.skills.cacheTtlHours).toBe(24);
+		}
+	});
+
+	it('accepts user-provided native registry in skills', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			skills: {
+				registries: [
+					{ type: 'native' as const, url: 'https://example.com/skills/index.json' },
+				],
+			},
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.skills.registries).toHaveLength(1);
+			expect(result.data.skills.registries[0].type).toBe('native');
+			expect(result.data.skills.registries[0].url).toBe('https://example.com/skills/index.json');
+		}
+	});
+
+	it('accepts disabled registry in skills', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			skills: {
+				registries: [
+					{ type: 'clawhub' as const, enabled: false },
+				],
+			},
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.skills.registries[0].enabled).toBe(false);
+		}
+	});
+
+	it('rejects invalid URL in skills.registries entry', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			skills: {
+				registries: [
+					{ type: 'native' as const, url: 'not-a-url' },
+				],
+			},
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(false);
+	});
+
+	it('rejects cacheTtlHours below 1', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			skills: {
+				cacheTtlHours: -1,
+			},
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(false);
+	});
+
+	it('accepts cacheTtlHours: 48 in skills', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			skills: {
+				cacheTtlHours: 48,
+			},
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.skills.cacheTtlHours).toBe(48);
+		}
+	});
+
+	it('rejects unknown registry type in skills.registries', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			skills: {
+				registries: [
+					{ type: 'unknown-type', url: 'https://example.com' },
+				],
+			},
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(false);
+	});
+
+	it('round-trips skills config through ConfigManager disk loading', async () => {
+		const configPath = tempConfigPath();
+		const fullConfig = configSchema.parse({
+			providers: [],
+			defaultProvider: '',
+			skills: {
+				registries: [
+					{ type: 'clawhub', enabled: false },
+					{ type: 'native', url: 'https://example.com/index.json', enabled: true },
+				],
+				cacheTtlHours: 12,
+			},
+		});
+
+		await Bun.write(configPath, `${JSON.stringify(fullConfig, null, 2)}\n`);
+		const manager = new ConfigManager({ globalConfigPath: configPath });
+		const loaded = await manager.getConfig();
+
+		expect(loaded.ok).toBe(true);
+		if (loaded.ok) {
+			expect(loaded.data.skills.registries).toHaveLength(2);
+			expect(loaded.data.skills.registries[0].type).toBe('clawhub');
+			expect(loaded.data.skills.registries[0].enabled).toBe(false);
+			expect(loaded.data.skills.registries[1].type).toBe('native');
+			expect(loaded.data.skills.registries[1].url).toBe('https://example.com/index.json');
+			expect(loaded.data.skills.cacheTtlHours).toBe(12);
+		}
+	});
+
+	it('ConfigManager defaults skills to bundled registries when field is absent', async () => {
+		const configPath = tempConfigPath();
+		await Bun.write(configPath, JSON.stringify({ providers: [], defaultProvider: '' }));
+
+		const manager = new ConfigManager({ globalConfigPath: configPath });
+		const loaded = await manager.getConfig();
+
+		expect(loaded.ok).toBe(true);
+		if (loaded.ok) {
+			expect(loaded.data.skills.registries).toHaveLength(2);
+			expect(loaded.data.skills.registries[0].type).toBe('clawhub');
+			expect(loaded.data.skills.registries[1].type).toBe('github-registry');
+			expect(loaded.data.skills.cacheTtlHours).toBe(24);
+		}
+	});
+
+	it('ConfigManager loads old configs without skills field (backward compatibility)', async () => {
+		const configPath = tempConfigPath();
+		await Bun.write(configPath, JSON.stringify({
+			port: 1555,
+			providers: [],
+			defaultProvider: '',
+			logLevel: 'warn',
+		}));
+
+		const manager = new ConfigManager({ globalConfigPath: configPath });
+		const loaded = await manager.getConfig();
+
+		expect(loaded.ok).toBe(true);
+		if (loaded.ok) {
+			expect(loaded.data.skills.registries).toHaveLength(2);
+			expect(loaded.data.skills.cacheTtlHours).toBe(24);
 			expect(loaded.data.port).toBe(1555);
 		}
 	});

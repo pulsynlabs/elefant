@@ -137,27 +137,6 @@ export class SpecCheckpointTool extends SpecTool<CheckpointArgs, unknown> {
 	}
 }
 
-const skillSchema = z.discriminatedUnion('action', [z.object({ action: z.literal('list') }), z.object({ action: z.literal('load'), name: z.string().min(1) })]);
-type SkillArgs = z.infer<typeof skillSchema>;
-
-/** @example {"action":"list"} */
-export class SpecSkillTool extends SpecTool<SkillArgs, unknown> {
-	readonly name = 'wf_skill';
-	readonly description = 'List or load bundled Spec Mode skill markdown resources.';
-	readonly schema = skillSchema;
-	readonly allowedPhases = [];
-	readonly permissions = { read: true, write: false, execute: false };
-	readonly examples = [{ name: 'list', payload: { action: 'list' } }];
-
-	async run(ctx: SpecToolContext, rawArgs: unknown): Promise<unknown | SpecToolError> { return this.runWithoutWorkflow(ctx, rawArgs); }
-	private async runWithoutWorkflow(ctx: SpecToolContext, rawArgs: unknown): Promise<unknown | SpecToolError> {
-		const parsed = this.schema.safeParse(rawArgs);
-		if (!parsed.success) return new SpecToolError('VALIDATION_FAILED', `Invalid payload for ${this.name}`, parsed.error.flatten());
-		return this.execute(ctx, parsed.data);
-	}
-	protected async execute(_ctx: SpecToolContext, args: SkillArgs): Promise<unknown> { return readResource('src/agents/skills', args); }
-}
-
 const referenceSchema = z.discriminatedUnion('action', [z.object({ action: z.literal('list') }), z.object({ action: z.literal('load'), name: z.string().min(1) }), z.object({ action: z.literal('section'), name: z.string().min(1), section: z.string().min(1) })]);
 type ReferenceArgs = z.infer<typeof referenceSchema>;
 

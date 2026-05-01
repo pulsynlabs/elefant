@@ -88,6 +88,45 @@ const mcpServerSchema = z.discriminatedUnion("transport", [
 	mcpRemoteConfigSchema,
 ]);
 
+const registryConfigSchema = z.discriminatedUnion('type', [
+	z.object({
+		type: z.literal('native'),
+		url: z.string().url(),
+		enabled: z.boolean().default(true),
+	}),
+	z.object({
+		type: z.literal('clawhub'),
+		url: z.string().url().default('https://clawhub.com'),
+		enabled: z.boolean().default(true),
+	}),
+	z.object({
+		type: z.literal('github-registry'),
+		url: z.string().url(),
+		enabled: z.boolean().default(true),
+	}),
+]);
+
+const skillsConfigSchema = z.object({
+	registries: z.array(registryConfigSchema).default([
+		{ type: 'clawhub' as const, url: 'https://clawhub.com', enabled: true },
+		{
+			type: 'github-registry' as const,
+			url: 'https://raw.githubusercontent.com/majiayu000/claude-skill-registry-core/main/registry.json',
+			enabled: true,
+		},
+	]),
+	cacheTtlHours: z.number().int().min(1).default(24),
+});
+
+const BUNDLED_REGISTRIES = [
+	{ type: 'clawhub' as const, url: 'https://clawhub.com', enabled: true },
+	{
+		type: 'github-registry' as const,
+		url: 'https://raw.githubusercontent.com/majiayu000/claude-skill-registry-core/main/registry.json',
+		enabled: true,
+	},
+];
+
 const configSchema = z.object({
 	port: z.number().int().min(1).max(65535).default(1337),
 	providers: z.array(providerSchema).default([]),
@@ -98,6 +137,10 @@ const configSchema = z.object({
 	mcp: z.array(mcpServerSchema).optional().default([]),
 	tokenBudgetPercent: z.number().min(0).max(100).optional().default(10),
 	hardwareAccelerationDisabled: z.boolean().optional().default(false),
+	skills: skillsConfigSchema.optional().default({
+		registries: BUNDLED_REGISTRIES,
+		cacheTtlHours: 24,
+	}),
 }).strict();
 
 type AgentProfileInput = z.input<typeof agentProfileSchema>;
@@ -149,6 +192,9 @@ export {
 	mcpServerSchema,
 	mcpStdioConfigSchema,
 	mcpRemoteConfigSchema,
+	registryConfigSchema,
+	skillsConfigSchema,
+	BUNDLED_REGISTRIES,
 };
 export type ElefantConfig = z.infer<typeof configSchema>;
 export type ProviderEntry = z.infer<typeof providerSchema>;
@@ -161,3 +207,5 @@ export type AgentProfile = z.infer<typeof agentProfileSchema>;
 export type McpServerConfig = z.infer<typeof mcpServerSchema>;
 export type McpStdioConfig = z.infer<typeof mcpStdioConfigSchema>;
 export type McpRemoteConfig = z.infer<typeof mcpRemoteConfigSchema>;
+export type RegistryConfig = z.infer<typeof registryConfigSchema>;
+export type SkillsConfig = z.infer<typeof skillsConfigSchema>;

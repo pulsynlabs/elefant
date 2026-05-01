@@ -6,8 +6,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { skillTool } from './index.js';
+import { skillTool, createSkillTool } from './index.js';
 import { resolveSkill, listSkills } from './resolver.js';
+import { ToolRegistry } from '../registry.js';
+import { HookRegistry } from '../../hooks/index.js';
 
 describe('skill tool', () => {
 	describe('skillTool.execute', () => {
@@ -208,6 +210,70 @@ describe('skill tool', () => {
 			} finally {
 				rmSync(tempCwd, { recursive: true, force: true });
 				rmSync(tempHome, { recursive: true, force: true });
+			}
+		});
+
+		it('discovers skill from registry cache', async () => {
+			const tempCache = mkdtempSync(join(tmpdir(), 'elefant-registry-'));
+			const tempHome = mkdtempSync(join(tmpdir(), 'elefant-home-'));
+			const tempCwd = mkdtempSync(join(tmpdir(), 'elefant-cwd-'));
+
+			try {
+				// Create registry cache skill in <cacheRoot>/clawhub-abc123/my-registry-skill/SKILL.md
+				const skillDir = join(tempCache, 'clawhub-abc123', 'my-registry-skill');
+				mkdirSync(skillDir, { recursive: true });
+				writeFileSync(
+					join(skillDir, 'SKILL.md'),
+					'---\ndescription: A registry skill\n---\n\nBody content.',
+				);
+
+				const skills = await listSkills({
+					home: tempHome,
+					cwd: tempCwd,
+					cacheRoot: tempCache,
+				});
+				const found = skills.find((s) => s.name === 'my-registry-skill');
+
+				expect(found).toBeDefined();
+				expect(found!.source).toBe('registry');
+				expect(found!.description).toBe('A registry skill');
+			} finally {
+				rmSync(tempCache, { recursive: true, force: true });
+				rmSync(tempHome, { recursive: true, force: true });
+				rmSync(tempCwd, { recursive: true, force: true });
+			}
+		});
+
+		it('project skill overrides registry skill with same name', async () => {
+			const tempCache = mkdtempSync(join(tmpdir(), 'elefant-registry-'));
+			const tempHome = mkdtempSync(join(tmpdir(), 'elefant-home-'));
+			const tempCwd = mkdtempSync(join(tmpdir(), 'elefant-cwd-'));
+
+			try {
+				// Project skill (higher priority)
+				const projDir = join(tempCwd, '.elefant', 'skills', 'foo');
+				mkdirSync(projDir, { recursive: true });
+				writeFileSync(join(projDir, 'SKILL.md'), 'Project foo');
+
+				// Registry cache skill (same name, lower priority)
+				const regDir = join(tempCache, 'clawhub-abc123', 'foo');
+				mkdirSync(regDir, { recursive: true });
+				writeFileSync(join(regDir, 'SKILL.md'), 'Registry foo');
+
+				const skills = await listSkills({
+					home: tempHome,
+					cwd: tempCwd,
+					cacheRoot: tempCache,
+				});
+				const foos = skills.filter((s) => s.name === 'foo');
+
+				expect(foos).toHaveLength(1);
+				expect(foos[0].source).toBe('project');
+				expect(foos[0].description).toBe('Project foo');
+			} finally {
+				rmSync(tempCache, { recursive: true, force: true });
+				rmSync(tempHome, { recursive: true, force: true });
+				rmSync(tempCwd, { recursive: true, force: true });
 			}
 		});
 	});
@@ -457,6 +523,91 @@ describe('skill tool', () => {
 				// Cleanup builtin skill
 				rmSync(builtinDir, { recursive: true, force: true });
 			}
+		});
+	});
+
+	describe('createSkillTool', () => {
+		let tempDir: string;
+		let originalCwd: string;
+
+		beforeEach(() => {
+			tempDir = mkdtempSync(join(tmpdir(), 'elefant-skill-test-'));
+			originalCwd = process.cwd();
+			process.chdir(tempDir);
+		});
+
+		afterEach(() => {
+			process.chdir(originalCwd);
+			rmSync(tempDir, { recursive: true, force: true });
+		});
+
+		it('description contains ## Available Skills header when fixture skills exist', async () => {
+			// Create project-level fixture skills
+			for (const name of ['alpha-skill', 'beta-skill']) {
+				const dir = join(tempDir, '.elefant', 'skills', name);
+				mkdirSync(dir, { recursive: true });
+				writeFileSync(join(dir, 'SKILL.md'), `Description for ${name}`);
+			}
+
+			const tool = await createSkillTool({ home: tempDir, cwd: tempDir });
+
+			expect(tool.name).toBe('skill');
+			expect(tool.description).toContain('## Available Skills');
+		});
+
+		it('description contains invocation hint /<skill-name>', async () => {
+			const tool = await createSkillTool({ home: tempDir, cwd: tempDir });
+
+			expect(tool.description).toContain('/<skill-name>');
+		});
+
+		it('description lists at least one fixture skill by name', async () => {
+			// Create project-level fixture skills
+			const dir = join(tempDir, '.elefant', 'skills', 'charlie-tool');
+			mkdirSync(dir, { recursive: true });
+			writeFileSync(join(dir, 'SKILL.md'), 'Charlie description');
+
+			const tool = await createSkillTool({ home: tempDir, cwd: tempDir });
+
+			expect(tool.description).toContain('charlie-tool');
+		});
+
+		it('description shows "No skills are currently available." when empty', async () => {
+			const tool = await createSkillTool({ home: tempDir, cwd: tempDir });
+
+			expect(tool.description).toContain('No skills are currently available.');
+		});
+
+		it('retains the skill name and parameter shape from the static tool', async () => {
+			const tool = await createSkillTool({ home: tempDir, cwd: tempDir });
+
+			expect(tool.name).toBe('skill');
+			expect(tool.parameters.name).toBeDefined();
+			expect(tool.parameters.name.type).toBe('string');
+			expect(tool.parameters.list).toBeDefined();
+			expect(tool.parameters.list.type).toBe('boolean');
+		});
+
+		it('can be re-registered into a ToolRegistry overwriting the static fallback', async () => {
+			const registry = new ToolRegistry(new HookRegistry());
+			registry.register(skillTool);
+
+			const before = registry.getAll().find((t) => t.name === 'skill');
+			expect(before).toBeDefined();
+			expect(before!.description).not.toContain('## Available Skills');
+
+			// Create a fixture skill so the description changes
+			const dir = join(tempDir, '.elefant', 'skills', 'delta-tool');
+			mkdirSync(dir, { recursive: true });
+			writeFileSync(join(dir, 'SKILL.md'), 'Delta description');
+
+			const upgraded = await createSkillTool({ home: tempDir, cwd: tempDir });
+			registry.register(upgraded);
+
+			const after = registry.getAll().find((t) => t.name === 'skill');
+			expect(after).toBeDefined();
+			expect(after!.description).toContain('## Available Skills');
+			expect(after!.description).toContain('delta-tool');
 		});
 	});
 });

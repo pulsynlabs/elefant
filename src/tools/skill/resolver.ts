@@ -10,7 +10,7 @@ import { parseFrontmatter } from './frontmatter.js';
 export interface SkillInfo {
 	name: string;
 	description: string; // frontmatter description or first non-blank body line
-	source: 'project' | 'user' | 'builtin';
+	source: 'project' | 'user' | 'registry' | 'builtin';
 	path: string;
 }
 
@@ -62,6 +62,16 @@ function extractDescription(content: string): string {
 	return '(no description)';
 }
 
+/** Overrides for listSkills to enable testability. */
+export interface ListSkillsOptions {
+	/** Override `process.cwd()` — defaults to `process.cwd()`. */
+	cwd?: string;
+	/** Override `homedir()` — defaults to `homedir()`. */
+	home?: string;
+	/** Override registry cache root — defaults to `~/.config/elefant/cache/skills/`. */
+	cacheRoot?: string;
+}
+
 /**
  * Resolve skill in priority order:
  * 1. .elefant/skills/<name>/SKILL.md         (project — Elefant)
@@ -70,13 +80,16 @@ function extractDescription(content: string): string {
  * 4. ~/.config/elefant/skills/<name>/SKILL.md (user — Elefant)
  * 5. ~/.agents/skills/<name>/SKILL.md        (user — agents-compatible)
  * 6. ~/.claude/skills/<name>/SKILL.md        (user — Claude-compatible)
- * 7. <import.meta.dir>/builtin/<name>/SKILL.md (bundled)
+ * 7. <cacheRoot>/<subdir>/<name>/SKILL.md         (registry — dynamic scan)
+ * 8. <import.meta.dir>/builtin/<name>/SKILL.md (bundled)
  */
 export async function resolveSkill(
 	name: string,
+	opts: ListSkillsOptions = {},
 ): Promise<{ path: string; content: string } | null> {
-	const cwd = process.cwd();
-	const home = homedir();
+	const cwd = opts.cwd ?? process.cwd();
+	const home = opts.home ?? homedir();
+	const cacheRoot = opts.cacheRoot ?? join(homedir(), '.config', 'elefant', 'cache', 'skills');
 
 	const candidates = [
 		join(cwd, '.elefant', 'skills', name, 'SKILL.md'),
@@ -85,7 +98,6 @@ export async function resolveSkill(
 		join(home, '.config', 'elefant', 'skills', name, 'SKILL.md'),
 		join(home, '.agents', 'skills', name, 'SKILL.md'),
 		join(home, '.claude', 'skills', name, 'SKILL.md'),
-		join(import.meta.dir, 'builtin', name, 'SKILL.md'),
 	];
 
 	for (const candidate of candidates) {
@@ -95,6 +107,30 @@ export async function resolveSkill(
 			return { path: candidate, content };
 		}
 	}
+
+	// Registry cache: scan <cacheRoot>/*/<name>/SKILL.md
+	try {
+		const entries = readdirSync(cacheRoot, { withFileTypes: true });
+		for (const entry of entries) {
+			if (!entry.isDirectory()) continue;
+			const candidate = join(cacheRoot, entry.name, name, 'SKILL.md');
+			const file = Bun.file(candidate);
+			if (await file.exists()) {
+				const content = await file.text();
+				return { path: candidate, content };
+			}
+		}
+	} catch {
+		// cache dir doesn't exist — skip silently
+	}
+
+	// Builtin as final fallback
+	const builtinPath = join(import.meta.dir, 'builtin', name, 'SKILL.md');
+	const builtinFile = Bun.file(builtinPath);
+	if (await builtinFile.exists()) {
+		return { path: builtinPath, content: await builtinFile.text() };
+	}
+
 	return null;
 }
 
@@ -133,22 +169,16 @@ async function scanSkillDir(
 	return skills;
 }
 
-/** Overrides for listSkills to enable testability. */
-export interface ListSkillsOptions {
-	/** Override `process.cwd()` — defaults to `process.cwd()`. */
-	cwd?: string;
-	/** Override `homedir()` — defaults to `homedir()`. */
-	home?: string;
-}
-
 /**
  * Skill directory entries in priority order (highest first).
- * Project-level paths all map to `'project'`; user-level to `'user'`; builtin to `'builtin'`.
+ * Project-level paths all map to `'project'`; user-level to `'user'`;
+ * registry to `'registry'`; builtin to `'builtin'`.
  */
 function skillSearchDirs(
 	cwd: string,
 	home: string,
-): Array<{ path: string; source: SkillInfo['source'] }> {
+	cacheRoot: string,
+): Array<{ path: string; source: SkillInfo['source']; isRegistryRoot?: boolean }> {
 	return [
 		{ path: join(cwd, '.elefant', 'skills'), source: 'project' },
 		{ path: join(cwd, '.claude', 'skills'), source: 'project' },
@@ -156,30 +186,50 @@ function skillSearchDirs(
 		{ path: join(home, '.config', 'elefant', 'skills'), source: 'user' },
 		{ path: join(home, '.agents', 'skills'), source: 'user' },
 		{ path: join(home, '.claude', 'skills'), source: 'user' },
+		{ path: cacheRoot, source: 'registry', isRegistryRoot: true },
 		{ path: join(import.meta.dir, 'builtin'), source: 'builtin' },
 	];
 }
 
 /**
  * List all available skills across all tiers.
- * Deduplicates by name (project overrides user overrides builtin).
+ * Deduplicates by name (project > user > registry > builtin).
  */
 export async function listSkills(
 	opts: ListSkillsOptions = {},
 ): Promise<SkillInfo[]> {
 	const cwd = opts.cwd ?? process.cwd();
 	const home = opts.home ?? homedir();
+	const cacheRoot = opts.cacheRoot ?? join(homedir(), '.config', 'elefant', 'cache', 'skills');
 
-	const dirs = skillSearchDirs(cwd, home);
+	const dirs = skillSearchDirs(cwd, home, cacheRoot);
 
 	// Scan directories in priority order. First found for a name wins.
 	const skillMap = new Map<string, SkillInfo>();
 
-	for (const { path: dirPath, source } of dirs) {
-		const skills = await scanSkillDir(dirPath, source);
-		for (const skill of skills) {
-			if (!skillMap.has(skill.name)) {
-				skillMap.set(skill.name, skill);
+	for (const { path: dirPath, source, isRegistryRoot } of dirs) {
+		if (isRegistryRoot) {
+			// Two-level scan: <cacheRoot>/<type-hash>/<skill-name>/SKILL.md
+			try {
+				const subEntries = readdirSync(dirPath, { withFileTypes: true });
+				for (const subEntry of subEntries) {
+					if (!subEntry.isDirectory()) continue;
+					const skills = await scanSkillDir(join(dirPath, subEntry.name), source);
+					for (const skill of skills) {
+						if (!skillMap.has(skill.name)) {
+							skillMap.set(skill.name, skill);
+						}
+					}
+				}
+			} catch {
+				// cache dir doesn't exist — skip silently
+			}
+		} else {
+			const skills = await scanSkillDir(dirPath, source);
+			for (const skill of skills) {
+				if (!skillMap.has(skill.name)) {
+					skillMap.set(skill.name, skill);
+				}
 			}
 		}
 	}
