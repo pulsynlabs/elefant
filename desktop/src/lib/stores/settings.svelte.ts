@@ -38,7 +38,10 @@ export async function initSettings(): Promise<void> {
 			autoStartDaemon = savedAutoStart;
 		}
 
-		getDaemonClient(daemonUrl);
+		// Default to http://localhost:1337 when no URL is saved (Tauri first launch).
+		// In browser-mode, initSettings throws before reaching here, and the
+		// DaemonClient constructor default ('') keeps relative URLs for the proxy.
+		getDaemonClient(daemonUrl || 'http://localhost:1337');
 	} catch {
 		// Use defaults on error
 	}

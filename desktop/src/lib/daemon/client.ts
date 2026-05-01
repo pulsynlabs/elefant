@@ -63,7 +63,7 @@ export class DaemonClient {
 	private baseUrl: string;
 	private timeout: number;
 
-	constructor(baseUrl: string = 'http://localhost:1337', timeout: number = 5000) {
+	constructor(baseUrl: string = '', timeout: number = 5000) {
 		this.baseUrl = baseUrl;
 		this.timeout = timeout;
 	}

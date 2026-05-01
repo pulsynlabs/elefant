@@ -5,6 +5,7 @@
 
 export type ErrorCode =
   | 'FILE_NOT_FOUND'
+  | 'NOT_FOUND'
   | 'PERMISSION_DENIED'
   | 'TOOL_NOT_FOUND'
   | 'TOOL_EXECUTION_FAILED'
