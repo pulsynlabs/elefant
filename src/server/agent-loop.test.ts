@@ -885,6 +885,7 @@ describe('runAgentLoop', () => {
 		expect(capturedPayloads[0].map((message) => message.content)).toEqual([
 			'B(saw:A)',
 			'A',
+			expect.stringContaining('## Identity'),
 			'hello',
 		])
 	})
@@ -971,7 +972,9 @@ describe('runAgentLoop', () => {
 		expect(payloads.every((messages) => messages[0]?.role === 'system')).toBe(true)
 		expect(payloads.every((messages) => messages[0]?.content === 'fixed-header')).toBe(true)
 		expect(payloads.every((messages) => messages[1]?.role === 'system')).toBe(true)
-		expect(payloads.every((messages) => messages[1]?.content.length <= 80)).toBe(true)
+		expect(payloads.every((messages) => messages[1]?.content.includes('## Identity'))).toBe(true)
+		expect(payloads.every((messages) => messages[2]?.role === 'system')).toBe(true)
+		expect(payloads.every((messages) => messages[2]?.content.length <= 80)).toBe(true)
 		expect(warnings.length).toBeGreaterThan(0)
 
 		// The cached spec block render should read from disk only once for identical mtime.
