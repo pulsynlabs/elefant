@@ -1,7 +1,7 @@
 import { DAEMON_URL } from '$lib/daemon/client';
 
 /**
- * Typed client for Spec Mode daemon routes.
+ * Typed client for workflow daemon routes.
  *
  * Wave 7 GUI stores consume this thin wrapper instead of reaching into daemon
  * URLs directly. It intentionally contains no business logic: methods mirror

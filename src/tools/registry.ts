@@ -369,6 +369,7 @@ export interface ToolRegistryRunDeps {
 	providerRouter: ProviderRouter
 	configManager: ConfigManager
 	currentRun: RunContext
+	mode?: 'spec' | 'quick'
 	mcpManager?: MCPManager
 	metadataEmitter?: MetadataEmitter
 }
@@ -418,14 +419,16 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	}
 	registry.register(createAgentSessionSearchTool(agentSessionSearchDeps))
 
-	const specCtx = createSpecToolContext({
-		database: deps.database,
-		projectId: deps.currentRun.projectId,
-		runId: deps.currentRun.runId,
-		hookRegistry: deps.hookRegistry,
-	})
-	for (const tool of createSpecTools(specCtx)) {
-		registry.register(tool)
+	if ((deps.mode ?? 'quick') === 'spec') {
+		const specCtx = createSpecToolContext({
+			database: deps.database,
+			projectId: deps.currentRun.projectId,
+			runId: deps.currentRun.runId,
+			hookRegistry: deps.hookRegistry,
+		})
+		for (const tool of createSpecTools(specCtx)) {
+			registry.register(tool)
+		}
 	}
 
 	if (deps.mcpManager) {

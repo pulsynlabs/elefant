@@ -11,7 +11,7 @@ When starting a new Spec Mode workflow and you need to capture the user's vision
 - No existing workflow with the same ID for this project.
 
 ## Process
-1. Call `spec_state({ action: "get" })` — if `interviewComplete` is already `true`, ask the user whether to start fresh (reset) or resume the existing interview.
+1. Call `wf_state({ action: "get" })` — if `interviewComplete` is already `true`, ask the user whether to start fresh (reset) or resume the existing interview.
 2. Ask the user 6 discovery questions via the `question` tool:
    - **Vision:** What should this feature accomplish? One-sentence statement.
    - **Must-Haves:** What are the non-negotiable requirements? List them.
@@ -20,14 +20,14 @@ When starting a new Spec Mode workflow and you need to capture the user's vision
    - **Assumptions:** What are you assuming is true? Identify at least 3 and their consequences if false.
    - **Risks:** What could go wrong? Rate impact and likelihood for each.
 3. Synthesize answers into a structured REQUIREMENTS document with: Vision Statement, Must-Haves (with acceptance criteria), Out of Scope, Constraints, Assumptions (table with "If False" column), Risks (table with Impact/Likelihood/Mitigation).
-4. Write the document via `spec_requirements.write({ workflowId, content })`.
-5. Call `spec_state({ action: "complete-interview" })`.
+4. Write the document via `wf_requirements.write({ workflowId, content })`.
+5. Call `wf_state({ action: "complete-interview" })`.
 6. Present the synthesized REQUIREMENTS to the user for confirmation.
 7. **Memory protocol:** Save discovery to memory so subsequent workflows on this project surface it via `memory_search`. Call `memory_save({ type: "note", title: "Discovery: <workflowId>", importance: 7, concepts: ["spec-mode", "<workflowId>", "discovery"], content: "<vision> | Must-haves: <mh-titles> | Out of scope: <oos> | Risks: <risk-titles>" })`. The exact structured payload is built by `onDiscoveryComplete` in `src/state/spec-memory-hooks.ts`; agents should call `memory_save` directly with that envelope when running outside the daemon hook path.
 
 ## Tools Used
-- `spec_state` — read current state, complete interview
-- `spec_requirements.write` — persist the REQUIREMENTS document
+- `wf_state` — read current state, complete interview
+- `wf_requirements.write` — persist the REQUIREMENTS document
 - `question` — ask discovery questions (disabled in lazy autopilot)
 
 ## Autopilot Behavior

@@ -10,7 +10,7 @@ Any time you want to check where the workflow stands. Safe to run at any phase â
 - A workflow must exist and be active for the current project.
 
 ## Process
-1. Call `spec_status({ workflowId })` to get the full state payload.
+1. Call `wf_status({ workflowId })` to get the full state payload.
 2. Format the response as a human-readable table:
 
 ```
@@ -45,7 +45,7 @@ Any time you want to check where the workflow stands. Safe to run at any phase â
 4. If the spec is locked, show a lock indicator and the last amendment timestamp (if any).
 
 ## Tools Used
-- `spec_status` â€” get full workflow state
+- `wf_status` â€” get full workflow state
 
 ## Autopilot Behavior
 No autopilot continuation â€” this is a read-only status command. Always returns the table and stops.

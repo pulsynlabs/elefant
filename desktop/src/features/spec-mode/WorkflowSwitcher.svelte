@@ -11,7 +11,7 @@ Accessibility:
 -->
 <script lang="ts">
 	import { specModeStore } from '$lib/stores/spec-mode.svelte.js';
-	import type { SpecWorkflowSummary } from '$lib/api/spec-mode.js';
+	import type { SpecWorkflowSummary } from '$lib/api/workflow.js';
 	import {
 		HugeiconsIcon,
 		ChevronDownIcon,

@@ -21,12 +21,12 @@ When you need deep domain exploration before planning — technology tradeoffs, 
    - Compares alternatives with pros/cons tables.
    - Documents tradeoffs and provides a recommendation.
    - Writes findings to the output markdown file.
-6. Log the research dispatch to ADL: `spec_adl.append({ type: "decision", title: "Research dispatched", body: "Researcher dispatched for topic: <topic>. Output: research/<topic-slug>.md" })`.
+6. Log the research dispatch to ADL: `wf_adl.append({ type: "decision", title: "Research dispatched", body: "Researcher dispatched for topic: <topic>. Output: research/<topic-slug>.md" })`.
 7. Present the research summary path to the user: "Research saved to `.goopspec/<workflowId>/research/<topic-slug>.md`."
 
 ## Tools Used
 - `task` — dispatch researcher agent
-- `spec_adl.append` — log the research decision
+- `wf_adl.append` — log the research decision
 - `memory_search` — check for prior research on the same topic
 
 ## Autopilot Behavior

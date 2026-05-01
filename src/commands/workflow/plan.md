@@ -11,24 +11,24 @@ After `/discuss` has produced a confirmed REQUIREMENTS document. This command tr
 - The workflow must not already have a locked SPEC (unless amending).
 
 ## Process
-1. Read the REQUIREMENTS document via `spec_requirements.read({ workflowId })`.
+1. Read the REQUIREMENTS document via `wf_requirements.read({ workflowId })`.
 2. Run `memory_search({ query: "<workflow topic> patterns conventions" })` to surface relevant prior decisions.
 3. Dispatch the `planner` agent via `task({ subagent_type: "planner", ... })`. The planner:
    - Extracts must-haves with traceable IDs (MH1, MH2…).
    - Writes acceptance criteria and validation contract assertions for each must-have.
    - Decomposes the work into waves and tasks in a BLUEPRINT with per-task executor tier, files, and done criteria.
    - Produces a wave sequencing diagram showing the critical path.
-4. Write the SPEC via `spec_spec.write({ workflowId, content })`.
-5. Write the BLUEPRINT via `spec_blueprint.write({ workflowId, content })`.
+4. Write the SPEC via `wf_spec.write({ workflowId, content })`.
+5. Write the BLUEPRINT via `wf_blueprint.write({ workflowId, content })`.
 6. Present a **Contract Gate** to the user — show the must-have list with acceptance criteria and ask for explicit confirmation.
-7. On user confirmation, call `spec_spec.lock({ workflowId })` which validates that every must-have has at least one validation contract entry.
+7. On user confirmation, call `wf_spec.lock({ workflowId })` which validates that every must-have has at least one validation contract entry.
 8. Log the lock event to CHRONICLE.
 
 ## Tools Used
-- `spec_requirements.read` — read the requirements
-- `spec_spec.write` — persist the specification
-- `spec_spec.lock` — lock the specification contract
-- `spec_blueprint.write` — persist the execution blueprint
+- `wf_requirements.read` — read the requirements
+- `wf_spec.write` — persist the specification
+- `wf_spec.lock` — lock the specification contract
+- `wf_blueprint.write` — persist the execution blueprint
 - `memory_search` — surface prior decisions and patterns
 - `task` — dispatch the planner subagent
 
@@ -41,7 +41,7 @@ When `lazyAutopilot=true`:
 ## Output
 - A locked SPEC document with must-haves, acceptance criteria, and validation contracts.
 - A BLUEPRINT with waves and tasks, each with executor assignment and done criteria.
-- `spec_workflows.spec_locked` set to `true`.
+- `spec_workflows.locked` set to `true`.
 
 ## Success Criteria
 - [ ] SPEC contains at least one must-have with a traceable ID (MH1, MH2…).

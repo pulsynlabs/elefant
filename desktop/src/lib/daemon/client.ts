@@ -229,7 +229,7 @@ export class DaemonClient {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 		try {
-			const response = await fetch(`${this.baseUrl}/tools/slider/answer/${sliderId}`, {
+			const response = await fetch(`${this.baseUrl}/api/interactive/slider/${sliderId}`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ value }),

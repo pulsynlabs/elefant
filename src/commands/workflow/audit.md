@@ -12,8 +12,8 @@ After all waves of `/execute` are complete. This is the quality gate before acce
 - CHRONICLE must contain the list of files changed during execution.
 
 ## Process
-1. Read the locked SPEC's full validation contract (all per-MH VCs + aggregate AVCs) via `spec_spec({ action: "read", workflowId })` — pull every VC entry, not just the per-MH ones.
-2. Read the list of changed files from CHRONICLE via `spec_chronicle({ action: "read", workflowId, kind: "task_completed" })` and extract file paths from each entry payload.
+1. Read the locked SPEC's full validation contract (all per-MH VCs + aggregate AVCs) via `wf_spec({ action: "read", workflowId })` — pull every VC entry, not just the per-MH ones.
+2. Read the list of changed files from CHRONICLE via `wf_chronicle({ action: "read", workflowId, kind: "task_completed" })` and extract file paths from each entry payload.
 3. Dispatch the `verifier` agent via `task({ subagent_type: "verifier", contextMode: "none", input: { validationContract, changedFiles, perMhAcceptanceCriteria } })`. The `contextMode: "none"` is critical — the verifier must not inherit executor reasoning.
 4. Parse the verifier's response envelope. The `<verification>` block contains JSON matching `AuditReportSchema` from `src/tools/workflow/verifier-output.ts` — `{ workflowId, auditedAt, results: [{ vcId, status, evidence, severity?, recommendation? }], summary, recommendation }`.
 5. Persist the parsed report as a `spec_chronicle_entries` row with `kind: "audit_report"` and `payload: { auditReport }`.
@@ -24,12 +24,12 @@ After all waves of `/execute` are complete. This is the quality gate before acce
 7. If any result is `partial`, treat it as moderate at minimum; require explicit user confirmation before continuing.
 
 ## Tools Used
-- `spec_spec.read` — read the validation contract
-- `spec_chronicle.read` — gather changed-files list
+- `wf_spec.read` — read the validation contract
+- `wf_chronicle.read` — gather changed-files list
 - `task` — dispatch verifier agent (fresh context)
 - `permission:ask` — halt on major/partial failures
-- `spec_chronicle.append` — log audit outcome
-- `spec_adl.append` — log audit routing decisions
+- `wf_chronicle.append` — log audit outcome
+- `wf_adl.append` — log audit routing decisions
 
 ## Autopilot Behavior
 When `autopilot=true`:

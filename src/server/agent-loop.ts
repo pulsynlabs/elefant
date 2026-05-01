@@ -17,6 +17,7 @@ import { clearRunEventSequence, publishRunEvent, publishStatusChange } from '../
 import type { RunContext } from '../runs/types.ts'
 import { buildSystemPrompt, type WorkflowPromptState } from '../compaction/system-prompt-builder.ts'
 import { createQuestionEmitter, type QuestionEmitter } from '../tools/question/emitter.ts'
+import type { SliderEmitter } from '../tools/interactive/types.ts'
 import type { MetadataEmitter } from '../tools/task/metadata-emitter.ts'
 import type { ElefantError } from '../types/errors.ts'
 import { type Message } from '../types/providers.ts'
@@ -47,6 +48,7 @@ export interface AgentLoopOptions {
 	compaction?: CompactionManager
 	runContext: RunContext
 	questionEmitter?: QuestionEmitter
+	sliderEmitter?: SliderEmitter
 	metadataEmitter?: MetadataEmitter
 	sseManager?: SseManager
 	commandsDir?: string
@@ -250,6 +252,7 @@ function toToolArguments(
 	runId: string,
 	toolCallId: string,
 	questionEmitter: QuestionEmitter,
+	sliderEmitter: SliderEmitter,
 ): Record<string, unknown> {
 	const baseArgs =
 		typeof args === 'object' && args !== null && !Array.isArray(args)
@@ -261,6 +264,7 @@ function toToolArguments(
 		conversationId: runId,
 		_toolCallId: toolCallId,
 		_questionEmitter: questionEmitter,
+		_sliderEmitter: sliderEmitter,
 	}
 }
 
@@ -292,6 +296,17 @@ export async function* runAgentLoop(
 		options.runContext.runId,
 		questionEmitter,
 	)
+	const baseSliderEmitter = options.sliderEmitter ?? (() => undefined)
+	const sliderEmitter: SliderEmitter = (payload) => {
+		emitRunEvent('agent_run.slider', payload)
+		baseSliderEmitter(payload)
+	}
+	const runSliderEmitter: SliderEmitter = (payload) => {
+		sliderEmitter({
+			...payload,
+			conversationId: options.runContext.runId,
+		})
+	}
 
 	emitRunEvent('agent_run.spawned', {
 		runId: options.runContext.runId,
@@ -574,7 +589,7 @@ export async function* runAgentLoop(
 
 				const executeResult = await registry.execute(
 					toolCall.name,
-					toToolArguments(toolCall.arguments, options.runContext.runId, toolCall.id, runQuestionEmitter),
+					toToolArguments(toolCall.arguments, options.runContext.runId, toolCall.id, runQuestionEmitter, runSliderEmitter),
 				)
 
 				if (!executeResult.ok && executeResult.error.code === 'VALIDATION_ERROR') {

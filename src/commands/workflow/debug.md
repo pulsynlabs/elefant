@@ -27,7 +27,7 @@ When you have a reproducible bug and want a systematic investigation rather than
 ## Tools Used
 - `task` — dispatch debugger agent
 - `bash` — run experiments and verification commands
-- `spec_chronicle.append` — log investigation steps
+- `wf_chronicle.append` — log investigation steps
 
 ## Autopilot Behavior
 When `autopilot=true`:

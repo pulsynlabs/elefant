@@ -13,12 +13,12 @@ When the SPEC is locked but a must-have, acceptance criterion, or out-of-scope i
 
 ## Process
 1. Ask the user what they want to change: which must-have, acceptance criterion, or constraint, and why.
-2. Read the current SPEC via `spec_spec.read({ workflowId })` to show the current state.
+2. Read the current SPEC via `wf_spec.read({ workflowId })` to show the current state.
 3. Formulate the amendment payload:
    - **rationale:** why the change is needed
    - **target:** which document section is changing
    - **change:** the exact old → new content
-4. Call `spec_spec.amend({ workflowId, amendment: { rationale, change } })`. This:
+4. Call `wf_spec.amend({ workflowId, amendment: { rationale, change } })`. This:
    - Begins a transaction.
    - Snapshots the current locked state.
    - Temporarily clears `spec_locked`.
@@ -30,10 +30,10 @@ When the SPEC is locked but a must-have, acceptance criterion, or out-of-scope i
 6. Log the amendment to CHRONICLE and ADL.
 
 ## Tools Used
-- `spec_spec.read` — read current spec
-- `spec_spec.amend` — apply the amendment transactionally
-- `spec_chronicle.append` — log the amendment
-- `spec_adl.append` — record the deviation as a decision
+- `wf_spec.read` — read current spec
+- `wf_spec.amend` — apply the amendment transactionally
+- `wf_chronicle.append` — log the amendment
+- `wf_adl.append` — record the deviation as a decision
 
 ## Autopilot Behavior
 When `autopilot=true`:

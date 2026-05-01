@@ -13,9 +13,9 @@ After `/audit` has passed all validation contract assertions. This is the final 
 - The user must be present to confirm (this gate never auto-approves).
 
 ## Process
-1. Read the current workflow state via `spec_status({ workflowId })`.
+1. Read the current workflow state via `wf_status({ workflowId })`.
 2. Read the verifier's latest output via `spec_verifier_runs.latestForWorkflow({ workflowId })`.
-3. Read the BLUEPRINT summary (waves completed, tasks done) via `spec_blueprint.read({ workflowId, section: "summary" })`.
+3. Read the BLUEPRINT summary (waves completed, tasks done) via `wf_blueprint.read({ workflowId, section: "summary" })`.
 4. Present the acceptance summary to the user:
    - **Workflow ID and phase**
    - **Must-haves delivered** (count, list of IDs)
@@ -25,19 +25,19 @@ After `/audit` has passed all validation contract assertions. This is the final 
    - **Files changed** (from CHRONICLE)
 5. Ask for explicit confirmation: "Accept this work? Type 'accept' to confirm."
 6. On user confirmation:
-   - Call `spec_state({ action: "confirm-acceptance" })`.
+   - Call `wf_state({ action: "confirm-acceptance" })`.
    - Write a CHRONICLE entry: `{ kind: "workflow_accepted" }`.
    - Run the memory distillation hook (ADL → memory observations).
    - Generate a RETROSPECTIVE and LEARNINGS markdown.
 7. Mark the workflow status as `done`.
 
 ## Tools Used
-- `spec_status` — read workflow state
+- `wf_status` — read workflow state
 - `spec_verifier_runs.latestForWorkflow` — read audit results
-- `spec_blueprint.read` — read task summary
-- `spec_state.confirm-acceptance` — finalize the workflow
-- `spec_chronicle.append` — log acceptance
-- `spec_adl.append` — log acceptance decisions
+- `wf_blueprint.read` — read task summary
+- `wf_state.confirm-acceptance` — finalize the workflow
+- `wf_chronicle.append` — log acceptance
+- `wf_adl.append` — log acceptance decisions
 
 ## Autopilot Behavior
 The accept gate **never auto-approves**, regardless of `autopilot` or `lazyAutopilot` settings. This is the one human confirmation point that always requires explicit user input.

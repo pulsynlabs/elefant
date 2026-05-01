@@ -10,8 +10,8 @@ When you need to stop mid-workflow and resume later — at a wave boundary, end 
 - A workflow must be active and in a pausable phase (`plan`, `specify`, `execute`, or `audit`).
 
 ## Process
-1. Read the current workflow state via `spec_status({ workflowId })`.
-2. Call `spec_checkpoint.save({ id: "<workflowId>-<timestamp>", context: { phase, currentWave, totalWaves, completedTasks, pendingTasks, lockedMustHaveIds } })`.
+1. Read the current workflow state via `wf_status({ workflowId })`.
+2. Call `wf_checkpoint.save({ id: "<workflowId>-<timestamp>", context: { phase, currentWave, totalWaves, completedTasks, pendingTasks, lockedMustHaveIds } })`.
 3. Generate a HANDOFF.md file with:
    - **Current phase and wave position**
    - **What has been completed so far** (from CHRONICLE)
@@ -23,10 +23,10 @@ When you need to stop mid-workflow and resume later — at a wave boundary, end 
 5. Tell the user: "Checkpoint saved. Run `/resume` to continue from exactly where you left off."
 
 ## Tools Used
-- `spec_status` — read current state
-- `spec_checkpoint.save` — persist the checkpoint
-- `spec_chronicle.read` — gather progress context
-- `spec_adl.read` — gather recent decisions
+- `wf_status` — read current state
+- `wf_checkpoint.save` — persist the checkpoint
+- `wf_chronicle.read` — gather progress context
+- `wf_adl.read` — gather recent decisions
 
 ## Autopilot Behavior
 No autopilot continuation — pausing is the end state. The workflow stays paused until the user explicitly resumes.

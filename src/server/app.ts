@@ -10,6 +10,7 @@ import type { Database } from '../db/database.ts'
 import { ConfigManager } from '../config/index.ts'
 import { registerServerRoutes } from './routes.ts'
 import { registerQuestionRoute } from '../tools/question/route.ts'
+import { registerSliderRoute } from '../tools/interactive/slider-route.ts'
 import { mountWsRoute } from './routes-ws.ts'
 import { mountProjectEventsRoute, mountProjectsRoutes } from './routes-projects.ts'
 import { RunRegistry } from '../runs/registry.ts'
@@ -105,6 +106,7 @@ export function createApp(
 
 	// Register question tool route for HITL interactions
 	registerQuestionRoute(app as unknown as Elysia)
+	registerSliderRoute(app as unknown as Elysia)
 
 	// Create shared run infrastructure before routes so /api/chat
 	// and /api/projects/.../agent-runs share the same registry + config.

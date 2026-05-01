@@ -11,25 +11,25 @@ For small, well-defined tasks that don't need a formal discovery interview. The 
 - A project must be open.
 
 ## Process
-1. Set lazy autopilot mode on the workflow: `spec_state({ action: "set-autopilot", autopilot: true, lazy: true })`.
+1. Set lazy autopilot mode on the workflow: `wf_state({ action: "set-autopilot", autopilot: true, lazy: true })`.
 2. Create a new workflow or reuse the active one.
 3. Seed REQUIREMENTS directly from the `<task description>` argument without running the discovery interview:
    - Extract the vision from the task description.
    - Infer must-haves (at least one, derived from the description).
    - Set reasonable defaults for constraints, assumptions, and risks.
    - Mark out-of-scope as "inferred — review at accept gate."
-4. Write REQUIREMENTS via `spec_requirements.write`.
-5. Call `spec_state({ action: "complete-interview" })`.
+4. Write REQUIREMENTS via `wf_requirements.write`.
+5. Call `wf_state({ action: "complete-interview" })`.
 6. Invoke the `/plan` flow (see `plan.md`). The planner reads the inferred REQUIREMENTS and produces SPEC + BLUEPRINT.
 7. Invoke the `/execute` flow (see `execute.md`). Auto-progress through all waves.
 8. Invoke the `/audit` flow (see `audit.md`). Auto-route minor failures; halt on major.
 9. Pause at the accept gate — show the user the inferred REQUIREMENTS, the completed work summary, and ask for explicit confirmation.
-10. On user acceptance, call `spec_state({ action: "confirm-acceptance" })`.
+10. On user acceptance, call `wf_state({ action: "confirm-acceptance" })`.
 
 ## Tools Used
-- `spec_state.set-autopilot` — enable lazy autopilot
-- `spec_requirements.write` — seed inferred requirements
-- `spec_state.complete-interview` — mark interview complete
+- `wf_state.set-autopilot` — enable lazy autopilot
+- `wf_requirements.write` — seed inferred requirements
+- `wf_state.complete-interview` — mark interview complete
 - All tools from `/plan`, `/execute`, `/audit`, `/accept`
 
 ## Autopilot Behavior

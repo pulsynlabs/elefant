@@ -23,6 +23,8 @@ export interface SliderParams {
 	step?: number;
 	default?: number;
 	unit?: string;
+	/** Transport correlation id — injected by the agent loop (not exposed in schema). */
+	_toolCallId?: string;
 	/** Transport hook — injected by the agent loop (not exposed in schema). */
 	_sliderEmitter?: SliderEmitter;
 }
@@ -105,7 +107,9 @@ export function createSliderTool(deps: SliderDeps): ToolDefinition<SliderParams,
 			}
 
 			// ─── register with broker + emit to frontend ────────────────
-			const sliderId = crypto.randomUUID();
+			const sliderId = typeof params._toolCallId === 'string' && params._toolCallId.length > 0
+				? params._toolCallId
+				: crypto.randomUUID();
 			const emitter = params._sliderEmitter ?? deps.sliderEmitter;
 
 			const answerPromise = sliderBroker.register(sliderId, 60_000);

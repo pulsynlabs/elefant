@@ -1,6 +1,6 @@
 // Spec Mode store (Svelte 5 runes)
 //
-// Mirrors `desktop/src/lib/api/spec-mode.ts` as the reactive UI source of truth
+// Mirrors `desktop/src/lib/api/workflow.ts` as the reactive UI source of truth
 // for the Spec Mode panel. Components never call the API client directly — they
 // read from getters and call action methods. SSE event subscription keeps state
 // fresh in real time as the daemon emits spec lifecycle events.
@@ -13,7 +13,7 @@
 //   - File extension `.svelte.ts` is required for runes.
 
 import { DAEMON_URL } from '$lib/daemon/client.js';
-import { specModeApi, type SpecWorkflowSummary } from '$lib/api/spec-mode.js';
+import { specModeApi, type SpecWorkflowSummary } from '$lib/api/workflow.js';
 
 export interface SpecModeTask {
 	id: string;

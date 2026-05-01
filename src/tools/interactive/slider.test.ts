@@ -182,6 +182,24 @@ describe('createSliderTool', () => {
 		expect(r.ok).toBe(true);
 	});
 
+	it('uses injected tool call id as the slider broker id', async () => {
+		const tool = createSliderTool({ sliderEmitter: testEmitter });
+		const executePromise = tool.execute({
+			...validParams({ label: 'Temperature' }),
+			_toolCallId: 'tool-call-123',
+		});
+
+		await new Promise((r) => setTimeout(r, 50));
+
+		const payload = emittedPayloads[0] as Record<string, unknown>;
+		expect(payload.sliderId).toBe('tool-call-123');
+		sliderBroker.answer('tool-call-123', { value: 64 });
+
+		const r = await executePromise;
+		expect(r.ok).toBe(true);
+		if (r.ok) expect(r.data.value).toBe(64);
+	});
+
 	// ── timeout ────────────────────────────────────────────────────────
 
 	it('rejects on broker timeout', async () => {
