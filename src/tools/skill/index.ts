@@ -11,6 +11,10 @@ import { resolveSkill, listSkills } from './resolver.js';
 export interface SkillParams {
 	name?: string;
 	list?: boolean;
+	/** Override for `homedir()` — test isolation. */
+	home?: string;
+	/** Override for `process.cwd()` — test isolation. */
+	cwd?: string;
 }
 
 /**
@@ -45,7 +49,7 @@ export const skillTool: ToolDefinition<SkillParams, string> = {
 		},
 	},
 	execute: async (params): Promise<Result<string, ElefantError>> => {
-		const { name, list } = params;
+		const { name, list, home, cwd } = params;
 
 		// Neither name nor list → error
 		if (!name && !list) {
@@ -57,7 +61,7 @@ export const skillTool: ToolDefinition<SkillParams, string> = {
 
 		// List mode
 		if (list) {
-			const skills = await listSkills();
+			const skills = await listSkills({ home: home, cwd: cwd });
 			return ok(formatSkillsList(skills));
 		}
 

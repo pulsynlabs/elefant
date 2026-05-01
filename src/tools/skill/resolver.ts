@@ -5,24 +5,59 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { readdirSync } from 'node:fs';
+import { parseFrontmatter } from './frontmatter.js';
 
 export interface SkillInfo {
 	name: string;
-	description: string; // first non-blank line of SKILL.md
+	description: string; // frontmatter description or first non-blank body line
 	source: 'project' | 'user' | 'builtin';
 	path: string;
 }
 
 /**
- * Extract the first non-blank line from SKILL.md content as the description.
+ * Extract the skill description from SKILL.md content.
+ *
+ * 1. Prefer the YAML frontmatter `description` field (parsed by parseFrontmatter).
+ * 2. When frontmatter exists with no description, extract the first non-blank
+ *    body line after the closing `---`.
+ * 3. When no valid frontmatter is present, skip any stray `---` lines and
+ *    return the first non-blank line of the content.
+ * 4. Return `(no description)` sentinel when content has only blank lines.
  */
 function extractDescription(content: string): string {
-	const lines = content.split('\n');
-	for (const line of lines) {
-		const trimmed = line.trim();
-		if (trimmed.length > 0) {
-			return trimmed;
+	const { description, raw } = parseFrontmatter(content);
+
+	// Priority 1: explicit description field from frontmatter
+	if (description) return description;
+
+	if (raw !== null) {
+		// Priority 2: valid frontmatter block but no description field —
+		// extract the body after the closing --- delimiter
+		const lines = content.split('\n');
+		let delimiterCount = 0;
+
+		for (let i = 0; i < lines.length; i++) {
+			if (lines[i].trim() === '---') {
+				delimiterCount++;
+				if (delimiterCount === 2) {
+					// Scan body lines after the closing --- for first non-blank
+					for (let j = i + 1; j < lines.length; j++) {
+						const trimmed = lines[j].trim();
+						if (trimmed.length > 0) return trimmed;
+					}
+					return '(no description)';
+				}
+			}
 		}
+		return '(no description)';
+	}
+
+	// Priority 3: no valid frontmatter (absent or malformed) —
+	// skip any stray --- lines and take first non-blank line
+	for (const line of content.split('\n')) {
+		const trimmed = line.trim();
+		if (trimmed === '---') continue;
+		if (trimmed.length > 0) return trimmed;
 	}
 	return '(no description)';
 }
@@ -98,40 +133,59 @@ async function scanSkillDir(
 	return skills;
 }
 
+/** Overrides for listSkills to enable testability. */
+export interface ListSkillsOptions {
+	/** Override `process.cwd()` — defaults to `process.cwd()`. */
+	cwd?: string;
+	/** Override `homedir()` — defaults to `homedir()`. */
+	home?: string;
+}
+
+/**
+ * Skill directory entries in priority order (highest first).
+ * Project-level paths all map to `'project'`; user-level to `'user'`; builtin to `'builtin'`.
+ */
+function skillSearchDirs(
+	cwd: string,
+	home: string,
+): Array<{ path: string; source: SkillInfo['source'] }> {
+	return [
+		{ path: join(cwd, '.elefant', 'skills'), source: 'project' },
+		{ path: join(cwd, '.claude', 'skills'), source: 'project' },
+		{ path: join(cwd, '.agents', 'skills'), source: 'project' },
+		{ path: join(home, '.config', 'elefant', 'skills'), source: 'user' },
+		{ path: join(home, '.agents', 'skills'), source: 'user' },
+		{ path: join(home, '.claude', 'skills'), source: 'user' },
+		{ path: join(import.meta.dir, 'builtin'), source: 'builtin' },
+	];
+}
+
 /**
  * List all available skills across all tiers.
  * Deduplicates by name (project overrides user overrides builtin).
  */
-export async function listSkills(): Promise<SkillInfo[]> {
-	const projectDir = join(process.cwd(), '.elefant', 'skills');
-	const userDir = join(homedir(), '.config', 'elefant', 'skills');
-	const builtinDir = join(import.meta.dir, 'builtin');
+export async function listSkills(
+	opts: ListSkillsOptions = {},
+): Promise<SkillInfo[]> {
+	const cwd = opts.cwd ?? process.cwd();
+	const home = opts.home ?? homedir();
 
-	// Scan all tiers
-	const [projectSkills, userSkills, builtinSkills] = await Promise.all([
-		scanSkillDir(projectDir, 'project'),
-		scanSkillDir(userDir, 'user'),
-		scanSkillDir(builtinDir, 'builtin'),
-	]);
+	const dirs = skillSearchDirs(cwd, home);
 
-	// Deduplicate: project > user > builtin
+	// Scan directories in priority order. First found for a name wins.
 	const skillMap = new Map<string, SkillInfo>();
 
-	// Add builtin first (lowest priority)
-	for (const skill of builtinSkills) {
-		skillMap.set(skill.name, skill);
-	}
-
-	// User overrides builtin
-	for (const skill of userSkills) {
-		skillMap.set(skill.name, skill);
-	}
-
-	// Project overrides both
-	for (const skill of projectSkills) {
-		skillMap.set(skill.name, skill);
+	for (const { path: dirPath, source } of dirs) {
+		const skills = await scanSkillDir(dirPath, source);
+		for (const skill of skills) {
+			if (!skillMap.has(skill.name)) {
+				skillMap.set(skill.name, skill);
+			}
+		}
 	}
 
 	// Return sorted by name for consistent output
-	return Array.from(skillMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+	return Array.from(skillMap.values()).sort((a, b) =>
+		a.name.localeCompare(b.name),
+	);
 }
