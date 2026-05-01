@@ -5,10 +5,9 @@
 
 	type Props = {
 		onSelect: (provider: RegistryProvider) => void;
-		onCancel?: () => void;
 	};
 
-	let { onSelect, onCancel }: Props = $props();
+	let { onSelect }: Props = $props();
 
 	let providers = $state<RegistryProvider[]>([]);
 	let loading = $state(true);
@@ -49,9 +48,6 @@
 			<h4 id="quick-add-title" class="title">Quick Add Provider</h4>
 			<p class="subtitle">Choose a provider to pre-fill base URL and format.</p>
 		</div>
-		{#if onCancel}
-			<button class="btn-cancel" type="button" onclick={onCancel}>Cancel</button>
-		{/if}
 	</header>
 
 	{#if loading}
@@ -124,25 +120,6 @@
 	.subtitle {
 		font-size: var(--font-size-sm);
 		color: var(--color-text-secondary);
-	}
-
-	.btn-cancel {
-		background: none;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		color: var(--color-text-secondary);
-		cursor: pointer;
-		font-family: var(--font-sans);
-		font-size: var(--font-size-sm);
-		padding: var(--space-1) var(--space-3);
-		transition:
-			color var(--transition-fast),
-			border-color var(--transition-fast);
-	}
-
-	.btn-cancel:hover {
-		color: var(--color-text-primary);
-		border-color: var(--color-border-strong);
 	}
 
 	.state-panel {
