@@ -30,6 +30,7 @@
 
 	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
+	import { themeStore } from '$lib/stores/theme.svelte';
 	import type { Project, Session } from '$lib/types/project.js';
 	import {
 		HugeiconsIcon,
@@ -69,6 +70,10 @@
 	};
 
 	let { collapsed = false }: Props = $props();
+
+	const logoSrc = $derived(
+		themeStore.isDark ? '/elefant-dark.png' : '/elefant-light.png',
+	);
 
 	// Which project rows are currently expanded. Keyed by project id; a project
 	// is expanded iff its id maps to `true` here.
@@ -281,7 +286,7 @@
 		aria-label="Go to home"
 		title="Go to home"
 	>
-		<div class="brand-mark">E</div>
+		<img src={logoSrc} alt="Elefant" class="brand-logo" width="26" height="26" />
 		{#if !collapsed}
 			<span class="brand-name">Elefant</span>
 		{/if}
@@ -446,25 +451,15 @@
 		box-shadow: var(--glow-focus);
 	}
 
-	.brand-mark {
+	.brand-logo {
 		width: 26px;
 		height: 26px;
-		border-radius: var(--radius-md);
-		background-color: var(--color-primary);
-		color: #fff;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 13px;
-		font-family: var(--font-serif);
-		font-style: italic;
-		font-weight: var(--font-weight-normal);
+		object-fit: contain;
 		flex-shrink: 0;
-		/* No glow — quiet logo mark */
 		transition: opacity var(--duration-fast) var(--ease-out-expo);
 	}
 
-	.brand-mark:hover {
+	.brand-logo:hover {
 		opacity: 0.85;
 	}
 
