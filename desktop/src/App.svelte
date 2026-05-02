@@ -40,7 +40,6 @@
 	type LayoutMode = 'expanded' | 'collapsed' | 'mobileOverlay';
 	let layoutMode = $state<LayoutMode>('expanded');
 	let drawerOpen = $state(false);
-	const sidebarCollapsed = $derived(layoutMode === 'collapsed');
 	let isDesignSystemRoute = $state(false);
 
 	// Whether the user has a real (non-placeholder) provider configured.
@@ -196,9 +195,9 @@
 {#if isDesignSystemRoute}
 	<DesignSystemPage />
 {:else}
-	<AppShell sidebarCollapsed={sidebarCollapsed}>
+	<AppShell {layoutMode}>
 		{#snippet sidebar()}
-			<Sidebar collapsed={sidebarCollapsed} />
+			<Sidebar collapsed={layoutMode === 'collapsed'} />
 		{/snippet}
 
 		{#snippet topbar()}
@@ -266,6 +265,22 @@
 		{/if}
 	</AppShell>
 
+	<!-- Mobile drawer — rendered as a sibling outside the AppShell grid so the
+	     shell's overflow:hidden / overflow:clip doesn't clip it. Only mounted
+	     in mobileOverlay mode; backdrop + close-on-tap arrive in Task 1.3. -->
+	{#if layoutMode === 'mobileOverlay'}
+		<div
+			class="mobile-drawer"
+			class:drawer-open={drawerOpen}
+			role="dialog"
+			aria-modal="true"
+			aria-label="Navigation"
+			aria-hidden={!drawerOpen}
+		>
+			<Sidebar collapsed={false} />
+		</div>
+	{/if}
+
 	<!-- Floating tool-call approval overlay (shown when daemon requests user decision) -->
 	<ApprovalPanel />
 {/if}
@@ -277,5 +292,26 @@
 		justify-content: center;
 		height: 100%;
 		color: var(--color-text-muted);
+	}
+
+	/* Mobile drawer shell — fixed-position sibling of AppShell. Slides in from
+	   the left when drawerOpen is true. The Sidebar component is rendered
+	   inside; surface styling matches the desktop sidebar (Quire md surface). */
+	.mobile-drawer {
+		position: fixed;
+		inset: 0 auto 0 0;
+		width: var(--sidebar-width);
+		height: 100vh;
+		height: 100dvh;
+		z-index: var(--z-modal);
+		background-color: var(--surface-substrate);
+		border-right: 1px solid var(--border-edge);
+		transform: translateX(-100%);
+		transition: transform var(--transition-spring);
+		overflow: hidden;
+	}
+
+	.mobile-drawer.drawer-open {
+		transform: translateX(0);
 	}
 </style>
