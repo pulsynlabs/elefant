@@ -264,3 +264,14 @@ describe('buildUnauthorizedResponse', () => {
     expect(response.headers.get('WWW-Authenticate')).toBe('Basic realm="Elefant"');
   });
 });
+
+describe('proxyToDaemon header stripping', () => {
+  it('strips Origin and Referer headers before forwarding to daemon', async () => {
+    // proxyToDaemon is private, so we verify the source code contains
+    // the required delete calls.  This is a contract test — the fix
+    // is valueless if these lines are accidentally removed later.
+    const src = await Bun.file('src/commands/serve/browser-server.ts').text();
+    expect(src).toContain("headers.delete('origin')");
+    expect(src).toContain("headers.delete('referer')");
+  });
+});
