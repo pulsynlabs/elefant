@@ -1,6 +1,9 @@
 <script lang="ts">
 	import Tag from '$lib/components/ui/tag/Tag.svelte';
 	import { HugeiconsIcon, GithubIcon } from '$lib/icons/index.js';
+	import { themeStore } from '$lib/stores/theme.svelte';
+
+	const logoSrc = $derived(themeStore.isDark ? '/elefant-dark.png' : '/elefant-light.png');
 
 	const version = '0.1.0';
 	const repoUrl = 'https://github.com/hffmnnj/elefant';
@@ -23,7 +26,7 @@
 
 	<div class="about-content">
 		<div class="brand-section">
-			<div class="brand-mark" aria-hidden="true">E</div>
+			<img src={logoSrc} alt="Elefant" class="brand-logo" width="64" height="64" aria-hidden="true" />
 			<div class="brand-info">
 				<h1 class="brand-name">Elefant</h1>
 				<p class="brand-tagline">Code with memory.</p>
@@ -104,21 +107,13 @@
 		gap: var(--space-5);
 	}
 
-	.brand-mark {
+	.brand-logo {
 		width: 64px;
 		height: 64px;
-		border-radius: var(--radius-xl);
-		background-color: var(--color-primary);
-		color: var(--color-primary-foreground);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 28px;
-		font-weight: var(--font-weight-normal);
-		font-family: var(--font-serif);
-		font-style: italic;
+		object-fit: contain;
 		flex-shrink: 0;
 		box-shadow: var(--shadow-md);
+		border-radius: var(--radius-xl);
 	}
 
 	.brand-info {
