@@ -126,4 +126,11 @@
 			transition: none;
 		}
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.select-field {
+			min-height: 44px;
+		}
+	}
 </style>

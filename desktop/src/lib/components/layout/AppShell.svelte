@@ -7,14 +7,14 @@
 		sidebar?: Snippet;
 		topbar?: Snippet;
 		children?: Snippet;
-		sidebarCollapsed?: boolean;
+		layoutMode?: 'expanded' | 'collapsed' | 'mobileOverlay';
 	};
 
 	let {
 		sidebar,
 		topbar,
 		children,
-		sidebarCollapsed = $bindable(false),
+		layoutMode = 'expanded',
 	}: Props = $props();
 
 	// Pre-fetch slash commands so the completion overlay has data
@@ -27,7 +27,11 @@
 	});
 </script>
 
-<div class="app-shell" class:sidebar-collapsed={sidebarCollapsed}>
+<div
+	class="app-shell"
+	class:mode-collapsed={layoutMode === 'collapsed'}
+	class:mode-mobile={layoutMode === 'mobileOverlay'}
+>
 	<!-- Sidebar — Quire md surface (bound editorial sheet, no blur) -->
 	<aside class="sidebar quire-md" aria-label="Navigation sidebar">
 		{@render sidebar?.()}
@@ -49,7 +53,11 @@
 		display: grid;
 		grid-template-columns: var(--sidebar-width) 1fr;
 		grid-template-rows: 1fr;
+		/* Dual declaration: older browsers honor 100vh, modern mobile
+		   browsers (iOS Safari 16+, Chrome 108+) override with 100dvh
+		   so collapsing URL chrome doesn't trigger a layout shift. */
 		height: 100vh;
+		height: 100dvh;
 		width: 100vw;
 		overflow: hidden;
 		background-color: var(--surface-substrate);
@@ -93,8 +101,25 @@
 			);
 	}
 
-	.app-shell.sidebar-collapsed {
+	.app-shell.mode-collapsed {
 		grid-template-columns: var(--sidebar-width-collapsed) 1fr;
+	}
+
+	.app-shell.mode-mobile {
+		/* Sidebar column collapses to nothing — content fills full width.
+		   The drawer is rendered as a sibling outside this grid (in App.svelte)
+		   so it isn't clipped by the shell's overflow:hidden. */
+		grid-template-columns: 0 1fr;
+	}
+
+	/* In mobile-overlay mode the inline aside is unused (drawer takes its
+	   place). Hide it from layout and assistive tech without unmounting,
+	   so the sidebar snippet stays satisfied. */
+	.app-shell.mode-mobile .sidebar {
+		visibility: hidden;
+		width: 0;
+		overflow: hidden;
+		border: none;
 	}
 
 	.sidebar {
@@ -103,7 +128,10 @@
 		display: flex;
 		flex-direction: column;
 		overflow: clip;
+		/* Match the shell's dual-declaration so the sidebar tracks the
+		   dynamic viewport on mobile browsers without layout shift. */
 		height: 100vh;
+		height: 100dvh;
 		position: relative;
 		z-index: var(--z-sticky);
 		transition: width var(--transition-spring);
@@ -166,8 +194,15 @@
 	}
 
 	@media (max-width: 900px) {
-		.app-shell {
+		.app-shell:not(.mode-mobile) {
 			grid-template-columns: var(--sidebar-width-collapsed) 1fr;
+		}
+	}
+
+	@media (max-width: 640px) {
+		/* Force full-width content even before JS hydrates the layout mode. */
+		.app-shell {
+			grid-template-columns: 0 1fr;
 		}
 	}
 </style>

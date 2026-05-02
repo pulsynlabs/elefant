@@ -352,7 +352,11 @@
 	.chat-active-input {
 		flex: 0 0 auto;
 		width: 100%;
-		padding: var(--space-3) var(--space-4) var(--space-4);
+		/* Bottom padding uses max() so the iOS home indicator inset acts
+		   as a floor — keeps existing desktop spacing intact while
+		   pushing the input above the safe-area on mobile. */
+		padding: var(--space-3) var(--space-4)
+			max(var(--space-4), env(safe-area-inset-bottom));
 	}
 
 	/* ----- Reduced motion ---------------------------------------------- */

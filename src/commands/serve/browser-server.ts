@@ -117,6 +117,11 @@ async function proxyToDaemon(req: Request, daemonBaseUrl: string): Promise<Respo
   const headers = new Headers(req.headers);
   headers.set('host', new URL(daemonBaseUrl).host);
 
+  // Strip browser-origin headers — the proxy is the trusted local intermediary.
+  // The daemon's localhost-only CORS guard should not see the browser's remote origin.
+  headers.delete('origin');
+  headers.delete('referer');
+
   const daemonResponse = await fetch(targetUrl, {
     method: req.method,
     headers,

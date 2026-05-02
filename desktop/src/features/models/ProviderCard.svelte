@@ -227,4 +227,11 @@
 		white-space: normal;
 		text-align: right;
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.btn-test {
+			min-height: 44px;
+		}
+	}
 </style>

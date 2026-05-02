@@ -10,7 +10,8 @@
 		"tauri:dev": "tauri dev",
 		"tauri:build": "tauri build",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"test:e2e": "bunx playwright test"
 	},
 	"dependencies": {
 		"@codemirror/lang-javascript": "^6",

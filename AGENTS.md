@@ -127,3 +127,54 @@ The synthesis document (`05-synthesis/MASTER-SYNTHESIS.md`) is the only place th
 Research and design phase. No code written yet. No stack has been confirmed.
 
 Open questions are tracked in `05-synthesis/MASTER-SYNTHESIS.md` under "Open Questions for Design Phase."
+
+---
+
+## Mobile UI Testing
+
+The Elefant web UI is served to phone browsers. A Playwright test suite verifies
+mobile responsiveness and regression protection at 390×844 (iPhone 14 Pro).
+
+### Test Suites
+
+| Suite | File | Command | Purpose |
+|-------|------|---------|---------|
+| Mobile Audit | `desktop/tests/mobile-audit.spec.ts` | `cd desktop && bunx playwright test mobile-audit` | Discovery: visits every view, reports horizontal scroll, off-viewport elements, touch-target violations. Run this first when adding a new view. |
+| Mobile Regression | `desktop/tests/mobile-regression.spec.ts` | `cd desktop && bunx playwright test mobile-regression` | Stable CI suite: firm assertions on layout, drawer lifecycle, touch targets, resize auto-close. Must pass before merge. |
+| Desktop Spot-Check | `desktop/tests/desktop-spot.spec.ts` | `cd desktop && bunx playwright test desktop-spot` | Regression guard for desktop layout. Verifies sidebar inline, 900px collapse, no overlay artifacts. |
+
+### Running All E2E Tests
+
+```bash
+cd desktop && bunx playwright test
+# or
+cd desktop && bun run test:e2e
+```
+
+### Mobile Layout Architecture
+
+The app uses a three-mode layout state machine (in `App.svelte`):
+- **`expanded`** (> 900px): full sidebar, inline grid column
+- **`collapsed`** (641–900px): icon-only sidebar, inline grid column  
+- **`mobileOverlay`** (≤ 640px): sidebar hidden; hamburger opens a fixed overlay drawer
+
+Key files for mobile layout:
+- `desktop/src/App.svelte` — layout state machine, resize handler
+- `desktop/src/lib/components/layout/AppShell.svelte` — grid layout, `layoutMode` prop
+- `desktop/src/lib/styles/tokens.css` — `--mobile-breakpoint: 640px`, `--sidebar-width`, `--sidebar-width-collapsed`
+
+### Screenshots
+
+Baseline screenshots live in:
+- `desktop/tests/screenshots/mobile/baseline/` — mobile view baselines
+- `desktop/tests/screenshots/desktop/baseline/` — desktop view baselines
+- `desktop/tests/screenshots/mobile/` — latest audit screenshots (overwritten each run)
+
+### Adding a New View
+
+When adding a new view to the app:
+1. Add it to the `SIMPLE_VIEWS` or `PROJECT_VIEWS` array in `mobile-audit.spec.ts`
+2. Run `cd desktop && bunx playwright test mobile-audit` to audit the new view
+3. Fix any touch-target or overflow issues found
+4. Add assertions for the new view in `mobile-regression.spec.ts`
+5. Commit updated baseline screenshots

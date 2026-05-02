@@ -463,4 +463,12 @@
 		border-radius: var(--radius-sm);
 		color: var(--color-text-secondary);
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.btn-primary,
+		.btn-ghost {
+			min-height: 44px;
+		}
+	}
 </style>

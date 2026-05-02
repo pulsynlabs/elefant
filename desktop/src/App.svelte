@@ -37,7 +37,9 @@
 
 	const navigationRuntime = navigationStore as NavigationRuntime;
 
-	let sidebarCollapsed = $state(false);
+	type LayoutMode = 'expanded' | 'collapsed' | 'mobileOverlay';
+	let layoutMode = $state<LayoutMode>('expanded');
+	let drawerOpen = $state(false);
 	let isDesignSystemRoute = $state(false);
 
 	// Whether the user has a real (non-placeholder) provider configured.
@@ -76,9 +78,49 @@
 		previousActiveProjectId = current;
 	});
 
-	function toggleSidebar(): void {
-		sidebarCollapsed = !sidebarCollapsed;
+	function computeLayoutMode(width: number): LayoutMode {
+		if (width <= 640) return 'mobileOverlay';
+		if (width <= 900) return 'collapsed';
+		return 'expanded';
 	}
+
+	function toggleSidebar(): void {
+		if (layoutMode === 'mobileOverlay') {
+			drawerOpen = !drawerOpen;
+		} else {
+			layoutMode = layoutMode === 'expanded' ? 'collapsed' : 'expanded';
+		}
+	}
+
+	// Body scroll lock while the mobile drawer is open. Reactive $effect runs
+	// whenever layoutMode/drawerOpen change and ensures we always restore the
+	// previous overflow on cleanup (also handles unmount mid-open).
+	$effect(() => {
+		if (layoutMode === 'mobileOverlay' && drawerOpen) {
+			const previous = document.body.style.overflow;
+			document.body.style.overflow = 'hidden';
+			return () => {
+				document.body.style.overflow = previous;
+			};
+		}
+	});
+
+	// Move keyboard focus into the drawer when it opens so screen-reader and
+	// keyboard users land inside the dialog. (aria-hidden on sibling content
+	// is implied by aria-modal="true" for modern AT — explicit inert/aria-hidden
+	// on AppShell would require prop spreading on a component that doesn't
+	// accept arbitrary attributes, so we rely on aria-modal here.)
+	$effect(() => {
+		if (layoutMode === 'mobileOverlay' && drawerOpen) {
+			requestAnimationFrame(() => {
+				const drawer = document.querySelector<HTMLElement>('.mobile-drawer');
+				const firstFocusable = drawer?.querySelector<HTMLElement>(
+					'button, [href], input, [tabindex]:not([tabindex="-1"])',
+				);
+				firstFocusable?.focus();
+			});
+		}
+	});
 
 	onMount(() => {
 		// Initialize theme
@@ -139,6 +181,11 @@
 
 		// Keyboard shortcuts
 		function handleKeydown(event: KeyboardEvent): void {
+			// Close mobile drawer on Escape (highest-priority handler)
+			if (event.key === 'Escape' && layoutMode === 'mobileOverlay' && drawerOpen) {
+				drawerOpen = false;
+				return;
+			}
 			for (const shortcut of SHORTCUTS) {
 				if (matchesShortcut(event, shortcut)) {
 					if (shortcut.action === "settings") {
@@ -155,10 +202,15 @@
 
 		window.addEventListener("keydown", handleKeydown);
 
-		// Responsive sidebar
+		// Responsive sidebar — three-mode layout state machine
 		function handleResize(): void {
-			if (window.innerWidth < 900) {
-				sidebarCollapsed = true;
+			const newMode = computeLayoutMode(window.innerWidth);
+			if (newMode !== layoutMode) {
+				layoutMode = newMode;
+				// Auto-close drawer when leaving mobileOverlay
+				if (newMode !== 'mobileOverlay') {
+					drawerOpen = false;
+				}
 			}
 		}
 		window.addEventListener("resize", handleResize);
@@ -178,9 +230,9 @@
 {#if isDesignSystemRoute}
 	<DesignSystemPage />
 {:else}
-	<AppShell bind:sidebarCollapsed>
+	<AppShell {layoutMode}>
 		{#snippet sidebar()}
-			<Sidebar collapsed={sidebarCollapsed} />
+			<Sidebar collapsed={layoutMode === 'collapsed'} />
 		{/snippet}
 
 		{#snippet topbar()}
@@ -248,6 +300,38 @@
 		{/if}
 	</AppShell>
 
+	<!-- Mobile drawer — rendered as a sibling outside the AppShell grid so the
+	     shell's overflow:hidden / overflow:clip doesn't clip it. Only mounted
+	     in mobileOverlay mode. role="dialog" + aria-modal="true" implies
+	     aria-hidden on sibling content for modern screen readers. -->
+	{#if layoutMode === 'mobileOverlay'}
+		<div
+			class="mobile-drawer"
+			class:drawer-open={drawerOpen}
+			role="dialog"
+			aria-modal="true"
+			aria-label="Navigation"
+			aria-hidden={!drawerOpen}
+		>
+			<Sidebar collapsed={false} />
+		</div>
+	{/if}
+
+	<!-- Backdrop scrim. Rendered as a <button> so it has a native click handler
+	     and is keyboard-accessible; tabindex="-1" keeps it out of the tab order
+	     (users close via Escape). The {#if} guards mount it only while the
+	     drawer is open — close animates the drawer out via transform; the
+	     backdrop unmounts immediately, which is acceptable for MVP. -->
+	{#if layoutMode === 'mobileOverlay' && drawerOpen}
+		<button
+			type="button"
+			class="drawer-backdrop"
+			onclick={() => { drawerOpen = false; }}
+			aria-label="Close navigation"
+			tabindex="-1"
+		></button>
+	{/if}
+
 	<!-- Floating tool-call approval overlay (shown when daemon requests user decision) -->
 	<ApprovalPanel />
 {/if}
@@ -259,5 +343,52 @@
 		justify-content: center;
 		height: 100%;
 		color: var(--color-text-muted);
+	}
+
+	/* Mobile drawer shell — fixed-position sibling of AppShell. Slides in from
+	   the left when drawerOpen is true. The Sidebar component is rendered
+	   inside; surface styling matches the desktop sidebar (Quire md surface). */
+	.mobile-drawer {
+		position: fixed;
+		inset: 0 auto 0 0;
+		width: var(--sidebar-width);
+		height: 100vh;
+		height: 100dvh;
+		z-index: var(--z-modal);
+		background-color: var(--surface-substrate);
+		border-right: 1px solid var(--border-edge);
+		transform: translateX(-100%);
+		transition: transform var(--transition-spring);
+		overflow: hidden;
+	}
+
+	.mobile-drawer.drawer-open {
+		transform: translateX(0);
+	}
+
+	/* Drawer backdrop — semi-transparent scrim sitting between the content
+	   (z<20) and the drawer (--z-modal: 30). Rendered as a <button> for
+	   accessibility; reset native button chrome so it looks like a plain scrim. */
+	.drawer-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: var(--z-sticky);
+		background: rgb(0 0 0 / 0.45);
+		border: none;
+		padding: 0;
+		margin: 0;
+		cursor: pointer;
+		animation: drawer-backdrop-in var(--duration-base) var(--ease-out-expo) forwards;
+	}
+
+	@keyframes drawer-backdrop-in {
+		from { opacity: 0; }
+		to   { opacity: 1; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.drawer-backdrop {
+			animation: none;
+		}
 	}
 </style>

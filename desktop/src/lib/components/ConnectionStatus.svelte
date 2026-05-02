@@ -71,4 +71,11 @@
 	.status-text {
 		transition: color var(--transition-base);
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.connection-btn {
+			min-height: 44px;
+		}
+	}
 </style>

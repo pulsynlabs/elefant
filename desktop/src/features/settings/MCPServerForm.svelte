@@ -582,4 +582,12 @@
 		opacity: 0.6;
 		cursor: not-allowed;
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.btn-primary,
+		.btn-secondary {
+			min-height: 44px;
+		}
+	}
 </style>

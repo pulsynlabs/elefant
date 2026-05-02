@@ -42,4 +42,12 @@
 		border-color: var(--color-border-strong);
 		background-color: var(--color-surface-hover);
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.theme-toggle {
+			min-width: 44px;
+			min-height: 44px;
+		}
+	}
 </style>

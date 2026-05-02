@@ -140,4 +140,76 @@
 		overflow-y: auto;
 		padding: var(--space-6);
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.settings-nav-item {
+			min-height: 44px;
+		}
+	}
+
+	/* ── Mobile settings: horizontal scrollable tab strip ──────────── */
+	@media (max-width: 640px) {
+		/* Settings header: tighter padding */
+		.settings-header {
+			padding: var(--space-3) var(--space-4);
+		}
+
+		/* Switch layout direction: stack vertically */
+		.settings-layout {
+			flex-direction: column;
+			overflow: visible;
+		}
+
+		/* Nav becomes a horizontal scrollable strip */
+		.settings-nav {
+			width: 100%;
+			flex-shrink: 0;
+			flex-direction: row;
+			gap: var(--space-2);
+			padding: var(--space-2) var(--space-3);
+			border-right: none;
+			border-bottom: 1px solid var(--color-border);
+			overflow-x: auto;
+			overflow-y: hidden;
+			/* Hide scrollbar visually but keep scrollability */
+			-ms-overflow-style: none;
+			scrollbar-width: none;
+			min-height: unset;
+		}
+
+		.settings-nav::-webkit-scrollbar {
+			display: none;
+		}
+
+		/* Tabs become horizontal pills */
+		.settings-nav-item {
+			flex-shrink: 0;
+			width: auto;
+			white-space: nowrap;
+			padding: var(--space-2) var(--space-4);
+			border-radius: var(--radius-full);
+			font-size: var(--font-size-sm);
+			/* Keep ≥44px for WCAG 2.5.5 / MH3 touch target compliance */
+			min-height: 44px;
+			/* Remove the inset left border from desktop active state */
+			transform: none !important;
+		}
+
+		/* Active tab: filled pill */
+		.settings-nav-item.active {
+			box-shadow: none;
+			background-color: var(--color-primary);
+			color: #fff;
+			font-weight: var(--font-weight-medium);
+		}
+
+		/* Content fills remaining space */
+		.settings-content {
+			flex: 1;
+			min-height: 0;
+			overflow-y: auto;
+			padding: var(--space-4);
+		}
+	}
 </style>

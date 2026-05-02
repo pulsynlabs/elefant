@@ -936,4 +936,13 @@
 		border-color: var(--color-primary);
 		background-color: color-mix(in oklch, var(--color-primary) 10%, transparent);
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.btn-primary,
+		.btn-secondary,
+		.btn-pin {
+			min-height: 44px;
+		}
+	}
 </style>
