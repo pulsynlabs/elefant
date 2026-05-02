@@ -49,7 +49,11 @@
 		display: grid;
 		grid-template-columns: var(--sidebar-width) 1fr;
 		grid-template-rows: 1fr;
+		/* Dual declaration: older browsers honor 100vh, modern mobile
+		   browsers (iOS Safari 16+, Chrome 108+) override with 100dvh
+		   so collapsing URL chrome doesn't trigger a layout shift. */
 		height: 100vh;
+		height: 100dvh;
 		width: 100vw;
 		overflow: hidden;
 		background-color: var(--surface-substrate);
@@ -103,7 +107,10 @@
 		display: flex;
 		flex-direction: column;
 		overflow: clip;
+		/* Match the shell's dual-declaration so the sidebar tracks the
+		   dynamic viewport on mobile browsers without layout shift. */
 		height: 100vh;
+		height: 100dvh;
 		position: relative;
 		z-index: var(--z-sticky);
 		transition: width var(--transition-spring);

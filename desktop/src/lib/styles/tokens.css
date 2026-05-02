@@ -318,6 +318,10 @@
 	--sidebar-width-collapsed: 56px;
 	--topbar-height: 48px;
 	--sidebar-collapse-breakpoint: 900px;
+	/* Mobile breakpoint — viewports at or below this width switch the
+	   sidebar into the overlay drawer mode. Documented as a token so
+	   future @media queries can reference a single source of truth. */
+	--mobile-breakpoint: 640px;
 }
 
 /* =========================================

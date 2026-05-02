@@ -589,7 +589,11 @@ Accessibility:
 	 */
 	.spec-chat-input {
 		flex-shrink: 0;
-		padding: var(--space-3) var(--space-4) var(--space-4);
+		/* Bottom padding uses max() so the iOS home indicator inset acts
+		   as a floor — keeps existing desktop spacing intact while
+		   pushing the input above the safe-area on mobile. */
+		padding: var(--space-3) var(--space-4)
+			max(var(--space-4), env(safe-area-inset-bottom));
 		border-top: 1px solid var(--border-edge);
 	}
 
