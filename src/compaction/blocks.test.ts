@@ -4,23 +4,56 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { Database } from '../db/database.ts';
+import { defaultAgentProfiles } from '../config/schema.ts';
 import { SpecAdlRepo } from '../db/repo/spec/adl.ts';
 import { MustHavesRepo } from '../db/repo/spec/must-haves.ts';
 import { emit } from '../hooks/emit.ts';
 import { HookRegistry } from '../hooks/registry.ts';
 import { insertEvent } from '../db/repo/events.ts';
+import { buildInitialMessages } from '../runs/context.ts';
 import { StateManager } from '../state/manager.ts';
 import { createDefaultState } from '../state/schema.ts';
 import {
 	__getFileReadCountForTests,
 	__resetFileBlockCacheForTests,
 	buildAdlBlock,
+	buildResumeDirective,
+	buildResumeDirectiveFromWorkflow,
 	buildSpecBlock,
 	buildStateBlock,
 	buildToolInstructionsBlock,
 	createCompactionBlockTransform,
-  buildSpecModeBlock,
+	buildSpecModeBlock,
 } from './blocks.ts';
+
+type DirectiveStateOverrides = Omit<
+	Partial<ReturnType<typeof createDefaultState>['workflow']>,
+	'workflowId' | 'phase'
+> & {
+	workflowId?: string | null;
+	phase?: string;
+};
+
+function createDirectiveState(
+	overrides: DirectiveStateOverrides = {},
+): ReturnType<StateManager['getState']> {
+	const state = createDefaultState({
+		id: crypto.randomUUID(),
+		name: 'elefant',
+		path: '/tmp/project',
+	});
+
+	return {
+		...state,
+		workflow: {
+			...state.workflow,
+			workflowId: 'workflow-1',
+			currentWave: 1,
+			totalWaves: 4,
+			...overrides,
+		},
+	} as unknown as ReturnType<StateManager['getState']>;
+}
 
 function seedProjectAndSession(
   db: Database,
@@ -77,6 +110,100 @@ describe('compaction blocks', () => {
     expect(block).toContain('Phase: idle');
     expect(block).toContain('Mode: standard');
   });
+
+	it('buildResumeDirective returns Quick Mode fallback without a workflowId', () => {
+		const directive = buildResumeDirective(createDirectiveState({ workflowId: null }));
+
+		expect(directive.startsWith('> **RESUME FROM HERE:** Continue from where you left off.')).toBe(true);
+	});
+
+	it('buildResumeDirective tells Quick Mode to scan recent messages', () => {
+		const directive = buildResumeDirective(createDirectiveState({ workflowId: null }));
+
+		expect(directive).toContain('scan the most recent messages');
+	});
+
+	it('buildResumeDirective uses lazy autopilot first-wake-up wording', () => {
+		const directive = buildResumeDirective(
+			createDirectiveState({ lazyAutopilot: true, phase: 'execute' }),
+		);
+
+		expect(directive).toContain('NOT a first wake-up');
+	});
+
+	it('buildResumeDirective tells lazy autopilot not to ask questions', () => {
+		const directive = buildResumeDirective(
+			createDirectiveState({ lazyAutopilot: true, phase: 'execute' }),
+		);
+
+		expect(directive).toContain('Do NOT ask questions');
+	});
+
+	it('buildResumeDirective includes execute phase wave progress', () => {
+		const directive = buildResumeDirective(
+			createDirectiveState({ phase: 'execute', currentWave: 2, totalWaves: 4 }),
+		);
+
+		expect(directive).toContain('Wave 2/4 in progress');
+	});
+
+	it('buildResumeDirective includes plan phase guidance', () => {
+		const directive = buildResumeDirective(createDirectiveState({ phase: 'plan' }));
+
+		expect(directive).toContain('finalize SPEC.md/BLUEPRINT.md');
+	});
+
+	it('buildResumeDirective includes audit phase guidance', () => {
+		const directive = buildResumeDirective(createDirectiveState({ phase: 'audit' }));
+
+		expect(directive).toContain('run `/audit`');
+	});
+
+	it('buildResumeDirective includes accept phase guidance', () => {
+		const directive = buildResumeDirective(createDirectiveState({ phase: 'accept' }));
+
+		expect(directive).toContain('run `/accept`');
+	});
+
+	it('buildResumeDirective includes discuss phase guidance', () => {
+		const directive = buildResumeDirective(createDirectiveState({ phase: 'discuss' }));
+
+		expect(directive).toContain('continue clarifying requirements');
+	});
+
+	it('buildResumeDirective uses Quick Mode fallback for idle without workflowId', () => {
+		const directive = buildResumeDirective(
+			createDirectiveState({ phase: 'idle', workflowId: null }),
+		);
+
+		expect(directive.startsWith('> **RESUME FROM HERE:** Continue from where you left off.')).toBe(true);
+	});
+
+	it('buildResumeDirectiveFromWorkflow accepts minimal workflow input', () => {
+		const directive = buildResumeDirectiveFromWorkflow({
+			workflowId: 'workflow-1',
+			phase: 'execute',
+			currentWave: 2,
+			totalWaves: 4,
+		});
+
+		expect(directive).toContain('Wave 2/4 in progress');
+	});
+
+	it('buildStateBlock ends with the resume directive', () => {
+		const state = createDirectiveState({
+			phase: 'execute',
+			currentWave: 2,
+			totalWaves: 4,
+		});
+		const block = buildStateBlock(state);
+		const lines = block.split('\n').filter((line) => line !== '');
+
+		expect(lines.at(-1)).toBe(
+			'> **RESUME FROM HERE:** Wave 2/4 in progress — run `wf_status` to confirm task state, then resume incomplete tasks via `/execute`.',
+		);
+		expect(block).not.toContain('Read project state and spec before taking action');
+	});
 
   it('buildAdlBlock returns empty string when no decisions exist', () => {
     const directory = mkdtempSync(join(tmpdir(), 'elefant-compaction-blocks-empty-'));
@@ -152,6 +279,129 @@ describe('compaction blocks', () => {
 			content: '## State\n- Phase: execute',
 		});
 		expect(transformed.messages[1]).toEqual({ role: 'user', content: 'hello' });
+	});
+
+	it('createCompactionBlockTransform injects Spec Mode block from dual-mode builder', async () => {
+		const hooks = new HookRegistry();
+		const activeSpec = { projectId: 'project-1', workflowId: 'workflow-1' };
+		hooks.register(
+			'system:transform',
+			createCompactionBlockTransform({
+				blocks: [
+					{
+						name: 'spec-mode-context',
+						render: () =>
+							activeSpec
+								? `## SPEC MODE — ${activeSpec.workflowId}\n> **RESUME FROM HERE:** Continue.`
+								: buildStateBlock(createDirectiveState({ workflowId: null })),
+					},
+				],
+				budget: 1_000,
+			}),
+		);
+
+		const transformed = await emit(hooks, 'system:transform', {
+			messages: [{ role: 'user', content: 'continue' }],
+			sessionId: 'session-spec',
+			conversationId: 'conv-spec',
+			state: null,
+			budgets: { tokens: 1_000 },
+		});
+
+		expect(transformed.messages[0]?.content).toContain('## SPEC MODE — workflow-1');
+		expect(transformed.messages[1]).toEqual({ role: 'user', content: 'continue' });
+	});
+
+	it('createCompactionBlockTransform injects state block when no active spec exists', async () => {
+		const hooks = new HookRegistry();
+		const activeSpec: { projectId: string; workflowId: string } | null = null;
+		hooks.register(
+			'system:transform',
+			createCompactionBlockTransform({
+				blocks: [
+					{
+						name: 'spec-mode-context',
+						render: () =>
+							activeSpec
+								? '## SPEC MODE — workflow-1'
+								: buildStateBlock(createDirectiveState({ workflowId: null })),
+					},
+				],
+				budget: 1_000,
+			}),
+		);
+
+		const transformed = await emit(hooks, 'system:transform', {
+			messages: [{ role: 'user', content: 'continue' }],
+			sessionId: 'session-quick',
+			conversationId: 'conv-quick',
+			state: null,
+			budgets: { tokens: 1_000 },
+		});
+
+		expect(transformed.messages[0]?.content).toContain('## 🔮 Workflow State');
+		expect(transformed.messages[0]?.content).toContain('Continue from where you left off');
+		expect(transformed.messages[1]).toEqual({ role: 'user', content: 'continue' });
+	});
+
+	it('createCompactionBlockTransform does not double inject an existing Spec Mode block', async () => {
+		const hooks = new HookRegistry();
+		hooks.register(
+			'system:transform',
+			createCompactionBlockTransform({
+				blocks: [{ name: 'spec-mode-context', render: () => '## SPEC MODE — duplicate' }],
+				budget: 1_000,
+			}),
+		);
+
+		const messages = [
+			{ role: 'system' as const, content: '## SPEC MODE — existing' },
+			{ role: 'user' as const, content: 'continue' },
+		];
+		const transformed = await emit(hooks, 'system:transform', {
+			messages,
+			sessionId: 'session-dedup',
+			conversationId: 'conv-dedup',
+			state: null,
+			budgets: { tokens: 1_000 },
+		});
+
+		expect(transformed.messages).toEqual(messages);
+		expect(
+			transformed.messages.filter(
+				(message) => message.content.startsWith('## SPEC MODE'),
+			),
+		).toHaveLength(1);
+	});
+
+	it('contextMode none agents are kept block-free by caller-level guard', async () => {
+		expect(defaultAgentProfiles.verifier.contextMode).toBe('none');
+		const source = buildInitialMessages({
+			contextMode: defaultAgentProfiles.verifier.contextMode,
+			sessionId: 'session-verifier',
+			db: { getSessionMessages: () => [{ role: 'system', content: '## SPEC MODE — parent' }] },
+		});
+		const messages = [
+			{ role: 'system' as const, content: 'verifier profile prompt' },
+			...source.getMessages(),
+			{ role: 'user' as const, content: 'verify the work' },
+		];
+
+		const transformed =
+			defaultAgentProfiles.verifier.contextMode === 'none'
+				? { messages }
+				: await emit(new HookRegistry(), 'system:transform', {
+						messages,
+						sessionId: 'session-verifier',
+						conversationId: 'conv-verifier',
+						state: null,
+						budgets: { tokens: 1_000 },
+					});
+
+		expect(transformed.messages.map((message) => message.content)).toEqual([
+			'verifier profile prompt',
+			'verify the work',
+		]);
 	});
 
 	it('clamps oversized injected content to token budget and logs warning', async () => {
