@@ -1,174 +1,151 @@
+<img src="elefant-about-logo.png" alt="Elefant" width="80" />
+
 # Elefant
 
-**Open-source AI coding agent platform** — Bun-native daemon, SQLite-backed state, hook-enforced behavior, and a Tauri + Svelte 5 desktop app.
+**Open-source AI coding agent platform by [Pulsyn](https://getpulsyn.com).**
 
-Elefant is in active development. The core agent runtime (Bun daemon, Elysia HTTP server, hook system, tool registry, permission model, provider abstraction) is shipped. Spec Mode — the structured, spec-driven development workflow — is in its final integration wave.
+Bun-native daemon · SQLite-backed state · Hook-enforced behavior · Tauri + Svelte 5 desktop app
 
 ---
 
-## Architecture
+![Elefant workspace view](docs/screenshots/readme/workspace.png)
 
+---
+
+## What it does
+
+Elefant runs a local daemon that manages AI coding sessions across your projects. Point it at a folder, pick a model, and start building. No cloud account required, no data leaving your machine.
+
+**Spec Mode** is the key differentiator. Instead of free-form chat, you describe what you want to build and Elefant runs a structured workflow: discovery interview → locked specification → wave-based execution → verification. Thirteen specialist agents handle planning, implementation, research, debugging, and verification — each with a configurable model.
+
+---
+
+## Screenshots
+
+### Chat
+
+![Chat view](docs/screenshots/readme/chat.png)
+
+### Spec Mode
+
+![Spec Mode](docs/screenshots/readme/spec-mode.png)
+
+### Agent Profiles
+
+![Agent Config](docs/screenshots/readme/agent-config.png)
+
+### Settings
+
+![Settings](docs/screenshots/readme/settings.png)
+
+---
+
+## Quick start
+
+**Prerequisites:** [Bun](https://bun.sh) >= 1.3, Git
+
+```bash
+git clone https://github.com/pulsynlabs/elefant.git
+cd elefant
+bun install
+bun run dev          # daemon, watch mode
 ```
-┌────────────────────────────────────────────────┐
-│  Desktop App (Tauri v2 + Svelte 5 runes)       │
-│  ┌──────────┐  ┌──────────┐  ┌─────────────┐  │
-│  │ Chat     │  │Spec Mode │  │ Settings     │  │
-│  └──────────┘  └──────────┘  └─────────────┘  │
-└──────────────────┬─────────────────────────────┘
-                   │ HTTP + SSE/WebSocket
-┌──────────────────▼─────────────────────────────┐
-│  Daemon (Bun + Elysia on localhost:1337)        │
-│  ┌──────────┐ ┌──────────┐ ┌────────────────┐  │
-│  │ Agent    │ │ Tool     │ │ Permission     │  │
-│  │ Loop     │ │ Registry │ │ Gate           │  │
-│  └──────────┘ └──────────┘ └────────────────┘  │
-│  ┌──────────┐ ┌──────────┐ ┌────────────────┐  │
-│  │ Hook     │ │ State    │ │ Compaction     │  │
-│  │ System   │ │ Manager  │ │ Manager        │  │
-│  └──────────┘ └──────────┘ └────────────────┘  │
-│  ┌──────────────────────────────────────────┐   │
-│  │  SQLite (.elefant/db.sqlite per-project) │   │
-│  └──────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────┘
+
+```bash
+# Desktop app (separate terminal)
+cd desktop
+bun install
+bun run tauri:dev
 ```
+
+The daemon runs on `localhost:1337`. The desktop connects automatically.
 
 ---
 
 ## Spec Mode
 
-Elefant ships with **Spec Mode** — a structured, spec-driven development workflow built into
-the desktop app and daemon.
+```
+/spec-quick <task>     fast-track a small change
+/spec-discuss          full discovery interview
+```
 
-- Type `/spec-quick <task>` for instant structured delivery
-- Type `/spec-discuss` to start a full discovery interview
-- Use the Spec Mode panel in the desktop app for GUI-driven workflows
-- 13 specialist agents, configurable per role in Settings → Agent Config
+Or use the Spec panel in the sidebar for a GUI-driven workflow.
 
-[→ Spec Mode Documentation](docs/spec-mode/README.md)
+[→ Spec Mode docs](docs/spec-mode/README.md)
 
 ---
 
-## Quick Start
+## Tech stack
 
-### Prerequisites
-
-- [Bun](https://bun.sh) >= 1.3.0
-- Git
-
-### Development
-
-```bash
-git clone https://github.com/your-org/elefant.git
-cd elefant
-bun install
-bun run dev          # Start the daemon in watch mode
-```
-
-### Desktop App
-
-```bash
-cd desktop
-bun install
-bun run dev          # Start Tauri dev server
-```
-
-### Running Tests
-
-```bash
-bun test             # Full daemon test suite
-bun run typecheck    # TypeScript strict mode check
-bun run validate:prompts  # Validate agent prompt files
-bash bench/run-spec-mode-bench.sh  # Hook performance benchmarks
-```
-
-### CLI
-
-```bash
-bun run start        # Start the Elefant daemon
-bun run stop         # Stop the daemon
-bun run status       # Check daemon status
-```
+| Layer | Tech |
+|---|---|
+| Daemon | Bun + Elysia |
+| Database | SQLite (WAL, per-project) |
+| Desktop | Tauri v2 + Svelte 5 |
+| Styling | Tailwind v4 |
+| Types | TypeScript strict mode |
+| Testing | Bun test + Playwright |
 
 ---
 
-## What's in This Repo
+## Project layout
 
 ```
 elefant/
-├── AGENTS.md              ← Agent instructions and project context
-├── package.json           ← Daemon dependencies (Bun, Elysia, Zod)
-├── tsconfig.json          ← TypeScript strict mode config
+├── src/
+│   ├── daemon/        entry point, server lifecycle
+│   ├── state/         state manager, migrations
+│   ├── db/            SQLite repositories
+│   ├── tools/         tool registry (includes 11 spec_* tools)
+│   ├── hooks/         permission:ask · tool:before · context:transform
+│   ├── permissions/   orchestrator gate
+│   ├── compaction/    context compaction manager
+│   └── agents/        13 agent prompts + 15 slash commands
 │
-├── src/                   ← Daemon source
-│   ├── daemon/            ← Entry point, server lifecycle
-│   ├── state/             ← State manager, migrations, legacy migration
-│   ├── db/                ← Migrations, repository layer
-│   │   └── repo/spec/     ← Spec Mode repositories (workflows, docs, tasks, chronicle, adl)
-│   ├── tools/             ← Tool registry and implementations
-│   │   └── spec/          ← Spec Mode tools (11 spec_* tools)
-│   │   └── task/          ← Agent dispatch tool
-│   ├── hooks/             ← Hook system (permission:ask, tool:before, context:transform, session:pre_compact)
-│   ├── permissions/       ← Permission classifier and orchestrator gate
-│   ├── compaction/        ← Compaction manager and spec-mode survival block
-│   ├── transport/         ← SSE/WebSocket publishing
-│   ├── server/            ← Elysia routes (agents, projects, spec-mode API, slash commands)
-│   └── agents/            ← Agent prompts (13 agents) and slash command files
-│       ├── prompts/       ← 13 agent prompt markdown files
-│       └── commands/      ← 15 slash command markdown files
-│
-├── desktop/               ← Tauri v2 + Svelte 5 desktop app
+├── desktop/           Tauri app
 │   └── src/
-│       ├── lib/
-│       │   ├── api/       ← Eden Treaty typed API clients
-│       │   ├── stores/    ← Svelte 5 rune stores
-│       │   └── components/
-│       │       └── spec-mode/  ← Spec Mode GUI components
-│       └── features/
-│           └── spec-mode/ ← SpecModeView, settings
+│       ├── lib/       API clients, stores, components
+│       └── features/  chat · spec-mode · settings · models
 │
-├── docs/                  ← Documentation
-│   ├── spec-mode/         ← Spec Mode documentation set
-│   │   ├── README.md
-│   │   ├── architecture.md
-│   │   ├── tools.md
-│   │   ├── migration.md
-│   │   ├── agents/        ← 13 agent profiles
-│   │   └── commands/      ← 15 command references
-│   └── adr/               ← Architecture decision records
-│
-├── bench/                 ← Performance benchmarks
-├── scripts/               ← Validation and utility scripts
-├── test/                  ← Integration test fixtures
-│
-├── markdown-db/           ← Competitive research database (read-only)
-└── .references/           ← Cloned source repos used for research (read-only)
+└── docs/              architecture, spec-mode reference, ADRs
 ```
 
 ---
 
-## Design Philosophy
+## Running tests
 
-- **Hook-first enforcement** — Behavioral guardrails live in hooks (`permission:ask`, `tool:before`, `context:transform`, `session:pre_compact`) so they survive prompt drift.
-- **DB-backed state** — Spec mode state lives in SQLite, not markdown files in the project tree. Human-readable renderings are generated on demand.
-- **Single source of truth** — The daemon owns state. The desktop is a view. CLI/MCP exposure goes through the same daemon API.
-- **Provider-agnostic** — Agent configs target any model provider Elefant supports.
-- **No breaking changes** — Users not using Spec Mode see zero behavior change in chat sessions.
+```bash
+bun test                          # daemon test suite
+bun run typecheck                 # TypeScript strict check
+bun run validate:prompts          # agent prompt validation
+cd desktop && bunx playwright test  # E2E (mobile + desktop)
+```
 
 ---
 
-## Tech Stack
+## CLI
 
-| Layer | Technology |
-|-------|-----------|
-| Daemon runtime | Bun >= 1.3 |
-| HTTP framework | Elysia (type-safe, Eden Treaty) |
-| Database | SQLite via `bun:sqlite` (WAL mode, per-project) |
-| Desktop framework | Tauri v2 |
-| UI framework | Svelte 5 (runes mode) |
-| Styling | Tailwind v4 |
-| Icons | Hugeicons |
-| Testing | Bun test + Playwright (E2E) |
-| TypeScript | Strict mode throughout |
+```bash
+bun run start    # start daemon
+bun run stop     # stop daemon
+bun run status   # daemon status
+```
+
+---
+
+## Design principles
+
+- **Hook-first enforcement** — guardrails live in hooks, not prompts. They survive model drift.
+- **DB-backed state** — spec mode state is in SQLite, not markdown files scattered in your repo.
+- **Daemon owns state** — the desktop is a view. CLI and MCP go through the same API.
+- **Provider-agnostic** — each agent role can use a different model from any provider.
+- **Zero footprint** — projects not using Spec Mode see no behavior change.
+
+---
+
+## About Pulsyn
+
+Elefant is built by [Pulsyn](https://getpulsyn.com) — the team behind the Pulsyn Rune 1, a privacy-first smart ring with on-device AI. Both products share the same core belief: your compute and your data should stay with you.
 
 ---
 
