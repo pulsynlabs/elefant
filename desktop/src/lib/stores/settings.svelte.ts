@@ -19,7 +19,7 @@ let autoStartDaemon = $state<boolean>(false);
 let servers = $state<ServerConfig[]>([]);
 let activeServerId = $state<string | null>(null);
 let daemonUrl = $derived(
-	servers.find((s) => s.id === activeServerId)?.url ?? '',
+	servers.find((s) => s.id === activeServerId)?.url ?? ''
 );
 
 // ---------------------------------------------------------------------------
