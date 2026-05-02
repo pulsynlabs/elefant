@@ -898,5 +898,25 @@
 		.primary-button {
 			justify-content: center;
 		}
+
+		/* Scale down hero orbs on mobile — large 100px blur radii on
+		   900×900/700×700 elements are expensive to paint, and the orbs
+		   already extend far beyond the narrow phone viewport. Smaller
+		   sizes preserve the indigo atmosphere without the paint cost.
+		   They're aria-hidden + pointer-events:none, so reducing their
+		   reach has no functional impact. */
+		.hero-orb-a {
+			width: 400px;
+			height: 400px;
+			left: -100px;
+			top: -120px;
+		}
+
+		.hero-orb-b {
+			width: 300px;
+			height: 300px;
+			right: -80px;
+			top: -60px;
+		}
 	}
 </style>

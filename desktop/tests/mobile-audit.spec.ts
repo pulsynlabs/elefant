@@ -128,11 +128,31 @@ async function auditView(
     return document.documentElement.scrollWidth > window.innerWidth;
   });
 
-  // 2. Check for off-viewport elements (fixed/absolute beyond viewport)
+  // 2. Check for off-viewport elements (fixed/absolute beyond viewport).
+  //    Skip elements that are aria-hidden="true" — these are decorative
+  //    (e.g. blurred gradient orbs) that intentionally overflow for visual
+  //    effect, are not user-reachable, and don't cause horizontal scroll
+  //    because their containers clip them. Their viewport overflow is
+  //    irrelevant for mobile accessibility.
   const offViewportElements = await page.evaluate(() => {
     const violations: string[] = [];
     const elements = document.querySelectorAll("*");
     for (const el of elements) {
+      // Skip decorative elements that are explicitly hidden from AT.
+      if (el.getAttribute("aria-hidden") === "true") continue;
+      // Also skip if any ancestor is aria-hidden — the entire subtree
+      // is decorative in that case (e.g. an aria-hidden wrapper).
+      let ancestor: Element | null = el.parentElement;
+      let hiddenByAncestor = false;
+      while (ancestor) {
+        if (ancestor.getAttribute("aria-hidden") === "true") {
+          hiddenByAncestor = true;
+          break;
+        }
+        ancestor = ancestor.parentElement;
+      }
+      if (hiddenByAncestor) continue;
+
       const style = window.getComputedStyle(el);
       if (style.position === "fixed" || style.position === "absolute") {
         const rect = el.getBoundingClientRect();
