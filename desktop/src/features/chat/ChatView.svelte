@@ -295,6 +295,8 @@
 			streaming={chatStore.isStreaming}
 			onSend={handleSend}
 			onStop={handleStop}
+			onUndoShortcut={handleUndoShortcut}
+			onRedoShortcut={handleRedoShortcut}
 		/>
 	</div>
 </div>
