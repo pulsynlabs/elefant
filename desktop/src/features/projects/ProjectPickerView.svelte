@@ -11,9 +11,11 @@
 	// All motion is gated by `prefers-reduced-motion: no-preference`. No external
 	// animation libraries — the orb drift and card stagger are pure CSS.
 
+	import { onDestroy, onMount } from 'svelte';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import type { Project } from '$lib/types/project.js';
-	import { pickDirectory } from '$lib/tauri/dialog.js';
+	import { pickDirectory, registerRemotePicker } from '$lib/tauri/dialog.js';
+	import RemoteFileBrowser from '$lib/components/servers/RemoteFileBrowser.svelte';
 	import {
 		HugeiconsIcon,
 		FolderAddIcon,
@@ -54,6 +56,44 @@
 	// --- Open-folder flow -------------------------------------------------
 	// Tracks in-flight picker/open calls so rapid double-clicks can't stack.
 	let isOpeningFolder = $state(false);
+
+	// --- Remote picker registration ---------------------------------------
+	// `pickDirectory()` routes browser/serve mode and remote-server cases
+	// through the in-app RemoteFileBrowser modal. The modal lives in the
+	// DOM, so we expose it to dialog.ts via a callback that resolves once
+	// the user selects a folder or cancels.
+	let remotePickerOpen = $state(false);
+	let remotePickerResolve: ((path: string | null) => void) | null = null;
+
+	onMount(() => {
+		registerRemotePicker(() => {
+			return new Promise<string | null>((resolve) => {
+				remotePickerResolve = resolve;
+				remotePickerOpen = true;
+			});
+		});
+	});
+
+	onDestroy(() => {
+		// Clear the registration so a stale closure can't reopen the modal
+		// after this view has unmounted.
+		registerRemotePicker(null);
+		// Resolve any pending promise to null so callers don't hang.
+		remotePickerResolve?.(null);
+		remotePickerResolve = null;
+	});
+
+	function handleRemoteSelect(path: string): void {
+		remotePickerOpen = false;
+		remotePickerResolve?.(path);
+		remotePickerResolve = null;
+	}
+
+	function handleRemoteCancel(): void {
+		remotePickerOpen = false;
+		remotePickerResolve?.(null);
+		remotePickerResolve = null;
+	}
 
 	async function handleOpenNewFolder(): Promise<void> {
 		if (isOpeningFolder) return;
@@ -306,6 +346,12 @@
 		{/if}
 	</div>
 </section>
+
+<RemoteFileBrowser
+	open={remotePickerOpen}
+	onSelect={handleRemoteSelect}
+	onCancel={handleRemoteCancel}
+/>
 
 <style>
 	.picker {

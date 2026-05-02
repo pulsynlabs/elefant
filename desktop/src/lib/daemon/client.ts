@@ -8,6 +8,9 @@ import type {
 	RegistryProvider,
 } from './types.js';
 import { parseSSEStream } from './sse-parser.js';
+import { registry } from './registry.js';
+import { normalizeServerUrl, isLocalUrl, serverDisplayNameFallback } from './server-utils.js';
+import type { ServerConfig } from '../types/server.js';
 
 /**
  * Agent run record from the daemon (snake_case fields as returned by the API).
@@ -40,11 +43,19 @@ export interface MessageRow {
 	created_at: string;
 }
 
-// Default daemon URL — consumed by events.ts (SSE) and approvals.ts (WebSocket).
-// Keep in sync with `settingsStore.daemonUrl` when users customise the port.
-// Empty string resolves to the current origin (the Vite dev server or Tauri webview),
-// which proxies daemon routes via the Vite proxy config.
-export const DAEMON_URL = '';
+function getActiveDaemonUrl(): string {
+	const activeServerId = registry.getActiveServerId();
+	return activeServerId ? registry.get(activeServerId)?.getBaseUrl() ?? '' : '';
+}
+
+// Default daemon URL bridge — consumed by events.ts (SSE) and approvals.ts (WebSocket).
+// Coerces to the active registry client's base URL when used in template strings,
+// URL constructors, or string operations while preserving the existing export name.
+export const DAEMON_URL = {
+	toString: getActiveDaemonUrl,
+	valueOf: getActiveDaemonUrl,
+	[Symbol.toPrimitive]: getActiveDaemonUrl,
+} as unknown as string;
 
 // Eden Treaty client (future wiring):
 //
@@ -298,14 +309,45 @@ export class DaemonClient {
 	}
 }
 
-// Singleton instance — initialized with default URL, updated from settings
-let clientInstance: DaemonClient | null = null;
+const TEMPORARY_SERVER_ID_PREFIX = '__temporary_daemon__:';
+
+function getRegisteredClientByUrl(baseUrl: string): DaemonClient | null {
+	const normalizedUrl = normalizeServerUrl(baseUrl);
+	const activeServerId = registry.getActiveServerId();
+	const activeClient = activeServerId ? registry.get(activeServerId) : null;
+	if (activeClient?.getBaseUrl() === normalizedUrl) return activeClient;
+
+	return registry.getByUrl(normalizedUrl);
+}
+
+function registerTemporaryClient(baseUrl: string): DaemonClient {
+	const normalizedUrl = normalizeServerUrl(baseUrl);
+	const temporaryServer: ServerConfig = {
+		id: `${TEMPORARY_SERVER_ID_PREFIX}${normalizedUrl}`,
+		url: normalizedUrl,
+		displayName: serverDisplayNameFallback(normalizedUrl) || normalizedUrl || 'Temporary daemon',
+		isDefault: false,
+		isLocal: isLocalUrl(normalizedUrl),
+	};
+
+	registry.register(temporaryServer);
+	const client = registry.get(temporaryServer.id);
+	if (!client) {
+		throw new Error(`Temporary daemon client registration failed for ${normalizedUrl}`);
+	}
+	return client;
+}
 
 export function getDaemonClient(baseUrl?: string): DaemonClient {
-	if (!clientInstance) {
-		clientInstance = new DaemonClient(baseUrl);
-	} else if (baseUrl && baseUrl !== clientInstance.getBaseUrl()) {
-		clientInstance.setBaseUrl(baseUrl);
+	if (baseUrl === undefined) {
+		return registry.getActive();
 	}
-	return clientInstance;
+
+	const registeredClient = getRegisteredClientByUrl(baseUrl);
+	if (registeredClient) return registeredClient;
+
+	console.warn(
+		`[daemon] No registered daemon server found for ${baseUrl}; registering a temporary client.`,
+	);
+	return registerTemporaryClient(baseUrl);
 }

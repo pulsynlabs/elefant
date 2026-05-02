@@ -1,65 +1,130 @@
-import { getDaemonClient } from '$lib/daemon/client.js';
+import { registry } from '$lib/daemon/registry.js';
+import { checkServerHealth } from '$lib/daemon/health.js';
+import { settingsStore } from '$lib/stores/settings.svelte.js';
 import type { ConnectionStatus } from '$lib/daemon/types.js';
+import type { ServerHealthStatus } from '$lib/types/server.js';
 
-const POLL_INTERVAL_MS = 10_000; // 10 seconds
-const MAX_RECONNECT_ATTEMPTS = 3;
+// ---------------------------------------------------------------------------
+// Module-level reactive state (Svelte 5 runes)
+// ---------------------------------------------------------------------------
 
-let status = $state<ConnectionStatus>('disconnected');
+let activeStatus = $state<ConnectionStatus>('disconnected');
 let lastHealthCheck = $state<Date | null>(null);
 let lastError = $state<string | null>(null);
 
-let pollTimer: ReturnType<typeof setInterval> | null = null;
-let reconnectAttempts = 0;
+// ---------------------------------------------------------------------------
+// Internal tracking
+// ---------------------------------------------------------------------------
 
-async function checkConnection(): Promise<void> {
-	try {
-		const client = getDaemonClient();
-		await client.checkHealth();
+let started = false;
+let _unsubscribe: (() => void) | null = null;
 
-		status = 'connected';
-		lastHealthCheck = new Date();
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Map the registry's 4-variant health status to the public 3-variant type. */
+function mapStatus(s: ServerHealthStatus): ConnectionStatus {
+	return s === 'unknown' ? 'disconnected' : s;
+}
+
+async function doHealthCheck(): Promise<void> {
+	const sid = registry.getActiveServerId();
+	if (!sid) return;
+
+	const server = settingsStore.servers.find((s) => s.id === sid);
+	if (!server) return;
+
+	const result = await checkServerHealth(server.url, {
+		credentials: server.credentials,
+	});
+
+	if (result.ok) {
+		activeStatus = 'connected';
 		lastError = null;
-		reconnectAttempts = 0;
-	} catch (error) {
-		lastError = error instanceof Error ? error.message : 'Connection failed';
-
-		if (status === 'connected') {
-			status = 'reconnecting';
-		}
-
-		reconnectAttempts++;
-
-		if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-			status = 'disconnected';
-			reconnectAttempts = 0;
-		}
+	} else {
+		activeStatus = 'disconnected';
+		lastError = result.error;
 	}
+	lastHealthCheck = new Date();
 }
 
-export function startPolling(): void {
-	if (pollTimer) return;
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
-	// Check immediately
-	void checkConnection();
+function start(): void {
+	if (started) return;
+	started = true;
 
-	pollTimer = setInterval(() => {
-		void checkConnection();
-	}, POLL_INTERVAL_MS);
-}
-
-export function stopPolling(): void {
-	if (pollTimer) {
-		clearInterval(pollTimer);
-		pollTimer = null;
+	// 1. Register every server configured in settings.
+	for (const server of settingsStore.servers) {
+		registry.register(server);
 	}
+
+	// 2. Activate the persisted active server (or the first available).
+	const activeId =
+		settingsStore.activeServerId ?? settingsStore.servers[0]?.id;
+	if (activeId && registry.get(activeId)) {
+		registry.setActive(activeId);
+	}
+
+	// 3. Bridge the framework-agnostic registry into Svelte reactivity.
+	//    When the registry fires a health update for the active server,
+	//    push the values into the module-level $state so that every
+	//    consumer reading connectionStore.status re-renders.
+	_unsubscribe = registry.subscribe((serverId, entry) => {
+		if (serverId === registry.getActiveServerId()) {
+			activeStatus = mapStatus(entry.status);
+			lastHealthCheck = entry.lastCheck;
+			lastError = entry.lastError;
+		}
+	});
+
+	// 4. Seed the reactive state from whatever the registry already
+	//    knows (the register() call above started polling, so a result
+	//    may already exist before the subscription was installed).
+	const initialId = registry.getActiveServerId();
+	if (initialId) {
+		const entry = registry.getStatus(initialId);
+		activeStatus = mapStatus(entry.status);
+		lastHealthCheck = entry.lastCheck;
+		lastError = entry.lastError;
+	}
+
+	// 5. Kick off an immediate health check so the UI resolves quickly.
+	void doHealthCheck();
 }
+
+function stop(): void {
+	_unsubscribe?.();
+	_unsubscribe = null;
+	registry.clear();
+	started = false;
+
+	activeStatus = 'disconnected';
+	lastHealthCheck = null;
+	lastError = null;
+}
+
+// ---------------------------------------------------------------------------
+// Exported store object — identical public surface to the original
+// ---------------------------------------------------------------------------
 
 export const connectionStore = {
-	get status() { return status; },
-	get isConnected() { return status === 'connected'; },
-	get lastHealthCheck() { return lastHealthCheck; },
-	get lastError() { return lastError; },
-	start: startPolling,
-	stop: stopPolling,
-	checkNow: checkConnection,
+	get status(): ConnectionStatus {
+		return activeStatus;
+	},
+	get isConnected(): boolean {
+		return activeStatus === 'connected';
+	},
+	get lastHealthCheck(): Date | null {
+		return lastHealthCheck;
+	},
+	get lastError(): string | null {
+		return lastError;
+	},
+	start,
+	stop,
+	checkNow: doHealthCheck,
 };

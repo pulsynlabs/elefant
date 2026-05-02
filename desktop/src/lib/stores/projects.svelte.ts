@@ -2,22 +2,78 @@
 //
 // Single source of truth for all project/session UI state in the desktop app.
 // All methods call daemon HTTP endpoints and update reactive state.
+//
+// ## Multi-Server Namespacing (May 2026)
+//
+// Since multi-daemon support, all project state is namespaced by server ID.
+// Internal maps (`projectsByServer`, `sessionsByServerProject`) hold data
+// keyed by server ID.  The public `projects` and `sessionsByProject` getters
+// return only the active server's slice, derived from `currentServerId`.
+//
+// Switching the active server (detected via the daemon client registry's
+// subscribe callback) clears transient UI state (`activeProjectId`,
+// `activeSessionId`) and reloads the project list from the new server.
+//
+// ## Migration Semantics
+//
+// Daemon project data lives server-side (each daemon has its own SQLite DB),
+// so there is no frontend data migration.  The registry subscription that
+// watches for active-server changes bootstraps `currentServerId` and triggers
+// the initial `loadProjects()` call for the default local server.  Existing
+// users upgrading from the single-daemon model see their projects load
+// against the seeded local server configured by `settingsStore.init()`.
 
-import { DAEMON_URL } from '$lib/daemon/client.js';
+import { registry } from '$lib/daemon/registry.js';
 import type { Project, Session, SessionMode } from '$lib/types/project.js';
 
-let projects = $state<Project[]>([]);
+// ---------------------------------------------------------------------------
+// Internal state — namespaced by server ID
+// ---------------------------------------------------------------------------
+
+/** All project lists, keyed by server ID. */
+let projectsByServer = $state<Record<string, Project[]>>({});
+
+/** All session caches, keyed by server ID then project ID. */
+let sessionsByServerProject = $state<
+	Record<string, Record<string, Session[]>>
+>({});
+
+/** Which server's data is currently shown to the UI. */
+let currentServerId = $state<string | null>(null);
+
 let activeProjectId = $state<string | null>(null);
-let sessionsByProject = $state<Record<string, Session[]>>({});
 let activeSessionId = $state<string | null>(null);
 let lastError = $state<string | null>(null);
 let isLoading = $state(false);
 
+// ---------------------------------------------------------------------------
+// Derived values — the active server's slice of the namespaced state
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the active server's project list.  Must be called inside a
+ * reactive context (e.g. a store getter or `$derived`) for reactivity.
+ */
+function getProjects(): Project[] {
+	return projectsByServer[currentServerId ?? ''] ?? [];
+}
+
+/**
+ * Returns the active server's session cache.
+ */
+function getSessionsByProject(): Record<string, Session[]> {
+	return sessionsByServerProject[currentServerId ?? ''] ?? {};
+}
+
 const activeProject = $derived(
 	activeProjectId
-		? projects.find((p) => p.id === activeProjectId) ?? null
+		? getProjects().find((p) => p.id === activeProjectId) ?? null
 		: null
 );
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function clearError(): void {
 	lastError = null;
@@ -28,20 +84,35 @@ function setError(message: string): void {
 	console.error('[projects]', message);
 }
 
+/** Returns the active daemon client's base URL.  Throws if no active server. */
+function getBaseUrl(): string {
+	return registry.getActive().getBaseUrl();
+}
+
+// ---------------------------------------------------------------------------
+// API methods
+// ---------------------------------------------------------------------------
+
 async function loadProjects(): Promise<void> {
 	isLoading = true;
 	clearError();
 	try {
-		const response = await fetch(`${DAEMON_URL}/api/projects`, {
+		const baseUrl = getBaseUrl();
+		const response = await fetch(`${baseUrl}/api/projects`, {
 			headers: { Accept: 'application/json' },
 		});
 		if (!response.ok) {
-			throw new Error(`GET /api/projects failed: HTTP ${response.status}`);
+			throw new Error(
+				`GET /api/projects failed: HTTP ${response.status}`,
+			);
 		}
 		const data = (await response.json()) as Project[];
-		projects = data;
+		const sid = currentServerId ?? '';
+		projectsByServer = { ...projectsByServer, [sid]: data };
 	} catch (err) {
-		setError(err instanceof Error ? err.message : 'Failed to load projects');
+		setError(
+			err instanceof Error ? err.message : 'Failed to load projects',
+		);
 	} finally {
 		isLoading = false;
 	}
@@ -50,27 +121,41 @@ async function loadProjects(): Promise<void> {
 async function openProject(path: string, name?: string): Promise<Project> {
 	clearError();
 	try {
-		const response = await fetch(`${DAEMON_URL}/api/projects`, {
+		const baseUrl = getBaseUrl();
+		const response = await fetch(`${baseUrl}/api/projects`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ path, name }),
 		});
 		if (!response.ok) {
-			throw new Error(`POST /api/projects failed: HTTP ${response.status}`);
+			throw new Error(
+				`POST /api/projects failed: HTTP ${response.status}`,
+			);
 		}
 		const created = (await response.json()) as Project;
 
-		// Upsert into the projects list (idempotent: may return existing row)
-		const existingIndex = projects.findIndex((p) => p.id === created.id);
-		if (existingIndex >= 0) {
-			projects = projects.map((p, i) => (i === existingIndex ? created : p));
-		} else {
-			projects = [created, ...projects];
-		}
+		const sid = currentServerId ?? '';
+		const currentList = projectsByServer[sid] ?? [];
+
+		// Upsert into the active server's project list (idempotent: may
+		// return an existing row).
+		const existingIndex = currentList.findIndex(
+			(p) => p.id === created.id,
+		);
+		const updatedList =
+			existingIndex >= 0
+				? currentList.map((p, i) =>
+						i === existingIndex ? created : p,
+					)
+				: [created, ...currentList];
+
+		projectsByServer = { ...projectsByServer, [sid]: updatedList };
 		activeProjectId = created.id;
 		return created;
 	} catch (err) {
-		setError(err instanceof Error ? err.message : 'Failed to open project');
+		setError(
+			err instanceof Error ? err.message : 'Failed to open project',
+		);
 		throw err;
 	}
 }
@@ -83,59 +168,104 @@ async function selectProject(id: string): Promise<void> {
 async function renameProject(id: string, name: string): Promise<void> {
 	clearError();
 	try {
-		const response = await fetch(`${DAEMON_URL}/api/projects/${id}`, {
+		const baseUrl = getBaseUrl();
+		const response = await fetch(`${baseUrl}/api/projects/${id}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name }),
 		});
 		if (!response.ok) {
-			throw new Error(`PUT /api/projects/${id} failed: HTTP ${response.status}`);
+			throw new Error(
+				`PUT /api/projects/${id} failed: HTTP ${response.status}`,
+			);
 		}
 		const updated = (await response.json()) as Project;
-		projects = projects.map((p) => (p.id === id ? updated : p));
+
+		const sid = currentServerId ?? '';
+		const currentList = projectsByServer[sid] ?? [];
+		projectsByServer = {
+			...projectsByServer,
+			[sid]: currentList.map((p) => (p.id === id ? updated : p)),
+		};
 	} catch (err) {
-		setError(err instanceof Error ? err.message : 'Failed to rename project');
+		setError(
+			err instanceof Error ? err.message : 'Failed to rename project',
+		);
 	}
 }
 
 async function deleteProject(id: string): Promise<void> {
 	clearError();
 	try {
-		const response = await fetch(`${DAEMON_URL}/api/projects/${id}`, {
+		const baseUrl = getBaseUrl();
+		const response = await fetch(`${baseUrl}/api/projects/${id}`, {
 			method: 'DELETE',
 		});
 		if (!response.ok) {
-			throw new Error(`DELETE /api/projects/${id} failed: HTTP ${response.status}`);
+			throw new Error(
+				`DELETE /api/projects/${id} failed: HTTP ${response.status}`,
+			);
 		}
-		projects = projects.filter((p) => p.id !== id);
+
+		const sid = currentServerId ?? '';
+		const currentList = projectsByServer[sid] ?? [];
+		projectsByServer = {
+			...projectsByServer,
+			[sid]: currentList.filter((p) => p.id !== id),
+		};
+
 		if (activeProjectId === id) {
 			activeProjectId = null;
 		}
-		// Clean up cached sessions for this project
-		const { [id]: _, ...rest } = sessionsByProject;
-		sessionsByProject = rest;
+
+		// Clean up cached sessions for this project on the active server.
+		const currentSessions = sessionsByServerProject[sid] ?? {};
+		const { [id]: _, ...rest } = currentSessions;
+		sessionsByServerProject = {
+			...sessionsByServerProject,
+			[sid]: rest,
+		};
 	} catch (err) {
-		setError(err instanceof Error ? err.message : 'Failed to delete project');
+		setError(
+			err instanceof Error ? err.message : 'Failed to delete project',
+		);
 	}
 }
 
 async function loadSessions(projectId: string): Promise<void> {
 	clearError();
 	try {
-		const response = await fetch(`${DAEMON_URL}/api/projects/${projectId}/sessions`, {
-			headers: { Accept: 'application/json' },
-		});
+		const baseUrl = getBaseUrl();
+		const response = await fetch(
+			`${baseUrl}/api/projects/${projectId}/sessions`,
+			{ headers: { Accept: 'application/json' } },
+		);
 		if (!response.ok) {
 			throw new Error(
-				`GET /api/projects/${projectId}/sessions failed: HTTP ${response.status}`
+				`GET /api/projects/${projectId}/sessions failed: HTTP ${response.status}`,
 			);
 		}
-		const json = (await response.json()) as { ok: true; data: Session[] } | Session[];
-		// Routes wrapped in { ok, data } after the project-ui sprint; handle both shapes.
-		const data = Array.isArray(json) ? json : (json as { ok: true; data: Session[] }).data;
-		sessionsByProject = { ...sessionsByProject, [projectId]: data };
+		const json = (await response.json()) as
+			| { ok: true; data: Session[] }
+			| Session[];
+		// Routes wrapped in { ok, data } after the project-ui sprint; handle
+		// both shapes.
+		const data = Array.isArray(json)
+			? json
+			: (json as { ok: true; data: Session[] }).data;
+
+		const sid = currentServerId ?? '';
+		const currentSessions = sessionsByServerProject[sid] ?? {};
+		sessionsByServerProject = {
+			...sessionsByServerProject,
+			[sid]: { ...currentSessions, [projectId]: data },
+		};
 	} catch (err) {
-		setError(err instanceof Error ? err.message : 'Failed to load sessions');
+		setError(
+			err instanceof Error
+				? err.message
+				: 'Failed to load sessions',
+		);
 	}
 }
 
@@ -151,31 +281,48 @@ async function createSession(
 		const body: Record<string, unknown> = {};
 		if (options.mode !== undefined) body.mode = options.mode;
 
+		const baseUrl = getBaseUrl();
 		const response = await fetch(
-			`${DAEMON_URL}/api/projects/${projectId}/sessions`,
+			`${baseUrl}/api/projects/${projectId}/sessions`,
 			{
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(body),
-			}
+			},
 		);
 		if (!response.ok) {
 			throw new Error(
-				`POST /api/projects/${projectId}/sessions failed: HTTP ${response.status}`
+				`POST /api/projects/${projectId}/sessions failed: HTTP ${response.status}`,
 			);
 		}
-		const json = (await response.json()) as { ok: true; data: Session } | Session;
-		// Routes wrapped in { ok, data } after the project-ui sprint; handle both shapes.
-		const created = 'ok' in json && json.ok ? (json as { ok: true; data: Session }).data : (json as Session);
-		const existing = sessionsByProject[projectId] ?? [];
-		sessionsByProject = {
-			...sessionsByProject,
-			[projectId]: [created, ...existing],
+		const json = (await response.json()) as
+			| { ok: true; data: Session }
+			| Session;
+		// Routes wrapped in { ok, data } after the project-ui sprint; handle
+		// both shapes.
+		const created =
+			'ok' in json && json.ok
+				? (json as { ok: true; data: Session }).data
+				: (json as Session);
+
+		const sid = currentServerId ?? '';
+		const currentSessions = sessionsByServerProject[sid] ?? {};
+		const existing = currentSessions[projectId] ?? [];
+		sessionsByServerProject = {
+			...sessionsByServerProject,
+			[sid]: {
+				...currentSessions,
+				[projectId]: [created, ...existing],
+			},
 		};
 		activeSessionId = created.id;
 		return created;
 	} catch (err) {
-		setError(err instanceof Error ? err.message : 'Failed to create session');
+		setError(
+			err instanceof Error
+				? err.message
+				: 'Failed to create session',
+		);
 		throw err;
 	}
 }
@@ -183,47 +330,104 @@ async function createSession(
 function selectSession(sessionId: string): void {
 	// Clear child run stack when switching sessions (MH2)
 	// Import navigationStore dynamically to avoid circular dependency
-	import('./navigation.svelte.js').then((mod) => {
-		mod.navigationStore.clearChildRunStack();
-	}).catch(() => {
-		// Navigation store may not be initialized yet — ignore
-	});
+	import('./navigation.svelte.js')
+		.then((mod) => {
+			mod.navigationStore.clearChildRunStack();
+		})
+		.catch(() => {
+			// Navigation store may not be initialized yet — ignore
+		});
 	activeSessionId = sessionId;
 }
 
-/** Reset all store state to initial values. Exported for test isolation. */
+// ---------------------------------------------------------------------------
+// Active-server change handler
+// ---------------------------------------------------------------------------
+
+// The registry's subscribe callback fires on every health status update
+// AND on `setActive()` (which calls notify).  We compare
+// `registry.getActiveServerId()` with `currentServerId` to detect when
+// the user actually switches the active server — clearing transient UI
+// state and reloading the project list.
+//
+// Module-level `$effect` on `settingsStore.activeServerId` is preferred
+// but unavailable here (Bun's Svelte transform does not yet support
+// module-level `$effect` in `.svelte.ts` files bound for a test runner).
+// The registry subscribe fallback achieves the same result.
+
+let _registryUnsub: (() => void) | null = null;
+
+function _ensureServerSwitchWatch(): void {
+	if (_registryUnsub !== null) return;
+
+	_registryUnsub = registry.subscribe(() => {
+		const sid = registry.getActiveServerId();
+		if (sid !== null && sid !== currentServerId) {
+			currentServerId = sid;
+			activeProjectId = null;
+			activeSessionId = null;
+			void loadProjects();
+		}
+	});
+}
+
+// Start watching on load (idempotent — `_ensureServerSwitchWatch` is
+// guarded so calling it at module level is safe).
+_ensureServerSwitchWatch();
+
+// ---------------------------------------------------------------------------
+// Test isolation helpers
+// ---------------------------------------------------------------------------
+
+/** Reset all store state to initial values.  Exported for test isolation. */
 export function resetProjectsStore(): void {
-	projects = [];
+	// Unsubscribe the registry watch so the next test can re-attach
+	if (_registryUnsub) {
+		_registryUnsub();
+		_registryUnsub = null;
+	}
+	projectsByServer = {};
+	sessionsByServerProject = {};
+	currentServerId = null;
 	activeProjectId = null;
-	sessionsByProject = {};
 	activeSessionId = null;
 	lastError = null;
 	isLoading = false;
 }
 
-/** Set projects array directly. Exported for test isolation. */
+/** Set projects array for the current server.  Exported for test isolation. */
 export function _setProjects(p: Project[]): void {
-	projects = p;
+	projectsByServer[currentServerId ?? ''] = p;
 }
 
-/** Set active project ID directly. Exported for test isolation. */
+/** Set active project ID directly.  Exported for test isolation. */
 export function _setActiveProjectId(id: string | null): void {
 	activeProjectId = id;
 }
 
-/** Set sessions by project directly. Exported for test isolation. */
+/** Set sessions by project for the current server.  Exported for test isolation. */
 export function _setSessionsByProject(s: Record<string, Session[]>): void {
-	sessionsByProject = s;
+	sessionsByServerProject[currentServerId ?? ''] = s;
 }
 
-/** Set active session ID directly. Exported for test isolation. */
+/** Set active session ID directly.  Exported for test isolation. */
 export function _setActiveSessionId(id: string | null): void {
 	activeSessionId = id;
 }
 
+/** Set the current server ID.  Exported for test isolation. */
+export function _setCurrentServerId(id: string | null): void {
+	currentServerId = id;
+}
+
+// ---------------------------------------------------------------------------
+// Public store API
+// ---------------------------------------------------------------------------
+
 export const projectsStore = {
+	/** The active server's project list (reactive). */
 	get projects() {
-		return projects;
+		return getProjects();
 	},
 	get activeProjectId() {
 		return activeProjectId;
@@ -231,8 +435,9 @@ export const projectsStore = {
 	get activeProject() {
 		return activeProject;
 	},
+	/** The active server's session cache, keyed by project ID. */
 	get sessionsByProject() {
-		return sessionsByProject;
+		return getSessionsByProject();
 	},
 	get activeSessionId() {
 		return activeSessionId;
@@ -243,6 +448,12 @@ export const projectsStore = {
 	get isLoading() {
 		return isLoading;
 	},
+	/** The server ID whose data is currently visible. */
+	get currentServerId() {
+		return currentServerId;
+	},
+
+	// Methods
 	loadProjects,
 	openProject,
 	selectProject,
@@ -251,9 +462,12 @@ export const projectsStore = {
 	loadSessions,
 	createSession,
 	selectSession,
+
+	// Test helpers
 	resetProjectsStore,
 	_setProjects,
 	_setActiveProjectId,
 	_setSessionsByProject,
 	_setActiveSessionId,
+	_setCurrentServerId,
 };

@@ -6,8 +6,11 @@ import {
 	_setActiveProjectId,
 	_setSessionsByProject,
 	_setActiveSessionId,
+	_setCurrentServerId,
 } from "./projects.svelte.js";
 import type { Project, Session } from "$lib/types/project.js";
+import { registry } from "$lib/daemon/registry.js";
+import type { ServerConfig } from "$lib/types/server.js";
 
 // ─── Test Fixtures ───────────────────────────────────────────────────────────
 
@@ -34,18 +37,26 @@ const mockSession = (overrides: Partial<Session> = {}): Session => ({
 	...overrides,
 });
 
+const TEST_SERVER: ServerConfig = {
+	id: "test-server",
+	url: "",
+	displayName: "Test Server",
+	isLocal: true,
+	isDefault: true,
+};
+
 // ─── Fetch Mock Helper ───────────────────────────────────────────────────────
 
 function createFetchMock(responses: {
 	[url: string]: { status: number; body: unknown };
 }) {
-	return mock((input: RequestInfo | URL, init?: RequestInit) => {
+	return mock((input: RequestInfo | URL, _init?: RequestInit) => {
 		const url = typeof input === "string" ? input : input.toString();
 		const match = Object.entries(responses).find(([key]) => url.includes(key));
 
 		if (!match) {
 			return Promise.resolve(
-				new Response("Not Found", { status: 404 })
+				new Response("Not Found", { status: 404 }),
 			);
 		}
 
@@ -54,7 +65,7 @@ function createFetchMock(responses: {
 			new Response(JSON.stringify(body), {
 				status,
 				headers: { "Content-Type": "application/json" },
-			})
+			}),
 		);
 	});
 }
@@ -63,11 +74,16 @@ function createFetchMock(responses: {
 
 describe("projectsStore", () => {
 	beforeEach(() => {
+		registry.clear();
+		registry.register(TEST_SERVER);
+		registry.setActive("test-server");
 		resetProjectsStore();
+		_setCurrentServerId("test-server");
 	});
 
 	afterEach(() => {
 		globalThis.fetch = fetch;
+		registry.clear();
 	});
 
 	// ── loadProjects ───────────────────────────────────────────────────────
@@ -106,7 +122,7 @@ describe("projectsStore", () => {
 
 		it("sets lastError when network throws", async () => {
 			globalThis.fetch = mock(() =>
-				Promise.reject(new Error("Network down"))
+				Promise.reject(new Error("Network down")),
 			) as unknown as typeof globalThis.fetch;
 
 			await projectsStore.loadProjects();
@@ -161,7 +177,7 @@ describe("projectsStore", () => {
 			}) as unknown as typeof globalThis.fetch;
 
 			await expect(
-				projectsStore.openProject("/invalid/path")
+				projectsStore.openProject("/invalid/path"),
 			).rejects.toThrow();
 
 			expect(projectsStore.lastError).toContain("HTTP 400");
@@ -332,7 +348,7 @@ describe("projectsStore", () => {
 			}) as unknown as typeof globalThis.fetch;
 
 			await expect(
-				projectsStore.createSession("proj-1")
+				projectsStore.createSession("proj-1"),
 			).rejects.toThrow();
 
 			expect(projectsStore.lastError).toContain("HTTP 400");
@@ -442,9 +458,6 @@ describe("projectsStore", () => {
 			_setActiveProjectId("dirty");
 			_setSessionsByProject({ dirty: [] });
 			_setActiveSessionId("dirty");
-			// Manually set error and loading via store methods
-			// Since we can't directly set these, we'll test reset after a failed operation
-			// For now, just verify the main state properties reset
 
 			resetProjectsStore();
 
@@ -453,6 +466,75 @@ describe("projectsStore", () => {
 			expect(projectsStore.sessionsByProject).toEqual({});
 			expect(projectsStore.activeSessionId).toBeNull();
 			expect(projectsStore.isLoading).toBe(false);
+			expect(projectsStore.currentServerId).toBeNull();
+		});
+	});
+
+	// ── cross-server isolation ─────────────────────────────────────────────
+
+	describe("cross-server isolation", () => {
+		it("does not show projects from a different server", () => {
+			// Load projects for server A
+			_setCurrentServerId("server-a");
+			_setProjects([mockProject({ id: "pa", name: "Project A" })]);
+
+			// Switch to server B — projects from A should not be visible
+			_setCurrentServerId("server-b");
+
+			expect(projectsStore.projects).toEqual([]);
+		});
+
+		it("clears activeProjectId when switching servers via registry subscribe", () => {
+			// Set up server A with a project
+			_setCurrentServerId("server-a");
+			_setProjects([mockProject({ id: "pa", name: "Project A" })]);
+			_setActiveProjectId("pa");
+
+			// Switch to server B — activeProjectId is still set but
+			// the project doesn't exist on the new server
+			_setCurrentServerId("server-b");
+
+			expect(projectsStore.activeProjectId).toBe("pa");
+			// activeProject is null because "pa" is not on server-b
+			expect((projectsStore.activeProject as any)?.__raw).toBeNull();
+		});
+
+		it("isolates sessions per server", () => {
+			_setCurrentServerId("server-a");
+			_setSessionsByProject({
+				"p1": [mockSession({ id: "sa", projectId: "p1" })],
+			});
+
+			_setCurrentServerId("server-b");
+			_setSessionsByProject({
+				"p2": [mockSession({ id: "sb", projectId: "p2" })],
+			});
+
+			// Verify each server sees only its own sessions
+			_setCurrentServerId("server-a");
+			expect(projectsStore.sessionsByProject["p1"]).toBeDefined();
+			expect(projectsStore.sessionsByProject["p2"]).toBeUndefined();
+
+			_setCurrentServerId("server-b");
+			expect(projectsStore.sessionsByProject["p1"]).toBeUndefined();
+			expect(projectsStore.sessionsByProject["p2"]).toBeDefined();
+		});
+	});
+
+	// ── currentServerId getter ─────────────────────────────────────────────
+
+	describe("currentServerId", () => {
+		it("returns the current server ID", () => {
+			_setCurrentServerId("test-server");
+			expect(projectsStore.currentServerId).toBe("test-server");
+		});
+
+		it("returns null after reset", () => {
+			_setCurrentServerId("test-server");
+			expect(projectsStore.currentServerId).toBe("test-server");
+
+			resetProjectsStore();
+			expect(projectsStore.currentServerId).toBeNull();
 		});
 	});
 });

@@ -152,19 +152,42 @@ function staticFilePath(distPath: string, pathname: string): string {
   return path.join(resolvedDistPath, 'index.html');
 }
 
+/**
+ * Cache headers strategy:
+ *   - index.html: never cache (it references hashed asset URLs)
+ *   - hashed asset files (e.g. /assets/index-AbC123.js): cache forever
+ *   - everything else: short cache (favicon, fonts that aren't hashed)
+ */
+function cacheHeadersFor(pathname: string): Headers {
+  const headers = new Headers();
+  if (pathname === '/' || pathname.endsWith('.html')) {
+    headers.set('cache-control', 'no-store, no-cache, must-revalidate');
+    headers.set('pragma', 'no-cache');
+    headers.set('expires', '0');
+  } else if (pathname.startsWith('/assets/')) {
+    headers.set('cache-control', 'public, max-age=31536000, immutable');
+  } else {
+    headers.set('cache-control', 'public, max-age=300');
+  }
+  return headers;
+}
+
 async function staticResponse(distPath: string, pathname: string): Promise<Response> {
   const filePath = staticFilePath(distPath, pathname);
   const file = Bun.file(filePath);
+  const headers = cacheHeadersFor(pathname);
 
   if (pathname.includes('.') && (await file.exists())) {
-    return new Response(file);
+    return new Response(file, { headers });
   }
 
   if (pathname === '/' && (await file.exists())) {
-    return new Response(file);
+    return new Response(file, { headers });
   }
 
-  return new Response(Bun.file(path.join(distPath, 'index.html')));
+  // SPA fallback — always serve index.html with no-cache headers
+  const fallbackHeaders = cacheHeadersFor('/');
+  return new Response(Bun.file(path.join(distPath, 'index.html')), { headers: fallbackHeaders });
 }
 
 /**
@@ -209,7 +232,8 @@ export async function createBrowserServer(
   const tailscaleDetectOnly = opts.tailscaleDetectOnly ?? false;
 
   let loadedAuth: ServeAuth | undefined = opts.auth;
-  if (bindMode !== 'localhost') {
+  if (bindMode === 'network') {
+    // Network mode requires auth — it's exposed to the local LAN.
     if (!loadedAuth) {
       const authResult = await authPreflightCheck(bindMode);
       if (!authResult.ok) {
@@ -220,6 +244,14 @@ export async function createBrowserServer(
       if (!loadedAuthResult.ok) {
         return loadedAuthResult;
       }
+      loadedAuth = loadedAuthResult.data;
+    }
+  } else if (bindMode === 'tailscale') {
+    // Tailscale mode: auth is optional. Tailscale already restricts access
+    // to devices on your tailnet, so basic auth is not required.
+    // If credentials are configured, use them; otherwise serve openly.
+    const loadedAuthResult = await loadServeAuth();
+    if (loadedAuthResult.ok) {
       loadedAuth = loadedAuthResult.data;
     }
   }
@@ -257,12 +289,15 @@ export async function createBrowserServer(
       async fetch(req) {
         const url = new URL(req.url);
 
-        if (bindMode !== 'localhost' && loadedAuth && !(await verifyBasicAuth(req, loadedAuth))) {
-          return buildUnauthorizedResponse();
-        }
-
+        // API/proxy paths are never gated by basic auth — the daemon
+        // runs on localhost and handles its own security. Auth only
+        // protects the static UI assets served to external browsers.
         if (shouldProxy(url.pathname)) {
           return proxyToDaemon(req, daemonBaseUrl);
+        }
+
+        if (bindMode !== 'localhost' && loadedAuth && !(await verifyBasicAuth(req, loadedAuth))) {
+          return buildUnauthorizedResponse();
         }
 
         return staticResponse(distPath, url.pathname);
