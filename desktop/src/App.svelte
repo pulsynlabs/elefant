@@ -92,6 +92,36 @@
 		}
 	}
 
+	// Body scroll lock while the mobile drawer is open. Reactive $effect runs
+	// whenever layoutMode/drawerOpen change and ensures we always restore the
+	// previous overflow on cleanup (also handles unmount mid-open).
+	$effect(() => {
+		if (layoutMode === 'mobileOverlay' && drawerOpen) {
+			const previous = document.body.style.overflow;
+			document.body.style.overflow = 'hidden';
+			return () => {
+				document.body.style.overflow = previous;
+			};
+		}
+	});
+
+	// Move keyboard focus into the drawer when it opens so screen-reader and
+	// keyboard users land inside the dialog. (aria-hidden on sibling content
+	// is implied by aria-modal="true" for modern AT — explicit inert/aria-hidden
+	// on AppShell would require prop spreading on a component that doesn't
+	// accept arbitrary attributes, so we rely on aria-modal here.)
+	$effect(() => {
+		if (layoutMode === 'mobileOverlay' && drawerOpen) {
+			requestAnimationFrame(() => {
+				const drawer = document.querySelector<HTMLElement>('.mobile-drawer');
+				const firstFocusable = drawer?.querySelector<HTMLElement>(
+					'button, [href], input, [tabindex]:not([tabindex="-1"])',
+				);
+				firstFocusable?.focus();
+			});
+		}
+	});
+
 	onMount(() => {
 		// Initialize theme
 		themeStore.init();
@@ -151,6 +181,11 @@
 
 		// Keyboard shortcuts
 		function handleKeydown(event: KeyboardEvent): void {
+			// Close mobile drawer on Escape (highest-priority handler)
+			if (event.key === 'Escape' && layoutMode === 'mobileOverlay' && drawerOpen) {
+				drawerOpen = false;
+				return;
+			}
 			for (const shortcut of SHORTCUTS) {
 				if (matchesShortcut(event, shortcut)) {
 					if (shortcut.action === "settings") {
@@ -267,7 +302,8 @@
 
 	<!-- Mobile drawer — rendered as a sibling outside the AppShell grid so the
 	     shell's overflow:hidden / overflow:clip doesn't clip it. Only mounted
-	     in mobileOverlay mode; backdrop + close-on-tap arrive in Task 1.3. -->
+	     in mobileOverlay mode. role="dialog" + aria-modal="true" implies
+	     aria-hidden on sibling content for modern screen readers. -->
 	{#if layoutMode === 'mobileOverlay'}
 		<div
 			class="mobile-drawer"
@@ -279,6 +315,21 @@
 		>
 			<Sidebar collapsed={false} />
 		</div>
+	{/if}
+
+	<!-- Backdrop scrim. Rendered as a <button> so it has a native click handler
+	     and is keyboard-accessible; tabindex="-1" keeps it out of the tab order
+	     (users close via Escape). The {#if} guards mount it only while the
+	     drawer is open — close animates the drawer out via transform; the
+	     backdrop unmounts immediately, which is acceptable for MVP. -->
+	{#if layoutMode === 'mobileOverlay' && drawerOpen}
+		<button
+			type="button"
+			class="drawer-backdrop"
+			onclick={() => { drawerOpen = false; }}
+			aria-label="Close navigation"
+			tabindex="-1"
+		></button>
 	{/if}
 
 	<!-- Floating tool-call approval overlay (shown when daemon requests user decision) -->
@@ -313,5 +364,31 @@
 
 	.mobile-drawer.drawer-open {
 		transform: translateX(0);
+	}
+
+	/* Drawer backdrop — semi-transparent scrim sitting between the content
+	   (z<20) and the drawer (--z-modal: 30). Rendered as a <button> for
+	   accessibility; reset native button chrome so it looks like a plain scrim. */
+	.drawer-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: var(--z-sticky);
+		background: rgb(0 0 0 / 0.45);
+		border: none;
+		padding: 0;
+		margin: 0;
+		cursor: pointer;
+		animation: drawer-backdrop-in var(--duration-base) var(--ease-out-expo) forwards;
+	}
+
+	@keyframes drawer-backdrop-in {
+		from { opacity: 0; }
+		to   { opacity: 1; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.drawer-backdrop {
+			animation: none;
+		}
 	}
 </style>
