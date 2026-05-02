@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { connectionStore } from '$lib/stores/connection.svelte.js';
 	import { settingsStore } from '$lib/stores/settings.svelte.js';
+	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import StatusDot from '$lib/components/ui/status-dot/StatusDot.svelte';
 	import DaemonPopover from '$lib/components/DaemonPopover.svelte';
 
@@ -19,6 +20,11 @@
 
 	function togglePopover(): void {
 		popoverOpen = !popoverOpen;
+	}
+
+	function handleManageServers(): void {
+		popoverOpen = false;
+		navigationStore.navigate('settings');
 	}
 </script>
 
@@ -45,6 +51,7 @@
 	open={popoverOpen}
 	onClose={() => { popoverOpen = false; }}
 	anchorEl={triggerEl}
+	onManageServers={handleManageServers}
 />
 
 <style>
