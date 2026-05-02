@@ -172,7 +172,7 @@ export const registry = {
 
 	get(serverId: string): DaemonClient | null {
 		const clientKey = clientKeysByServerId.get(serverId);
-		return clientKey ? (clientsByUrl.get(clientKey) ?? null) : null;
+		return clientKey !== undefined ? (clientsByUrl.get(clientKey) ?? null) : null;
 	},
 
 	getByUrl(url: string): DaemonClient | null {
