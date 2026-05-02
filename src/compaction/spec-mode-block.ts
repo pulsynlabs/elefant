@@ -4,6 +4,7 @@ import type { Database } from '../db/database.ts';
 import { SpecAdlRepo } from '../db/repo/spec/adl.ts';
 import { MustHavesRepo } from '../db/repo/spec/must-haves.ts';
 import { SpecWorkflowsRepo } from '../db/repo/spec/workflows.ts';
+import { buildResumeDirectiveFromWorkflow } from './blocks.ts';
 
 type TaskStatusRow = {
 	status: string;
@@ -27,6 +28,32 @@ function buildTaskSummary(db: BunDatabase, workflowPk: string, waveNumber: numbe
 	return rows.map((row) => `${row.status}: ${row.count}`).join(', ');
 }
 
+function buildTaskProgress(
+	db: BunDatabase,
+	workflowPk: string,
+	waveNumber: number,
+): { done: number; inProgress: number } {
+	const rows = db
+		.query(
+			`SELECT t.status AS status, COUNT(*) AS count
+			 FROM spec_tasks t
+			 JOIN spec_waves w ON w.id = t.wave_id
+			 JOIN spec_blueprints b ON b.id = w.blueprint_id
+			 WHERE b.workflow_id = ? AND w.wave_number = ?
+			 GROUP BY t.status`,
+		)
+		.all(workflowPk, waveNumber) as TaskStatusRow[];
+
+	const done = rows
+		.filter((row) => row.status === 'done' || row.status === 'complete')
+		.reduce((sum, row) => sum + row.count, 0);
+	const inProgress = rows
+		.filter((row) => row.status !== 'done' && row.status !== 'complete')
+		.reduce((sum, row) => sum + row.count, 0);
+
+	return { done, inProgress };
+}
+
 export function buildSpecModeBlock(
 	db: Database,
 	projectId: string,
@@ -42,6 +69,7 @@ export function buildSpecModeBlock(
 	const mustHaves = mustHavesRepo.list(workflow.id).slice(0, 5);
 	const lastAdl = adlRepo.getLastN(workflow.id, 3);
 	const taskSummary = buildTaskSummary(db.db, workflow.id, workflow.currentWave);
+	const progress = buildTaskProgress(db.db, workflow.id, workflow.currentWave);
 
 	const lines: string[] = [];
 
@@ -51,11 +79,27 @@ export function buildSpecModeBlock(
 	}
 
 	lines.push(`## SPEC MODE — ${workflowId}`);
+	lines.push(buildResumeDirectiveFromWorkflow({
+		workflowId,
+		phase: workflow.phase,
+		currentWave: workflow.currentWave,
+		totalWaves: workflow.totalWaves,
+		lazyAutopilot: workflow.lazyAutopilot,
+	}));
+	lines.push('> 1) Run `wf_status` to confirm phase/wave/task state.');
+	lines.push('> 2) Continue the current phase using the appropriate command (`/execute`, `/plan`, `/audit`, `/accept`).');
+	lines.push('> 3) Resume the *next incomplete task*; do not restart completed work.');
 	lines.push('');
 	lines.push(`**Phase:** ${workflow.phase} | **Mode:** ${workflow.mode} | **Depth:** ${workflow.depth}`);
 	lines.push(`**Spec Locked:** ${workflow.specLocked ? '🔒 Yes' : 'No'} | **Wave:** ${workflow.currentWave}/${workflow.totalWaves}`);
 	lines.push(`**Current Wave Tasks:** ${taskSummary}`);
 	if (workflow.autopilot) lines.push(`**Autopilot:** ${workflow.lazyAutopilot ? 'Lazy' : 'Standard'}`);
+	lines.push('');
+	lines.push('## Progress');
+	lines.push('### Done');
+	lines.push(`- [x] ${progress.done} task${progress.done !== 1 ? 's' : ''} completed`);
+	lines.push('### In Progress');
+	lines.push(`- [ ] ${progress.inProgress} task${progress.inProgress !== 1 ? 's' : ''} remaining`);
 	lines.push('');
 
 	if (mustHaves.length > 0) {
