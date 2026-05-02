@@ -1,4 +1,3 @@
-import { Store } from '@tauri-apps/plugin-store';
 import { getDaemonClient } from '$lib/daemon/client.js';
 import type { ServerConfig } from '$lib/types/server.js';
 import { DEFAULT_LOCAL_SERVER_SEED } from '$lib/types/server.js';
@@ -8,6 +7,13 @@ import {
 	isLocalUrl,
 	serverDisplayNameFallback,
 } from '$lib/daemon/server-utils.js';
+
+/**
+ * True when running inside a Tauri webview; false in plain browser/serve mode.
+ * Exported so other modules (e.g. dialog.ts) can read the same flag.
+ */
+export const isTauriRuntime: boolean =
+	typeof window !== 'undefined' && '__TAURI__' in window;
 
 const STORE_FILE = 'elefant-preferences.json';
 
@@ -26,10 +32,15 @@ let daemonUrl = $derived(
 // Store lifecycle
 // ---------------------------------------------------------------------------
 
-let store: Store | null = null;
+// Lazily imported so the module doesn't fail to parse in browser mode where
+// the Tauri plugin throws on import.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+type TauriStore = Awaited<ReturnType<typeof import('@tauri-apps/plugin-store').Store.load>>;
+let store: TauriStore | null = null;
 
-async function getStore(): Promise<Store> {
+async function getStore(): Promise<TauriStore> {
 	if (!store) {
+		const { Store } = await import('@tauri-apps/plugin-store');
 		store = await Store.load(STORE_FILE);
 	}
 	return store;
@@ -39,11 +50,11 @@ async function getStore(): Promise<Store> {
 // Persistence helpers
 // ---------------------------------------------------------------------------
 
-async function persistServers(s: Store): Promise<void> {
+async function persistServers(s: TauriStore): Promise<void> {
 	await s.set('servers', servers);
 }
 
-async function persistActiveServerId(s: Store): Promise<void> {
+async function persistActiveServerId(s: TauriStore): Promise<void> {
 	await s.set('activeServerId', activeServerId);
 }
 
@@ -73,9 +84,44 @@ function ensureOneDefault(): void {
  * migration so that users of the legacy `daemonUrl` preference are
  * transparently upgraded to the multi-server `servers[]` format.
  */
+/**
+ * Seeds the server list from `window.location.origin` when running in
+ * browser/serve mode (no Tauri runtime). The origin IS the proxy URL for the
+ * daemon, so no configuration is needed — the browser already knows where it is.
+ */
+function initBrowserMode(): void {
+	const origin = normalizeServerUrl(
+		typeof window !== 'undefined' ? window.location.origin : DEFAULT_LOCAL_SERVER_SEED.url,
+	);
+	const config: ServerConfig = {
+		id: generateServerId(),
+		url: origin,
+		displayName: serverDisplayNameFallback(origin),
+		isLocal: isLocalUrl(origin),
+		isDefault: true,
+	};
+	servers = [config];
+	activeServerId = config.id;
+	getDaemonClient(origin);
+}
+
 export async function initSettings(): Promise<void> {
+	// Always seed from the page origin first so the app is never left with
+	// an empty server list. If we're in a Tauri runtime, the Tauri Store
+	// load below will overwrite this with the user's persisted preferences.
+	initBrowserMode();
+
+	// Non-Tauri (browser/serve mode) — browser-mode seed is all we need.
+	if (!isTauriRuntime) {
+		return;
+	}
+
 	try {
-		const s = await getStore();
+		const s = await getStore().catch(() => null);
+		if (!s) {
+			// Store unavailable — browser-mode seed already applied above.
+			return;
+		}
 
 		// --- auto-start (unchanged) ---
 		const savedAutoStart = await s.get<boolean>('autoStartDaemon');
@@ -150,7 +196,11 @@ export async function initSettings(): Promise<void> {
 			servers.find((srv) => srv.id === activeServerId)?.url ?? '';
 		getDaemonClient(activeUrl || DEFAULT_LOCAL_SERVER_SEED.url);
 	} catch {
-		// Use module-level defaults on error (app will limp with empty state)
+		// Any Tauri Store error — fall back to browser mode so the app
+		// always has at least one server configured and can connect.
+		if (servers.length === 0) {
+			initBrowserMode();
+		}
 	}
 }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'elefant-v1';
+const CACHE_NAME = 'elefant-v2-multi-daemon';
 
 // Precache on install: index.html + the JS/CSS bundles
 self.addEventListener('install', (event) => {
@@ -46,6 +46,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-first for the HTML entry point — always get the latest
+  // bundle references. Falls back to cache if offline.
+  if (url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse.ok) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(request).then((c) => c ?? Response.error())),
+    );
+    return;
+  }
+
+  // Stale-while-revalidate for hashed assets and other static files.
   event.respondWith(
     caches.match(request).then((cached) => {
       const fetchPromise = fetch(request).then((networkResponse) => {

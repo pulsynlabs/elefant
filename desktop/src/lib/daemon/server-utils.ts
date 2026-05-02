@@ -41,11 +41,21 @@ export function normalizeServerUrl(input: string): string {
 }
 
 /**
- * Generates a stable unique server ID using crypto.randomUUID().
- * Each call returns a new v4 UUID.
+ * Generates a unique server ID.
+ * Uses crypto.randomUUID() in secure contexts (HTTPS / Tauri).
+ * Falls back to a Math.random-based UUID v4 in plain HTTP contexts
+ * where the Web Crypto API is restricted.
  */
 export function generateServerId(): string {
-	return crypto.randomUUID();
+	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+		return crypto.randomUUID();
+	}
+	// Fallback: RFC 4122 v4 UUID using Math.random
+	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+		const r = (Math.random() * 16) | 0;
+		const v = c === 'x' ? r : (r & 0x3) | 0x8;
+		return v.toString(16);
+	});
 }
 
 /**
