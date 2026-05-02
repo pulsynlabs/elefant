@@ -8,7 +8,7 @@ Bun-native daemon · SQLite-backed state · Hook-enforced behavior · Tauri + Sv
 
 ---
 
-![Elefant workspace view](docs/screenshots/readme/workspace.png)
+![Elefant](docs/screenshots/readme/github-header.png)
 
 ---
 
