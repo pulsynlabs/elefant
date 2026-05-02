@@ -466,4 +466,12 @@
 		color: var(--color-text-primary);
 		border-color: var(--color-border-strong);
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.btn-primary,
+		.btn-secondary {
+			min-height: 44px;
+		}
+	}
 </style>

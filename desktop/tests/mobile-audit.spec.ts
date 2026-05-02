@@ -184,7 +184,28 @@ async function auditView(
           seen.add(el);
 
           const rect = el.getBoundingClientRect();
-          if (rect.width <= 0 && rect.height <= 0) continue;
+          // Skip elements that aren't actually visible / tappable. A
+          // zero-width column collapsed via CSS (e.g. the inline sidebar
+          // aside in mobile-overlay mode) reports width=0 but a non-zero
+          // height — counting it would flag invisible duplicates of the
+          // drawer copy that IS visible. Combined visibility check covers
+          // display:none, visibility:hidden, and zero-dimension cases.
+          if (rect.width <= 0 || rect.height <= 0) continue;
+          const style = window.getComputedStyle(el);
+          if (style.visibility === "hidden" || style.display === "none") continue;
+          // Also skip if any ancestor sets visibility:hidden (the inline
+          // sidebar aside hides the whole subtree).
+          let ancestor: Element | null = el.parentElement;
+          let hiddenByAncestor = false;
+          while (ancestor) {
+            const aStyle = window.getComputedStyle(ancestor);
+            if (aStyle.visibility === "hidden" || aStyle.display === "none") {
+              hiddenByAncestor = true;
+              break;
+            }
+            ancestor = ancestor.parentElement;
+          }
+          if (hiddenByAncestor) continue;
 
           if (rect.width < 44 || rect.height < 44) {
             const tag = el.tagName.toLowerCase();

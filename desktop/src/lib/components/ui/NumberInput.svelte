@@ -244,4 +244,14 @@
 			transition: none;
 		}
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.stepper-btn {
+			min-width: 44px;
+			min-height: 44px;
+			width: 44px;
+			height: 44px;
+		}
+	}
 </style>

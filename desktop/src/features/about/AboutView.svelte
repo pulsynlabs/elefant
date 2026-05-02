@@ -222,4 +222,11 @@
 		font-size: var(--font-size-sm);
 		color: var(--color-text-muted);
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.link-item {
+			min-height: 44px;
+		}
+	}
 </style>

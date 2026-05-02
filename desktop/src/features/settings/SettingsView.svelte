@@ -140,4 +140,11 @@
 		overflow-y: auto;
 		padding: var(--space-6);
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.settings-nav-item {
+			min-height: 44px;
+		}
+	}
 </style>
