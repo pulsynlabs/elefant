@@ -75,4 +75,12 @@
 	.topbar-spacer {
 		flex: 1;
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		.sidebar-toggle {
+			min-width: 44px;
+			min-height: 44px;
+		}
+	}
 </style>

@@ -681,4 +681,31 @@
 	.sidebar-nav.collapsed .bottom-nav {
 		padding: var(--space-3) var(--space-2) var(--space-4);
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		/* Brand button — keep generous tappable area on mobile */
+		.sidebar-brand {
+			min-height: 44px;
+		}
+
+		/* Nav items grow vertically without disturbing icon/label layout */
+		.nav-item {
+			min-height: 44px;
+			padding-top: 10px;
+			padding-bottom: 10px;
+		}
+
+		/* Collapsed-mode nav items still need the full 44×44 hit box */
+		.sidebar-nav.collapsed .nav-item {
+			min-height: 44px;
+			min-width: 44px;
+		}
+
+		/* Avatar buttons in collapsed mode (mobile drawer collapsed state) */
+		.avatar-button {
+			min-width: 44px;
+			min-height: 44px;
+		}
+	}
 </style>

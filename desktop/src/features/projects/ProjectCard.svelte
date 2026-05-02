@@ -485,4 +485,20 @@
 	   in a visually confusing way — but we keep them focusable because
 	   :focus-within reveals them (see rule above). That's the intended UX:
 	   Tab reaches them, which reveals them. No extra work needed. */
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		/* Rename/delete icon buttons need 44×44 hit area on mobile */
+		.icon-button {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		/* On mobile there is no hover; reveal card actions permanently
+		   so the rename/delete buttons are reachable without a hover. */
+		.card-actions {
+			opacity: 1;
+			transform: none;
+		}
+	}
 </style>

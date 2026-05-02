@@ -481,4 +481,33 @@
 			opacity: 0.35;
 		}
 	}
+
+	/* ── Mobile touch targets (≥44px) ─────────────────────────────── */
+	@media (max-width: 640px) {
+		/* Project expand/collapse row — taller hit area for thumbs */
+		.project-header {
+			min-height: 44px;
+		}
+
+		/* New-session "+" button — was 22×22, expand to full 44×44 hit area.
+		   The button is opacity:0 by default on desktop (reveals on hover);
+		   on mobile we keep that behaviour but make the layout box reserve
+		   the full tap target so users can find it once it's visible
+		   (project-row.expanded reveals it permanently). */
+		.header-icon-button {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		/* Session row — 44px reach */
+		.session-row {
+			min-height: 44px;
+		}
+
+		/* Always reveal the new-session button on mobile so users can
+		   actually reach it without a hover that doesn't exist on touch. */
+		.header-icon-button {
+			opacity: 1;
+		}
+	}
 </style>
