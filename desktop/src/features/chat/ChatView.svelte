@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { chatStore } from './chat.svelte.js';
-	import MessageList from './MessageList.svelte';
+	import MessageList, { type GhostEntry } from './MessageList.svelte';
 	import MessageInput from './MessageInput.svelte';
 	import ProviderSelector from './ProviderSelector.svelte';
 	import ConnectionBanner from './ConnectionBanner.svelte';
@@ -10,6 +10,32 @@
 	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
 
 	let abortController: AbortController | null = null;
+
+	// Ephemeral "tombstone" entries for pairs that were just undone. Owned
+	// here (NOT on chatStore) because ghosts are a purely presentational
+	// concern — `chatStore.undo()` already mutates `messages` and the
+	// `redoStack`, while the ghost is a fading visual cue layered on top.
+	// New entries push to the end; each carries a stable id so multiple
+	// stacked ghosts dissolve independently.
+	let ghostEntries = $state<GhostEntry[]>([]);
+
+	// Helper that turns the prompt text returned by `chatStore.undo()` into
+	// a fresh ghost entry. Centralised so the `/undo` slash intercept and
+	// the per-message undo button stay in sync — both surfaces should
+	// render exactly the same tombstone for the same kind of action.
+	function pushGhost(userContent: string): void {
+		if (!userContent) return;
+		ghostEntries = [...ghostEntries, { id: crypto.randomUUID(), userContent }];
+	}
+
+	function handleGhostRedo(id: string): void {
+		chatStore.redo();
+		ghostEntries = ghostEntries.filter((g) => g.id !== id);
+	}
+
+	function handleGhostDismiss(id: string): void {
+		ghostEntries = ghostEntries.filter((g) => g.id !== id);
+	}
 
 	// Subscribe to the active project's SSE event stream so the
 	// agent-runs store receives `agent_run.spawned` and
@@ -75,7 +101,31 @@
 	});
 
 	async function handleSend(content: string): Promise<void> {
+		// Client-side slash command intercepts. These commands operate on
+		// in-memory chat state only and must NEVER reach the daemon — even
+		// when they're a no-op (no pair to undo, empty redo stack), we
+		// always early-return so the slash literal isn't streamed as a
+		// user prompt. Match is exact trimmed equality so genuine messages
+		// like "/undo something I wrote" still forward as normal text.
+		const trimmed = content.trim();
+		if (trimmed === '/undo') {
+			const promptText = chatStore.undo();
+			pendingInputRestore = promptText ?? '';
+			if (promptText !== null) pushGhost(promptText);
+			return;
+		}
+		if (trimmed === '/redo') {
+			chatStore.redo();
+			return;
+		}
+
 		if (chatStore.isStreaming || !content.trim()) return;
+
+		// A real send invalidates every pending tombstone: the redo stack
+		// is cleared inside `addUserMessage`, so any ghost still on screen
+		// would point at history the user can no longer reach. Mirror that
+		// store-side reset here in lock-step.
+		ghostEntries = [];
 
 		// Add user message to conversation
 		chatStore.addUserMessage(content.trim());
@@ -170,6 +220,9 @@
 	function handleUndoMessage(): void {
 		const promptText = chatStore.undo();
 		pendingInputRestore = promptText ?? '';
+		// Mirror the `/undo` slash command path: surface a ghost tombstone
+		// for the just-removed pair so the user can redo it inline.
+		if (promptText !== null) pushGhost(promptText);
 	}
 
 	// --- Layout state ---------------------------------------------------
@@ -193,7 +246,13 @@
 
 	<!-- Message list (scrollable area) -->
 	<div class="chat-messages">
-		<MessageList messages={chatStore.messages} onUndoMessage={handleUndoMessage} />
+		<MessageList
+			messages={chatStore.messages}
+			onUndoMessage={handleUndoMessage}
+			{ghostEntries}
+			onGhostRedo={handleGhostRedo}
+			onGhostDismiss={handleGhostDismiss}
+		/>
 	</div>
 
 	<!-- Input area -->

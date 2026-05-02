@@ -2,8 +2,18 @@
 	import type { ChatMessage } from './types.js';
 	import MessageBubble from './MessageBubble.svelte';
 	import { HugeiconsIcon, ChatIcon } from '$lib/icons/index.js';
+	import GhostMessage from './GhostMessage.svelte';
 	import { chatStore } from './chat.svelte.js';
 	import { tick } from 'svelte';
+
+	/**
+	 * Ephemeral "tombstone" entry for a user+assistant pair that was just
+	 * undone. Kept purely in the UI layer (ChatView) — these are NOT
+	 * persisted on the chatStore — and rendered inline below the real
+	 * message stream so auto-scroll captures them. Each entry has a
+	 * stable id so multiple stacked ghosts dissolve independently.
+	 */
+	export type GhostEntry = { id: string; userContent: string };
 
 	type Props = {
 		messages: ChatMessage[];
@@ -14,9 +24,26 @@
 		 * by the `/undo` slash command) is the single source of truth.
 		 */
 		onUndoMessage?: () => void;
+		/**
+		 * Active ghost tombstones rendered after the last real message.
+		 * Owned by ChatView so `addUserMessage` (which clears the redo
+		 * stack) can clear them in lock-step on a real send. Optional so
+		 * existing call sites that don't yet pass ghosts keep compiling.
+		 */
+		ghostEntries?: GhostEntry[];
+		/** Per-ghost redo handler — calls chatStore.redo() and removes the ghost. */
+		onGhostRedo?: (id: string) => void;
+		/** Per-ghost dismiss handler — fires after the auto-dissolve fade-out. */
+		onGhostDismiss?: (id: string) => void;
 	};
 
-	let { messages, onUndoMessage }: Props = $props();
+	let {
+		messages,
+		onUndoMessage,
+		ghostEntries = [],
+		onGhostRedo,
+		onGhostDismiss,
+	}: Props = $props();
 
 	let listEl: HTMLDivElement;
 
@@ -37,7 +64,10 @@
 		return null;
 	});
 
-	// Auto-scroll to bottom when messages change
+	// Auto-scroll to bottom when messages change OR when a ghost is
+	// pushed/dismissed. Ghosts render in the same scrollable area as the
+	// messages, so depending on `ghostEntries.length` keeps the latest
+	// activity in view even when no new real message has arrived.
 	$effect(() => {
 		// Access messages to create dependency
 		const _len = messages.length;
@@ -45,6 +75,9 @@
 		// Also track streaming content changes
 		const _streaming = lastMsg?.isStreaming;
 		const _content = lastMsg?.content;
+		// Track ghost lifecycle so a fresh undo scrolls the new tombstone
+		// into view alongside the message stream.
+		const _ghostLen = ghostEntries.length;
 
 		tick().then(() => {
 			if (listEl) {
@@ -71,6 +104,21 @@
 				{message}
 				isLastUndoablePair={chatStore.canUndo && message.id === lastUserMessageId}
 				onUndo={onUndoMessage}
+			/>
+		{/each}
+
+		<!--
+			Ghost tombstones render *after* the live message list so they
+			appear visually below the most recent assistant turn. Keeping
+			them inside the same scroll container guarantees auto-scroll
+			captures them and avoids the layout-shift that would occur if
+			they were stacked above the input bar.
+		-->
+		{#each ghostEntries as ghost (ghost.id)}
+			<GhostMessage
+				userContent={ghost.userContent}
+				onRedo={() => onGhostRedo?.(ghost.id)}
+				onDismiss={() => onGhostDismiss?.(ghost.id)}
 			/>
 		{/each}
 	{/if}
