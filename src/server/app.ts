@@ -24,6 +24,7 @@ import { gracefulShutdown } from '../daemon/shutdown.ts'
 import type { StateManager } from '../state/manager.ts'
 import { mountWorkflowRoutes } from './routes-workflow.ts'
 import { mountServeRoutes } from './routes-serve.ts'
+import { mountFsRoutes } from './routes-fs.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,
@@ -170,6 +171,9 @@ export function createApp(
 
 	// Mount serve control routes (MH14)
 	mountServeRoutes(baseApp as unknown as Elysia)
+
+	// Mount secure filesystem listing routes for remote project selection
+	mountFsRoutes(baseApp as unknown as Elysia)
 
 	return baseApp
 }
