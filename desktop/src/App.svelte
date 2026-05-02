@@ -12,6 +12,7 @@
 	import { connectionStore } from "$lib/stores/connection.svelte.js";
 	import { settingsStore } from "$lib/stores/settings.svelte.js";
 	import { projectsStore } from "$lib/stores/projects.svelte.js";
+	import { registry } from "$lib/daemon/index.js";
 	import { chatStore } from "./features/chat/chat.svelte.js";
 	import { daemonLifecycle } from "$lib/services/daemon-lifecycle.js";
 	import { configService } from "$lib/services/config-service.js";
@@ -123,6 +124,8 @@
 	});
 
 	onMount(() => {
+		let disposed = false;
+
 		// Initialize theme
 		themeStore.init();
 
@@ -132,26 +135,9 @@
 		checkDesignSystemRoute();
 		window.addEventListener("hashchange", checkDesignSystemRoute);
 
-		// Initialize settings (daemon URL, auto-start preference)
-		settingsStore.init();
-
 		navigationRuntime.initNavigation({
 			getActiveProjectId: () => projectsStore.activeProjectId,
 		});
-
-		// Auto-start daemon if configured
-		if (settingsStore.autoStartDaemon) {
-			daemonLifecycle.getDaemonStatus().then((status) => {
-				if (status !== "running") {
-					daemonLifecycle.startDaemon().catch(() => {
-						// Silently ignore auto-start failures
-					});
-				}
-			});
-		}
-
-		// Start connection health polling
-		connectionStore.start();
 
 		// Load config — retries until daemon responds.
 		// hasConfig stays null (loading) until we get a definitive answer from the daemon.
@@ -177,7 +163,38 @@
 			// (the onboarding will also let them start the daemon)
 			hasConfig = false;
 		}
-		void loadConfigWhenReady();
+
+		async function initializeDaemonConnection(): Promise<void> {
+			await settingsStore.init();
+			if (disposed) return;
+
+			for (const server of settingsStore.servers) {
+				registry.register(server);
+			}
+
+			const activeServerId = settingsStore.activeServerId ?? settingsStore.servers[0]?.id;
+			if (activeServerId) {
+				registry.setActive(activeServerId);
+			}
+
+			// Auto-start daemon if configured
+			if (settingsStore.autoStartDaemon) {
+				daemonLifecycle.getDaemonStatus().then((status) => {
+					if (status !== "running") {
+						daemonLifecycle.startDaemon().catch(() => {
+							// Silently ignore auto-start failures
+						});
+					}
+				});
+			}
+
+			connectionStore.start();
+			await projectsStore.loadProjects();
+			if (disposed) return;
+			void loadConfigWhenReady();
+		}
+
+		void initializeDaemonConnection();
 
 		// Keyboard shortcuts
 		function handleKeydown(event: KeyboardEvent): void {
@@ -217,6 +234,7 @@
 		handleResize();
 
 		return () => {
+			disposed = true;
 			connectionStore.stop();
 			window.removeEventListener("keydown", handleKeydown);
 			window.removeEventListener("resize", handleResize);
