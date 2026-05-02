@@ -1,7 +1,7 @@
 <script lang="ts">
 	import GeneralSettings from './GeneralSettings.svelte';
 	import ProviderSettings from './ProviderSettings.svelte';
-	import DaemonControlSection from './DaemonControlSection.svelte';
+	import ServersSettings from './ServersSettings.svelte';
 	import ProjectSettings from './ProjectSettings.svelte';
 	import MCPSettings from './MCPSettings.svelte';
 	import ServeSettings from './ServeSettings.svelte';
@@ -15,7 +15,7 @@
 		{ id: 'project', label: 'Project' },
 		{ id: 'providers', label: 'Providers' },
 		{ id: 'mcp', label: 'MCP' },
-		{ id: 'daemon', label: 'Daemon' },
+		{ id: 'daemon', label: 'Servers' },
 		{ id: 'serve', label: 'Serve' },
 	];
 </script>
@@ -49,7 +49,7 @@
 			{:else if activeSection === 'mcp'}
 				<MCPSettings />
 			{:else if activeSection === 'daemon'}
-				<DaemonControlSection />
+				<ServersSettings />
 			{:else if activeSection === 'serve'}
 				<ServeSettings />
 			{/if}
