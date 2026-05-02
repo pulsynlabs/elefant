@@ -215,6 +215,7 @@ export function createConfigRoutes<TApp extends Elysia>(
 				port: z.number().int().min(1).max(65535).optional(),
 				defaultProvider: z.string().min(1).optional(),
 				logLevel: z.enum(['debug', 'info', 'warn', 'error']).optional(),
+				compactionThreshold: z.number().min(0.5).max(0.95).optional(),
 			})
 			.strict();
 
@@ -240,8 +241,11 @@ export function createConfigRoutes<TApp extends Elysia>(
 			...(parsed.data.defaultProvider !== undefined
 				? { defaultProvider: parsed.data.defaultProvider }
 				: {}),
-			...(parsed.data.logLevel !== undefined ? { logLevel: parsed.data.logLevel } : {}),
-		};
+		...(parsed.data.logLevel !== undefined ? { logLevel: parsed.data.logLevel } : {}),
+		...(parsed.data.compactionThreshold !== undefined
+			? { compactionThreshold: parsed.data.compactionThreshold }
+			: {}),
+	};
 
 		await writeConfigFile(updated);
 		providerRouter.reload(updated);
