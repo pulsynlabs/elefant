@@ -37,7 +37,10 @@
 
 	const navigationRuntime = navigationStore as NavigationRuntime;
 
-	let sidebarCollapsed = $state(false);
+	type LayoutMode = 'expanded' | 'collapsed' | 'mobileOverlay';
+	let layoutMode = $state<LayoutMode>('expanded');
+	let drawerOpen = $state(false);
+	const sidebarCollapsed = $derived(layoutMode === 'collapsed');
 	let isDesignSystemRoute = $state(false);
 
 	// Whether the user has a real (non-placeholder) provider configured.
@@ -76,8 +79,18 @@
 		previousActiveProjectId = current;
 	});
 
+	function computeLayoutMode(width: number): LayoutMode {
+		if (width <= 640) return 'mobileOverlay';
+		if (width <= 900) return 'collapsed';
+		return 'expanded';
+	}
+
 	function toggleSidebar(): void {
-		sidebarCollapsed = !sidebarCollapsed;
+		if (layoutMode === 'mobileOverlay') {
+			drawerOpen = !drawerOpen;
+		} else {
+			layoutMode = layoutMode === 'expanded' ? 'collapsed' : 'expanded';
+		}
 	}
 
 	onMount(() => {
@@ -155,10 +168,15 @@
 
 		window.addEventListener("keydown", handleKeydown);
 
-		// Responsive sidebar
+		// Responsive sidebar — three-mode layout state machine
 		function handleResize(): void {
-			if (window.innerWidth < 900) {
-				sidebarCollapsed = true;
+			const newMode = computeLayoutMode(window.innerWidth);
+			if (newMode !== layoutMode) {
+				layoutMode = newMode;
+				// Auto-close drawer when leaving mobileOverlay
+				if (newMode !== 'mobileOverlay') {
+					drawerOpen = false;
+				}
 			}
 		}
 		window.addEventListener("resize", handleResize);
@@ -178,7 +196,7 @@
 {#if isDesignSystemRoute}
 	<DesignSystemPage />
 {:else}
-	<AppShell bind:sidebarCollapsed>
+	<AppShell sidebarCollapsed={sidebarCollapsed}>
 		{#snippet sidebar()}
 			<Sidebar collapsed={sidebarCollapsed} />
 		{/snippet}
