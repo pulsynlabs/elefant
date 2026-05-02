@@ -155,6 +155,30 @@
 		chatStore.finalizeMessage('stop');
 		abortController = null;
 	}
+	// Holds the prompt text returned by `chatStore.undo()` so the
+	// input component can restore it programmatically. Reset to '' on
+	// each send so stale text can never survive across messages.
+	let pendingInputRestore = $state('');
+
+	// Per-message undo handler invoked by the inline button rendered on
+	// the most recent user message bubble. Mirrors the `/undo` slash
+	// command path exactly: call `chatStore.undo()`, then route the
+	// returned prompt text into the input via `pendingInputRestore`.
+	// Keeping a single restore handshake means the input-side `$effect`
+	// stays the only consumer, regardless of which surface triggered
+	// the undo.
+	function handleUndoMessage(): void {
+		const promptText = chatStore.undo();
+		pendingInputRestore = promptText ?? '';
+	}
+
+	// --- Layout state ---------------------------------------------------
+	//
+	// The view picks one of two arrangements based on whether the
+	// conversation has any messages yet. We swap the entire branch via
+	// `{#if hasMessages}` so layout differences (centred vs bottom-pinned)
+	// don't fight each other inside a single grid.
+	const hasMessages = $derived(chatStore.messages.length > 0);
 </script>
 
 <div class="chat-view">
@@ -169,7 +193,7 @@
 
 	<!-- Message list (scrollable area) -->
 	<div class="chat-messages">
-		<MessageList messages={chatStore.messages} />
+		<MessageList messages={chatStore.messages} onUndoMessage={handleUndoMessage} />
 	</div>
 
 	<!-- Input area -->

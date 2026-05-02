@@ -2,15 +2,40 @@
 	import type { ChatMessage } from './types.js';
 	import MessageBubble from './MessageBubble.svelte';
 	import { HugeiconsIcon, ChatIcon } from '$lib/icons/index.js';
+	import { chatStore } from './chat.svelte.js';
 	import { tick } from 'svelte';
 
 	type Props = {
 		messages: ChatMessage[];
+		/**
+		 * Forwarded to the per-message undo button on the last
+		 * undoable user bubble. Routed up to ChatView so the existing
+		 * `chatStore.undo()` -> `pendingInputRestore` handshake (used
+		 * by the `/undo` slash command) is the single source of truth.
+		 */
+		onUndoMessage?: () => void;
 	};
 
-	let { messages }: Props = $props();
+	let { messages, onUndoMessage }: Props = $props();
 
 	let listEl: HTMLDivElement;
+
+	// Identifier of the last user message in the current list, or null
+	// if no user message exists yet. The per-message undo button only
+	// renders on this message, and only when `chatStore.canUndo` is
+	// true — together they pin the affordance to the most recent
+	// undoable pair, matching the `/undo` semantics.
+	//
+	// Walks the array from the tail in a plain loop instead of
+	// `Array.prototype.findLast` so the file doesn't need ES2023 in the
+	// project's TS `lib` target — staying compatible with the existing
+	// build settings used everywhere else in the codebase.
+	const lastUserMessageId: string | null = $derived.by(() => {
+		for (let i = messages.length - 1; i >= 0; i--) {
+			if (messages[i].role === 'user') return messages[i].id;
+		}
+		return null;
+	});
 
 	// Auto-scroll to bottom when messages change
 	$effect(() => {
@@ -42,7 +67,11 @@
 		</div>
 	{:else}
 		{#each messages as message (message.id)}
-			<MessageBubble {message} />
+			<MessageBubble
+				{message}
+				isLastUndoablePair={chatStore.canUndo && message.id === lastUserMessageId}
+				onUndo={onUndoMessage}
+			/>
 		{/each}
 	{/if}
 </div>
