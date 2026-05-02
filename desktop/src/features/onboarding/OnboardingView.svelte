@@ -5,6 +5,7 @@
 	import Spinner from '$lib/components/ui/spinner/Spinner.svelte';
 	import { onMount } from 'svelte';
 	import { HugeiconsIcon, ViewIcon, ViewOffIcon } from '$lib/icons/index.js';
+	import { themeStore } from '$lib/stores/theme.svelte';
 
 	type Step = 'welcome' | 'provider' | 'starting';
 
@@ -18,6 +19,7 @@
 	let format = $state<'openai' | 'anthropic'>('anthropic');
 	let baseURL = $state('https://api.anthropic.com');
 	let apiKey = $state('');
+	const logoSrc = $derived(themeStore.isDark ? '/elefant-dark.png' : '/elefant-light.png');
 	let model = $state('claude-sonnet-4-5');
 	let showKey = $state(false);
 	let saving = $state(false);
@@ -109,7 +111,7 @@
 <div class="onboarding">
 	{#if step === 'welcome'}
 		<div class="step">
-			<div class="brand-mark" aria-hidden="true">E</div>
+			<img src={logoSrc} alt="Elefant" class="brand-logo" width="72" height="72" aria-hidden="true" />
 			<h1 class="heading">Welcome to Elefant</h1>
 			<p class="subheading">A local AI coding agent that runs on your machine.</p>
 			<p class="body">
@@ -261,18 +263,11 @@
 		text-align: left;
 	}
 
-	.brand-mark {
+	.brand-logo {
 		width: 72px;
 		height: 72px;
+		object-fit: contain;
 		border-radius: var(--radius-xl);
-		background-color: var(--color-primary);
-		color: var(--color-primary-foreground);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 40px;
-		font-weight: var(--font-weight-bold);
-		font-family: var(--font-mono);
 	}
 
 	.heading {
