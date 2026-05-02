@@ -4,6 +4,7 @@
 	import MessageInput from './MessageInput.svelte';
 	import ProviderSelector from './ProviderSelector.svelte';
 	import ConnectionBanner from './ConnectionBanner.svelte';
+	import RedoBanner from './RedoBanner.svelte';
 	import { getDaemonClient } from '$lib/daemon/client.js';
 	import type { MessageRole } from '$lib/daemon/types.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
@@ -225,6 +226,24 @@
 		if (promptText !== null) pushGhost(promptText);
 	}
 
+	// Keyboard-shortcut handlers (Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z, plus
+	// Ctrl+Y for Windows redo convention). UnifiedChatInput only fires
+	// these when its textarea is empty, so by the time we get here the
+	// user has clearly signalled intent to undo a chat turn rather than
+	// scrub through their typing. Both handlers route through exactly
+	// the same code paths as `/undo` / `/redo` and the per-message undo
+	// button — single source of truth for what an "undo" or "redo"
+	// means at the UI layer.
+	function handleUndoShortcut(): void {
+		const promptText = chatStore.undo();
+		pendingInputRestore = promptText ?? '';
+		if (promptText !== null) pushGhost(promptText);
+	}
+
+	function handleRedoShortcut(): void {
+		chatStore.redo();
+	}
+
 	// --- Layout state ---------------------------------------------------
 	//
 	// The view picks one of two arrangements based on whether the
@@ -257,6 +276,20 @@
 
 	<!-- Input area -->
 	<div class="chat-input-area">
+		<!--
+			Redo availability banner. Sits between the message list and
+			the composer so the redo affordance is visible without
+			blocking the message stream. Slide transition (inside
+			RedoBanner) handles the height collapse so the input doesn't
+			visually jump when the banner appears/disappears.
+		-->
+		{#if chatStore.canRedo}
+			<RedoBanner
+				redoCount={chatStore.redoCount}
+				onRedo={() => chatStore.redo()}
+			/>
+		{/if}
+
 		<MessageInput
 			disabled={chatStore.isStreaming}
 			streaming={chatStore.isStreaming}

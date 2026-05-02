@@ -536,6 +536,9 @@ export const chatStore = {
 	get canRedo() {
 		return canRedo;
 	},
+	get redoCount() {
+		return redoStack.length;
+	},
 	setActiveSession: (id: string | null) => {
 		activeSessionId = id;
 	},
