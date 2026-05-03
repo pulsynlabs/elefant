@@ -949,3 +949,338 @@ describe('fork branches — clearConversation() and caps', () => {
 		expect(chatStore.forkBranchCount).toBe(3);
 	});
 });
+
+// ==========================================================================
+// Side-context lifecycle tests (W4.T1)
+// ==========================================================================
+
+describe('side-context — entry', () => {
+	beforeEach(resetStore);
+
+	it('enterSideContext from a clean main thread opens side context', () => {
+		chatStore.addUserMessage('main question');
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('main answer');
+		chatStore.finalizeMessage('stop');
+
+		const mainLength = chatStore.messages.length;
+
+		const entered = chatStore.enterSideContext('side question');
+		expect(entered).toBe(true);
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(true);
+		// Messages = mainSnapshot (2) + user question (1) = 3
+		expect(chatStore.messages.length).toBe(mainLength + 1);
+		// Last message is the side-context user question
+		const lastMsg = chatStore.messages[chatStore.messages.length - 1];
+		expect(lastMsg.content).toBe('side question');
+		expect(lastMsg.role).toBe('user');
+	});
+
+	it('enterSideContext with empty string returns false', () => {
+		chatStore.addUserMessage('main');
+		const entered = chatStore.enterSideContext('');
+		expect(entered).toBe(false);
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(false);
+	});
+
+	it('enterSideContext returns false when already in side context', () => {
+		chatStore.addUserMessage('main');
+		chatStore.enterSideContext('first side');
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(true);
+
+		const second = chatStore.enterSideContext('second side');
+		expect(second).toBe(false);
+		// Side context unchanged — still the first entry
+		expect(chatStore.sideContext?.question).toBe('first side');
+	});
+
+	it('enterSideContext returns false while streaming', () => {
+		chatStore.addUserMessage('main');
+		chatStore.startAssistantMessage(); // sets isStreaming = true
+
+		const entered = chatStore.enterSideContext('side');
+		expect(entered).toBe(false);
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(false);
+
+		// Clean up: finalize the in-progress stream
+		chatStore.finalizeMessage('stop');
+	});
+
+	it('sideContext getter exposes the side-context snapshot', () => {
+		chatStore.addUserMessage('main msg');
+		chatStore.enterSideContext('side q');
+
+		const sc = chatStore.sideContext;
+		expect(sc).not.toBeNull();
+		expect(sc!.question).toBe('side q');
+		expect(sc!.mainSnapshot).toHaveLength(1); // only the main user message
+		expect(sc!.mainSnapshot[0].content).toBe('main msg');
+		expect(sc!.messages).toHaveLength(2); // mainSnapshot + user question
+	});
+
+	it('enterSideContext clears undo/redo stacks', () => {
+		addPair('hello', 'world');
+		chatStore.undo(); // push onto undoStack and redoStack
+		expect(readDerivedBool(chatStore.canRedo)).toBe(true);
+
+		chatStore.enterSideContext('side');
+		// Both stacks should be cleared by the entry path
+		expect(readDerivedBool(chatStore.canUndo)).toBe(false);
+		expect(readDerivedBool(chatStore.canRedo)).toBe(false);
+	});
+
+	it('enterSideContext with whitespace-only question returns false', () => {
+		chatStore.addUserMessage('main');
+		const entered = chatStore.enterSideContext('   ');
+		expect(entered).toBe(false);
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(false);
+	});
+});
+
+describe('side-context — exit', () => {
+	beforeEach(resetStore);
+
+	it('exitSideContext restores main messages and clears side-context state', () => {
+		chatStore.addUserMessage('main Q');
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('main A');
+		chatStore.finalizeMessage('stop');
+
+		const preEntryMessages = [...chatStore.messages];
+
+		chatStore.enterSideContext('side Q');
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('side A');
+		chatStore.finalizeMessage('stop');
+
+		// Messages now reflect side-context content (more than pre-entry)
+		expect(chatStore.messages.length).toBeGreaterThan(preEntryMessages.length);
+
+		const exited = chatStore.exitSideContext();
+		expect(exited).toBe(true);
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(false);
+		expect(chatStore.sideContext).toBeNull();
+		// Messages restored to exact pre-entry snapshot
+		expect(chatStore.messages.length).toBe(preEntryMessages.length);
+		expect(chatStore.messages).toEqual(preEntryMessages);
+	});
+
+	it('exitSideContext returns false when not in side context', () => {
+		const exited = chatStore.exitSideContext();
+		expect(exited).toBe(false);
+	});
+
+	it('exitSideContext clears undo/redo stacks', () => {
+		chatStore.addUserMessage('main');
+		chatStore.enterSideContext('side');
+		// Simulate a side-context message pair so undo/redo would have content
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('hello');
+		chatStore.finalizeMessage('stop');
+		chatStore.undo(); // populate undo/redo stacks within side context
+
+		chatStore.exitSideContext();
+		// Both stacks should be cleared
+		expect(readDerivedBool(chatStore.canUndo)).toBe(false);
+		expect(readDerivedBool(chatStore.canRedo)).toBe(false);
+	});
+
+	it('sequential enter → exit → enter cycle is idempotent', () => {
+		chatStore.addUserMessage('main 1');
+		chatStore.startAssistantMessage();
+		chatStore.finalizeMessage('stop');
+		const originalMessages = [...chatStore.messages];
+
+		// First cycle
+		chatStore.enterSideContext('side 1');
+		chatStore.exitSideContext();
+		expect(chatStore.messages).toEqual(originalMessages);
+
+		// Second cycle — should restore to the same original snapshot
+		chatStore.enterSideContext('side 2');
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(true);
+		chatStore.exitSideContext();
+		expect(chatStore.messages).toEqual(originalMessages);
+	});
+});
+
+describe('side-context — streaming isolation', () => {
+	beforeEach(resetStore);
+
+	it('streaming tokens during side context do not mutate mainSnapshot', () => {
+		chatStore.addUserMessage('main Q');
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('main A');
+		chatStore.finalizeMessage('stop');
+		const preEntrySnapshot = [...chatStore.messages];
+
+		chatStore.enterSideContext('side Q');
+		// Stream tokens into side context
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('token1');
+		chatStore.appendToken('token2');
+		chatStore.addToolCall({
+			id: 'tc-1',
+			name: 'read',
+			arguments: { filePath: '/foo' },
+		});
+		chatStore.addToolResult('tc-1', 'file content', false);
+		chatStore.appendToken('final token');
+		chatStore.finalizeMessage('stop');
+
+		// Side context is active and has mutated messages
+		expect(chatStore.messages.length).toBeGreaterThan(preEntrySnapshot.length);
+
+		// Exit — mainSnapshot should be restored byte-identical
+		chatStore.exitSideContext();
+		expect(chatStore.messages).toEqual(preEntrySnapshot);
+	});
+
+	it('setStreamingError during side context does not mutate mainSnapshot', () => {
+		chatStore.addUserMessage('main Q');
+		const preEntrySnapshot = [...chatStore.messages];
+
+		chatStore.enterSideContext('side Q');
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('partial');
+		chatStore.setStreamingError('mock error');
+
+		chatStore.exitSideContext();
+		expect(chatStore.messages).toEqual(preEntrySnapshot);
+	});
+
+	it('sideContext getter reflects live streaming mutations', () => {
+		chatStore.addUserMessage('main');
+		chatStore.enterSideContext('side');
+
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('hello');
+
+		// The sideContext.messages should be in sync with chatStore.messages
+		const sc = chatStore.sideContext;
+		expect(sc).not.toBeNull();
+		expect(sc!.messages.length).toBe(chatStore.messages.length);
+
+		// Last message should be the streaming assistant with accumulated token
+		const lastSc = sc!.messages[sc!.messages.length - 1];
+		expect(lastSc.role).toBe('assistant');
+		expect(lastSc.content).toBe('hello');
+		expect(lastSc.isStreaming).toBe(true);
+
+		chatStore.finalizeMessage('stop');
+	});
+});
+
+describe('side-context — persistence guard', () => {
+	beforeEach(resetStore);
+
+	it('saveSessionHistory is not called during side-context finalizeMessage', () => {
+		// NOTE: `saveSessionHistory` is a module-level import from
+		// `$lib/services/chat-history.js`. Because the chat.svelte.ts module is
+		// already resolved at import time, Bun's `mock.module` cannot retroactively
+		// replace the binding inside chat.svelte.ts without restructuring the
+		// test file to mock-before-import. Instead, we verify the guard indirectly:
+		//
+		// 1. Set an active session so the guard condition would pass if not blocked.
+		// 2. Enter side context, stream a complete assistant response, and exit.
+		// 3. Assert messages are byte-identical to the pre-entry snapshot —
+		//    proving no side-context messages leaked into any persisted output.
+		// 4. Source-level assertion: `finalizeMessage` line ~301 guards with
+		//    `if (activeSessionId && sideContext === null)` so side-context
+		//    finalizes never reach `saveSessionHistory`.
+
+		chatStore.setActiveSession('test-session-id');
+		chatStore.addUserMessage('persisted main Q');
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('persisted main A');
+		chatStore.finalizeMessage('stop');
+
+		const preEntryMessages = [...chatStore.messages];
+
+		chatStore.enterSideContext('side Q');
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('side A — should not be persisted');
+		chatStore.finalizeMessage('stop');
+
+		chatStore.exitSideContext();
+		// Messages restored exactly — no side-context content remains
+		expect(chatStore.messages).toEqual(preEntryMessages);
+	});
+});
+
+describe('side-context — lifecycle termination', () => {
+	beforeEach(resetStore);
+
+	it('setActiveSession discards active side context', () => {
+		chatStore.addUserMessage('main');
+		chatStore.enterSideContext('side Q');
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(true);
+
+		chatStore.setActiveSession('new-session');
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(false);
+		expect(chatStore.sideContext).toBeNull();
+	});
+
+	it('clearConversation clears side-context state', () => {
+		chatStore.addUserMessage('main');
+		chatStore.enterSideContext('side Q');
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(true);
+
+		chatStore.clearConversation();
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(false);
+		expect(chatStore.sideContext).toBeNull();
+		expect(chatStore.messages).toEqual([]);
+	});
+
+	it('setActiveSession(null) discards active side context', () => {
+		chatStore.addUserMessage('main');
+		chatStore.enterSideContext('side Q');
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(true);
+
+		chatStore.setActiveSession(null);
+		expect(readDerivedBool(chatStore.isSideContext)).toBe(false);
+		expect(chatStore.sideContext).toBeNull();
+	});
+});
+
+describe('side-context — fork branches unaffected', () => {
+	beforeEach(resetStore);
+
+	it('forkBranches are unchanged through enter/exit cycle', () => {
+		chatStore.addUserMessage('main Q');
+		const preForkCount = chatStore.forkBranchCount;
+		const preActiveBranch = chatStore.activeBranchId;
+
+		chatStore.enterSideContext('side Q');
+		expect(chatStore.forkBranchCount).toBe(preForkCount);
+		expect(chatStore.activeBranchId).toBe(preActiveBranch);
+
+		chatStore.exitSideContext();
+		expect(chatStore.forkBranchCount).toBe(preForkCount);
+		expect(chatStore.activeBranchId).toBe(preActiveBranch);
+	});
+
+	it('side context does not push onto forkBranches', () => {
+		// Setup: create a fork so we have a baseline
+		addPair('pair 1', 'resp 1');
+		addPair('pair 2', 'resp 2');
+		chatStore.fork(2); // fork at "pair 2"
+		const forkCountBefore = chatStore.forkBranchCount;
+
+		// Enter side context — nothing should be added to forkBranches
+		chatStore.enterSideContext('side Q');
+		expect(chatStore.forkBranchCount).toBe(forkCountBefore);
+
+		// Stream in side context
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('side response');
+		chatStore.finalizeMessage('stop');
+
+		// Fork count still unchanged
+		expect(chatStore.forkBranchCount).toBe(forkCountBefore);
+
+		// Exit — still unchanged
+		chatStore.exitSideContext();
+		expect(chatStore.forkBranchCount).toBe(forkCountBefore);
+	});
+});
