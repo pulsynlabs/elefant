@@ -1,4 +1,10 @@
 import { ConfigManager, type ElefantConfig } from '../config/index.ts'
+import {
+	buildSpecModeBlock,
+	buildStateBlock,
+	createCompactionBlockTransform,
+	type BlockBuilder,
+} from '../compaction/blocks.ts'
 import { CompactionManager } from '../compaction/manager.ts'
 import { Database } from '../db/database.ts'
 import { HookRegistry } from '../hooks/index.ts'
@@ -82,6 +88,40 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 	hookRegistry.on(
 		'context:transform',
 		createPkbContextTransformHandler({ projectPath: projectInfo.projectPath }),
+		{ priority: 10 },
+	)
+	const compactionBlock: BlockBuilder = {
+		name: 'compaction-context',
+		render: () => {
+			const activeSpec = db.db
+				.query(
+					'SELECT workflow_id FROM spec_workflows WHERE project_id = ? AND is_active = 1 LIMIT 1',
+				)
+				.get(projectInfo.projectId) as { workflow_id: string } | null
+
+			return activeSpec
+				? buildSpecModeBlock(db, projectInfo.projectId, activeSpec.workflow_id)
+				: buildStateBlock(stateManager.getState())
+		},
+	}
+	const compactionTransform = createCompactionBlockTransform({
+		blocks: [compactionBlock],
+		budget: 1_500,
+	})
+	hookRegistry.on(
+		'system:transform',
+		(context) => {
+			if (context.runId) {
+				const run = db.db
+					.query('SELECT context_mode FROM agent_runs WHERE run_id = ? LIMIT 1')
+					.get(context.runId) as { context_mode: string } | null
+				if (run?.context_mode === 'none') {
+					return { messages: context.messages }
+				}
+			}
+
+			return compactionTransform(context)
+		},
 		{ priority: 10 },
 	)
 

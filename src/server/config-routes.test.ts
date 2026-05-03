@@ -5,8 +5,8 @@ import { ConfigManager, defaultAgentProfiles } from '../config/index.ts';
 import { Elysia } from 'elysia';
 import type { ProviderRouter } from '../providers/router.ts';
 import { createConfigRoutes } from './config-routes.ts';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 
 function createMockProviderRouter(): ProviderRouter {
@@ -282,5 +282,139 @@ describe('config routes - provider registry', () => {
 
 		const payload = (await response.json()) as { providers: unknown[] };
 		expect(payload.providers.length).toBeGreaterThanOrEqual(20);
+	});
+});
+
+describe('config routes - top-level config CRUD', () => {
+	const CONFIG_DIR = join(homedir(), '.config', 'elefant');
+	const CONFIG_FILE = join(CONFIG_DIR, 'elefant.config.json');
+
+	let app: Elysia;
+	let backup: string | null;
+
+	function buildMinimalConfig(overrides: Record<string, unknown> = {}) {
+		return JSON.stringify({
+			providers: [{
+				name: 'test',
+				baseURL: 'https://api.openai.com/v1',
+				apiKey: 'sk-test',
+				model: 'gpt-4',
+				format: 'openai',
+			}],
+			defaultProvider: 'test',
+			port: 1337,
+			logLevel: 'info' as const,
+			compactionThreshold: 0.8,
+			...overrides,
+		});
+	}
+
+	beforeEach(() => {
+		backup = null;
+		if (existsSync(CONFIG_FILE)) {
+			backup = readFileSync(CONFIG_FILE, 'utf-8');
+		}
+		mkdirSync(CONFIG_DIR, { recursive: true });
+		writeFileSync(CONFIG_FILE, buildMinimalConfig());
+
+		app = createConfigRoutes(new Elysia(), createMockProviderRouter(), new ConfigManager({
+			globalConfigPath: CONFIG_FILE,
+			projectPathResolver: () => ({ ok: false as const, error: { code: 'FILE_NOT_FOUND' as const, message: '' } }),
+		}));
+	});
+
+	afterEach(() => {
+		if (backup !== null) {
+			writeFileSync(CONFIG_FILE, backup);
+		} else {
+			try { unlinkSync(CONFIG_FILE); } catch { /* cleanup is best-effort */ }
+		}
+	});
+
+	it('PUT /api/config with valid compactionThreshold persists and round-trips via GET', async () => {
+		const putResponse = await app.handle(
+			new Request('http://localhost/api/config', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ compactionThreshold: 0.85 }),
+			}),
+		);
+		expect(putResponse.status).toBe(200);
+		const putPayload = (await putResponse.json()) as { ok: boolean };
+		expect(putPayload.ok).toBe(true);
+
+		const getResponse = await app.handle(
+			new Request('http://localhost/api/config'),
+		);
+		expect(getResponse.status).toBe(200);
+		const getPayload = (await getResponse.json()) as {
+			ok: boolean;
+			config: { compactionThreshold: number };
+		};
+		expect(getPayload.ok).toBe(true);
+		expect(getPayload.config.compactionThreshold).toBe(0.85);
+	});
+
+	it('PUT /api/config with compactionThreshold below 0.5 returns 400', async () => {
+		const response = await app.handle(
+			new Request('http://localhost/api/config', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ compactionThreshold: 0.4 }),
+			}),
+		);
+		expect(response.status).toBe(400);
+		const payload = (await response.json()) as {
+			ok: boolean;
+			error: string;
+			details: unknown[];
+		};
+		expect(payload.ok).toBe(false);
+		expect(payload.error).toBe('Invalid request');
+		expect(payload.details).toBeDefined();
+		expect(Array.isArray(payload.details)).toBe(true);
+		expect(payload.details.length).toBeGreaterThan(0);
+	});
+
+	it('PUT /api/config with compactionThreshold above 0.95 returns 400', async () => {
+		const response = await app.handle(
+			new Request('http://localhost/api/config', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ compactionThreshold: 0.96 }),
+			}),
+		);
+		expect(response.status).toBe(400);
+		const payload = (await response.json()) as {
+			ok: boolean;
+			error: string;
+		};
+		expect(payload.ok).toBe(false);
+		expect(payload.error).toBe('Invalid request');
+	});
+
+	it('PUT /api/config with empty body does not change existing compactionThreshold', async () => {
+		// First set a known value
+		writeFileSync(CONFIG_FILE, buildMinimalConfig({ compactionThreshold: 0.75 }));
+
+		const putResponse = await app.handle(
+			new Request('http://localhost/api/config', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({}),
+			}),
+		);
+		expect(putResponse.status).toBe(200);
+
+		const getResponse = await app.handle(
+			new Request('http://localhost/api/config'),
+		);
+		expect(getResponse.status).toBe(200);
+		const getPayload = (await getResponse.json()) as {
+			ok: boolean;
+			config: { compactionThreshold: number };
+		};
+		expect(getPayload.ok).toBe(true);
+		expect(getPayload.config.compactionThreshold).toBe(0.75);
 	});
 });

@@ -17,7 +17,12 @@ interface CompactionFixture {
   state: StateManager;
   hooks: HookRegistry;
   manager: CompactionManager;
+  config?: TestConfig;
   sessionId: string;
+}
+
+interface TestConfig {
+  compactionThreshold?: number;
 }
 
 function seedProjectAndSession(
@@ -45,7 +50,7 @@ function seedProjectAndSession(
   );
 }
 
-function createFixture(): CompactionFixture {
+function createFixture(options: { config?: TestConfig | null } = {}): CompactionFixture {
   const tempDir = mkdtempSync(join(tmpdir(), 'elefant-compaction-manager-'));
   mkdirSync(join(tempDir, '.goopspec', 'workflow-1'), { recursive: true });
 
@@ -61,7 +66,9 @@ function createFixture(): CompactionFixture {
   });
 
   const hooks = new HookRegistry();
+  const config = options.config === undefined ? {} : options.config;
   const context = {
+    ...(config === null ? {} : { config }),
     hooks,
     db,
     state,
@@ -85,6 +92,7 @@ function createFixture(): CompactionFixture {
     db,
     state,
     hooks,
+    config: config ?? undefined,
     manager: new CompactionManager(context),
     sessionId,
   };
@@ -107,18 +115,38 @@ describe('CompactionManager', () => {
     }
   });
 
-  it('shouldCompact returns true when token count is above 70%', () => {
+  it('shouldCompact returns true when token count is above the default threshold', () => {
     const fixture = createFixture();
     fixtures.push(fixture);
 
-    expect(fixture.manager.shouldCompact(140_001, 200_000)).toBe(true);
+    expect(fixture.manager.shouldCompact(160_001, 200_000)).toBe(true);
   });
 
-  it('shouldCompact returns false when token count is below 70%', () => {
+  it('shouldCompact returns false when token count is below the default threshold', () => {
     const fixture = createFixture();
     fixtures.push(fixture);
 
-    expect(fixture.manager.shouldCompact(139_999, 200_000)).toBe(false);
+    expect(fixture.manager.shouldCompact(159_999, 200_000)).toBe(false);
+  });
+
+  it('shouldCompact reads the configured threshold on every call', () => {
+    const config = { compactionThreshold: 0.5 };
+    const fixture = createFixture({ config });
+    fixtures.push(fixture);
+
+    expect(fixture.manager.shouldCompact(5001, 10000)).toBe(true);
+
+    config.compactionThreshold = 0.9;
+
+    expect(fixture.manager.shouldCompact(5001, 10000)).toBe(false);
+  });
+
+  it('shouldCompact falls back to 80% when config is unavailable', () => {
+    const fixture = createFixture({ config: null });
+    fixtures.push(fixture);
+
+    expect(fixture.manager.shouldCompact(8001, 10000)).toBe(true);
+    expect(fixture.manager.shouldCompact(7999, 10000)).toBe(false);
   });
 
   it('compact returns fewer messages and includes surviving blocks', async () => {
@@ -140,6 +168,54 @@ describe('CompactionManager', () => {
     expect(result.blocks.some((block) => block.includes('Workflow State'))).toBe(true);
     expect(result.blocks.some((block) => block.includes('Available Tools'))).toBe(true);
     expect(result.didCompact).toBe(true);
+  });
+
+  it('compact uses checkpoint handoff format when no hook provides a summary', async () => {
+    const fixture = createFixture();
+    fixtures.push(fixture);
+
+    const result = await fixture.manager.compact({
+      messages: createMessages(12),
+      tokenCount: 180_000,
+      contextWindow: 200_000,
+      sessionId: fixture.sessionId,
+      conversationId: 'conv-checkpoint-format',
+    });
+
+    const summaryMessage = result.messages[0];
+
+    expect(typeof summaryMessage?.content).toBe('string');
+    expect(summaryMessage?.content).toContain('[Context Checkpoint');
+    expect(summaryMessage?.content).toContain('Immediate next actions');
+  });
+
+  it('compact references a prior compaction summary retained in recent messages', async () => {
+    const fixture = createFixture();
+    fixtures.push(fixture);
+
+    const priorCompactionSummary: Message = {
+      role: 'user',
+      content: '[Context Checkpoint — 2026-05-02T00:00:00.000Z]\n\nPrevious work summary.',
+    };
+    const messages: Message[] = [
+      ...createMessages(7),
+      priorCompactionSummary,
+      { role: 'assistant', content: 'recent assistant message' },
+      { role: 'user', content: 'recent user message' },
+    ];
+
+    const result = await fixture.manager.compact({
+      messages,
+      tokenCount: 180_000,
+      contextWindow: 200_000,
+      sessionId: fixture.sessionId,
+      conversationId: 'conv-iterative-summary',
+    });
+
+    const summaryMessage = result.messages[0];
+
+    expect(summaryMessage?.content).toContain('<previous-summary>');
+    expect(summaryMessage?.content).toContain(priorCompactionSummary.content);
   });
 
   it('compact skips and returns original messages when transcript ends mid-tool-call', async () => {

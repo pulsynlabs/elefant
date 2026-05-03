@@ -687,6 +687,73 @@ describe('configSchema with MCP fields', () => {
 		expect(result.success).toBe(false);
 	});
 
+	it('defaults compactionThreshold to 0.8 when not provided', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.compactionThreshold).toBe(0.8);
+		}
+	});
+
+	it('accepts config with compactionThreshold at minimum 0.5', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			compactionThreshold: 0.5,
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.compactionThreshold).toBe(0.5);
+		}
+	});
+
+	it('rejects compactionThreshold below min 0.5 (e.g. 0.4)', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			compactionThreshold: 0.4,
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(false);
+	});
+
+	it('rejects compactionThreshold above max 0.95 (e.g. 0.96)', () => {
+		const config = {
+			providers: [],
+			defaultProvider: '',
+			compactionThreshold: 0.96,
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(false);
+	});
+
+	it('existing config without compactionThreshold parses and defaults to 0.8', () => {
+		const config = {
+			port: 8080,
+			providers: [
+				{
+					name: 'openai',
+					baseURL: 'https://api.openai.com/v1',
+					apiKey: 'sk-test123',
+					model: 'gpt-4',
+					format: 'openai' as const,
+				},
+			],
+			defaultProvider: 'openai',
+			logLevel: 'debug' as const,
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.compactionThreshold).toBe(0.8);
+		}
+	});
+
 	it('rejects config with invalid MCP server in mcp array', () => {
 		const config = {
 			providers: [],

@@ -12,6 +12,14 @@ export interface BlockBuilder {
 	render: () => string;
 }
 
+export interface WorkflowDirectiveInput {
+	workflowId: string | null;
+	phase: string;
+	currentWave: number;
+	totalWaves: number;
+	lazyAutopilot?: boolean;
+}
+
 const fileContentCache = new Map<string, string>();
 const fileReadCountByPath = new Map<string, number>();
 
@@ -151,6 +159,17 @@ export function createCompactionBlockTransform(opts: {
 			return { messages: context.messages };
 		}
 
+		const alreadyHasBlock = context.messages.some(
+			(message) =>
+				message.role === 'system' &&
+				typeof message.content === 'string' &&
+				(message.content.startsWith('## SPEC MODE') ||
+					message.content.startsWith('## 🔮 Workflow State')),
+		);
+		if (alreadyHasBlock) {
+			return { messages: context.messages };
+		}
+
 		const renderedBlocks: Message[] = [];
 		for (const block of opts.blocks) {
 			const content = block.render().trim();
@@ -189,23 +208,80 @@ export function createCompactionBlockTransform(opts: {
 	};
 }
 
-export function buildStateBlock(
-  state: ReturnType<StateManager['getState']>,
+export function buildResumeDirectiveFromWorkflow(
+	workflow: WorkflowDirectiveInput,
 ): string {
-  const w = state.workflow;
-  return [
-    '## 🔮 Workflow State (Survived Compaction)',
-    `- Phase: ${w.phase}`,
-    `- Mode: ${w.mode}`,
-    `- Depth: ${w.depth}`,
-    `- Wave: ${w.currentWave}/${w.totalWaves}`,
-    `- Spec Locked: ${w.specLocked}`,
-    w.workflowId ? `- Workflow ID: ${w.workflowId}` : '',
-    '',
-    '> Continue from where you left off. Read project state and spec before taking action.',
-  ]
-    .filter((line) => line !== '')
-    .join('\n');
+	if (!workflow.workflowId) {
+		return [
+			'> **RESUME FROM HERE:** Continue from where you left off.',
+			'> First, scan the most recent messages to find your current task and any constraints.',
+			'> If you are unsure what to do next, ask a single clarifying question before taking action.',
+		].join('\n');
+	}
+
+	if (workflow.lazyAutopilot) {
+		return [
+			`> **RESUME FROM HERE:** This is NOT a first wake-up — you were already working autonomously before compaction.`,
+			`> Continue your work loop. Do NOT ask questions. Resume the next incomplete task immediately.`,
+			`> Current: ${workflow.phase} phase, Wave ${workflow.currentWave}/${workflow.totalWaves} — run \`wf_status\` to confirm task state.`,
+		].join('\n');
+	}
+
+	switch (workflow.phase) {
+		case 'execute':
+			return `> **RESUME FROM HERE:** Wave ${workflow.currentWave}/${workflow.totalWaves} in progress — run \`wf_status\` to confirm task state, then resume incomplete tasks via \`/execute\`.`;
+		case 'plan':
+			return `> **RESUME FROM HERE:** Planning in progress — finalize SPEC.md/BLUEPRINT.md, then run \`/plan\` to present the contract gate for confirmation.`;
+		case 'audit':
+			return `> **RESUME FROM HERE:** Audit phase — run \`/audit\`, verify against the spec, and report any gaps before \`/accept\`.`;
+		case 'accept':
+			return `> **RESUME FROM HERE:** Acceptance phase — run \`/accept\` to confirm completion and archive.`;
+		case 'research':
+			return `> **RESUME FROM HERE:** Research phase — continue capturing findings with sources, then proceed to \`/plan\` once decision-ready.`;
+		case 'discuss':
+			return `> **RESUME FROM HERE:** Discovery in progress — continue clarifying requirements via \`/discuss\` and update the spec inputs.`;
+		case 'specify':
+			return `> **RESUME FROM HERE:** Specification lock in progress — confirm or amend the contract before \`/execute\`.`;
+		case 'idle':
+		default:
+			return [
+				'> **RESUME FROM HERE:** Continue from where you left off.',
+				'> First, scan the most recent messages to find your current task and any constraints.',
+				'> If you are unsure what to do next, ask a single clarifying question before taking action.',
+			].join('\n');
+	}
+}
+
+export function buildResumeDirective(
+	state: ReturnType<StateManager['getState']>,
+): string {
+	const w = state.workflow;
+	return buildResumeDirectiveFromWorkflow({
+		workflowId: w.workflowId,
+		phase: w.phase,
+		currentWave: w.currentWave,
+		totalWaves: w.totalWaves,
+		lazyAutopilot: w.lazyAutopilot,
+	});
+}
+
+export function buildStateBlock(
+	state: ReturnType<StateManager['getState']>,
+): string {
+	const w = state.workflow;
+	return [
+		'## 🔮 Workflow State (Survived Compaction)',
+		`- Phase: ${w.phase}`,
+		`- Mode: ${w.mode}`,
+		`- Depth: ${w.depth}`,
+		`- Wave: ${w.currentWave}/${w.totalWaves}`,
+		`- Spec Locked: ${w.specLocked}`,
+		w.workflowId ? `- Workflow ID: ${w.workflowId}` : '',
+		'',
+		buildResumeDirective(state),
+	]
+		.filter((line) => line !== '')
+		.join('\n');
 }
 
 export function buildSpecBlock(specPath: string | null): string {

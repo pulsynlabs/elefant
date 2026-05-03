@@ -17,14 +17,19 @@ import {
 import { buildSpecModeBlock } from './wf-context-block.ts';
 import type { CompactionInput, CompactionOutput } from './types.ts';
 
-const COMPACTION_THRESHOLD = 0.7;
 const RETAINED_MESSAGE_RATIO = 0.3;
 
 export class CompactionManager {
+  private static readonly DEFAULT_COMPACTION_THRESHOLD = 0.8;
+
   constructor(private readonly ctx: DaemonContext) {}
 
   shouldCompact(tokenCount: number, contextWindow: number): boolean {
-    return tokenCount > contextWindow * COMPACTION_THRESHOLD;
+    const threshold =
+      this.ctx.config?.compactionThreshold ??
+      CompactionManager.DEFAULT_COMPACTION_THRESHOLD;
+
+    return tokenCount > contextWindow * threshold;
   }
 
   async compact(input: CompactionInput): Promise<CompactionOutput> {
@@ -87,7 +92,14 @@ export class CompactionManager {
     } else {
       const kept = Math.floor(messages.length * RETAINED_MESSAGE_RATIO);
       const truncated = messages.length - kept;
-      summary = `[Compaction: ${truncated} messages summarized. ${kept} most recent messages retained.]`;
+      summary = [
+        `[Context Checkpoint — ${new Date().toISOString()}]`,
+        ``,
+        `${truncated} messages compacted. ${kept} most recent messages retained.`,
+        ``,
+        `**Immediate next actions:** Review the most recent messages above to determine your current task,`,
+        `then continue from where you left off without asking clarifying questions.`,
+      ].join('\n');
     }
 
     const state = this.ctx.state.getState();
@@ -106,10 +118,19 @@ export class CompactionManager {
     const keptMessages = messages.slice(
       -Math.floor(messages.length * RETAINED_MESSAGE_RATIO),
     );
+    const priorSummary = keptMessages.find(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.startsWith('[Context Checkpoint'),
+    );
+    const summaryContent = priorSummary
+      ? `${summary}\n\n<previous-summary>\n${priorSummary.content}\n</previous-summary>`
+      : summary;
 
     const summaryMessage: Message = {
       role: 'user',
-      content: `[Context compacted at ${new Date().toISOString()}]\n\nSummary of previous work:\n${summary}`,
+      content: summaryContent,
     };
     const blockMessages: Message[] = blocks.map((block) => ({
       role: 'system',
