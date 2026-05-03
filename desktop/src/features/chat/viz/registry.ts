@@ -12,6 +12,7 @@
 import type { Component } from 'svelte';
 import type { VizType, VizRendererProps } from './types.js';
 import LoadingViz from './LoadingViz.svelte';
+import StatGridViz from './StatGridViz.svelte';
 
 const vizRendererRegistry = new Map<VizType, Component<VizRendererProps>>();
 
@@ -48,4 +49,8 @@ export function unregisterVizRenderer(type: VizType): void {
 registerVizRenderer(
 	'loading',
 	LoadingViz as unknown as Component<VizRendererProps>,
+);
+registerVizRenderer(
+	'stat-grid',
+	StatGridViz as unknown as Component<VizRendererProps>,
 );
