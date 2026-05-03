@@ -16,6 +16,7 @@ import { IndexerService, type BulkIndexSummary } from '../research/indexer.ts';
 import { ProgressEmitter } from '../research/progress.ts';
 import { createResearchSearchTool, type ResearchSearchOutput, type SearchResult } from '../tools/research_search/index.ts';
 import { launchEditor } from '../research/editor-launch.ts';
+import { routesLog } from '../research/log.ts';
 
 type ProjectContext = { projectId: string; projectPath: string };
 
@@ -390,6 +391,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
+    routesLog.info('GET /v1/research/tree', { projectId: parsed.data.projectId });
     return buildResearchTree(project.ctx.projectPath);
   });
 
@@ -414,6 +416,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       return errorBody('FILE_NOT_FOUND', `Research file not found: ${parsed.data.path}`);
     }
 
+    routesLog.info('GET /v1/research/file', { projectId: parsed.data.projectId, path: parsed.data.path });
     const raw = readFileSync(resolved.absolutePath, 'utf8');
     const parsedFile = parseFrontmatter(raw);
     if (!parsedFile.ok) {
@@ -442,6 +445,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
+    routesLog.info('POST /v1/research/search', { projectId: parsed.data.projectId, query: parsed.data.query, mode: parsed.data.mode ?? 'hybrid' });
     try {
       const result = await search(project.ctx, parsed.data);
       return Array.isArray(result) ? result : result.results;
@@ -462,7 +466,13 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
-    return await getStatus(project.ctx);
+    routesLog.info('GET /v1/research/status', { projectId: parsed.data.projectId });
+    const status = await getStatus(project.ctx);
+    if (!status) {
+      set.status = 500;
+      return errorBody('TOOL_EXECUTION_FAILED', 'Failed to get research status');
+    }
+    return status;
   });
 
   app.post('/v1/research/reindex', async ({ body, set }) => {
@@ -476,6 +486,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
+    routesLog.info('POST /v1/research/reindex', { projectId: parsed.data.projectId });
     const indexer = createIndexer(project.ctx);
     const unsubscribe = pipeIndexerProgress(indexer, progressEmitter(project.ctx.projectId));
     void Promise.resolve(indexer.bulkIndex() as Promise<BulkIndexSummary>).finally(unsubscribe);
@@ -493,6 +504,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
+    routesLog.info('GET /v1/research/index/progress (SSE)', { projectId: parsed.data.projectId });
     return sseResponse(project.ctx.projectId, progressEmitter(project.ctx.projectId), request.signal);
   });
 
@@ -512,6 +524,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = resolved.status;
       return resolved.body;
     }
+    routesLog.info('POST /v1/research/open-in-editor', { projectId: parsed.data.projectId, path: parsed.data.path });
     const launched = await editorLauncher(resolved.absolutePath);
     return launched;
   });

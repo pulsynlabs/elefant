@@ -5,13 +5,16 @@ import { researchIndexPath, researchBaseDir } from '../project/paths.js';
 import { ok, err, type Result } from '../types/result.js';
 import type { ElefantError } from '../types/errors.js';
 import type { ResearchStore } from './store.js';
-import type { EmbeddingProvider, EmbeddingProviderName } from './embeddings/provider.js';
+import type { EmbeddingProvider, EmbeddingProviderName, EmbeddingProviderConfig } from './embeddings/provider.js';
 import type { HardwareProfile, RecommendedTier } from './hardware.js';
+import { researchLog } from './log.js';
 
 export interface ResearchStatus {
   projectId: string;
   provider: EmbeddingProviderName;
   providerIsLocal: boolean;
+  embeddingProviderIsLocal: boolean;
+  embeddingModelId: string | null;
   embeddingDim: number;
   vectorEnabled: boolean;
   recommendedTier: RecommendedTier | null;
@@ -22,6 +25,7 @@ export interface ResearchStatus {
   driftCount: number;
   diskSizeBytes: number;
   indexExists: boolean;
+  warnings: string[];
 }
 
 const DRIFT_SCAN_MAX_FILES = 10000;
@@ -141,19 +145,38 @@ export async function getResearchStatus(opts: {
       
       if (exceeded) {
         driftCount = -1;
-        console.warn(`[getResearchStatus] Drift scan exceeded ${DRIFT_SCAN_MAX_FILES} files; returning -1 for driftCount`);
+        researchLog.warn('Drift scan exceeded max files; returning -1 for driftCount', { maxFiles: DRIFT_SCAN_MAX_FILES });
       } else {
         driftCount = countDriftedFiles(files, lastIndexedAt);
       }
     }
+
+    // Build warnings
+    const warnings: string[] = [];
+    const vectorEnabled = provider.name !== 'disabled';
+    if (vectorEnabled && !provider.isLocal) {
+      warnings.push('Embeddings are sent to an external service');
+    }
+    if (driftCount > 0) {
+      warnings.push(`${driftCount} file(s) modified since last index — consider reindexing`);
+    }
+    if (diskSizeBytes > 500_000_000) {
+      const mb = Math.round(diskSizeBytes / (1024 * 1024));
+      warnings.push(`Research index is large (${mb}MB) — consider running VACUUM`);
+    }
+
+    // Determine embedding model ID (for bundled providers, use the default model; for remote, null)
+    const embeddingModelId = getEmbeddingModelId(provider);
 
     // Build status object
     const status: ResearchStatus = {
       projectId,
       provider: provider.name,
       providerIsLocal: provider.isLocal,
+      embeddingProviderIsLocal: provider.isLocal,
+      embeddingModelId,
       embeddingDim: provider.dim(),
-      vectorEnabled: provider.name !== 'disabled',
+      vectorEnabled,
       recommendedTier: hardware ? recommendTier(hardware) : null,
       hardware: hardware ?? null,
       totalDocs,
@@ -162,6 +185,7 @@ export async function getResearchStatus(opts: {
       driftCount,
       diskSizeBytes,
       indexExists,
+      warnings,
     };
 
     return ok(status);
@@ -179,4 +203,25 @@ function recommendTier(profile: HardwareProfile): RecommendedTier {
     return 'bundled-gpu';
   }
   return 'bundled-cpu';
+}
+
+/**
+ * Get the embedding model ID for the provider.
+ * For bundled providers, returns the default model ID.
+ * For remote providers, returns null (model is configurable but not exposed here).
+ */
+function getEmbeddingModelId(provider: EmbeddingProvider): string | null {
+  // Bundled providers use specific models
+  if (provider.name === 'bundled-cpu') {
+    return 'Xenova/all-MiniLM-L6-v2';
+  }
+  if (provider.name === 'bundled-gpu') {
+    return 'Xenova/all-MiniLM-L6-v2';
+  }
+  if (provider.name === 'bundled-large') {
+    return 'Xenova/bge-base-en-v1.5';
+  }
+  // Remote providers don't expose their model ID through the provider interface
+  // The caller should use config.model if needed
+  return null;
 }

@@ -4,6 +4,7 @@ import { createEmbeddingProvider, type EmbeddingProvider, type EmbeddingProvider
 import type { ResearchStore } from './store.ts';
 import type { IndexerOptions } from './indexer.ts';
 import { IndexerService } from './indexer.ts';
+import { providerSwitchLog } from './log.ts';
 
 export type ProviderSwitchEventType = 'research:provider-changed';
 
@@ -64,6 +65,8 @@ export async function switchProvider(opts: {
   const hasChunks = opts.store.totalChunks() > 0;
   const requiresReindex = previousDim > 0 && previousDim !== newDim;
 
+  providerSwitchLog.info('provider switch started', { from: opts.currentProviderName, to: opts.newConfig.name, requiresReindex });
+
   // 4. Emit the event before mutating state.
   const event: ProviderSwitchedEvent = {
     type: 'research:provider-changed',
@@ -94,6 +97,7 @@ export async function switchProvider(opts: {
   }
 
   // 6. Trigger reindex (fire-and-forget — the caller may await or ignore).
+  providerSwitchLog.info('reindex triggered after provider switch', { projectId: opts.projectId });
   const factory = opts.indexerFactory ?? ((ixOpts: IndexerOptions) => new IndexerService(ixOpts));
   const indexer = factory({
     projectPath: opts.projectPath,

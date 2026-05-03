@@ -3,6 +3,7 @@ import type { Result } from '../../types/result.ts';
 import { err, ok } from '../../types/result.ts';
 import { providerError } from './_http.ts';
 import type { EmbedResult, EmbeddingProvider, EmbeddingProviderConfig, EmbeddingProviderName } from './provider.ts';
+import { embeddingsLog } from '../log.ts';
 
 export type BundledBackend = 'cpu' | 'webgpu';
 export type FeatureExtractionPipeline = (text: string, options: { pooling: 'mean'; normalize: true }) => Promise<unknown>;
@@ -32,7 +33,7 @@ async function configureWebGpu(): Promise<boolean> {
     module.env.backends.onnx.executionProviders = ['webgpu'];
     return true;
   } catch (error) {
-    console.warn('research: embeddings WebGPU setup failed; falling back to CPU', error);
+    embeddingsLog.warn('GPU unavailable, falling back to CPU', { error: String(error) });
     return false;
   }
 }
@@ -71,19 +72,22 @@ export class BundledEmbeddingProvider implements EmbeddingProvider {
 
   async init(): Promise<Result<void, ElefantError>> {
     if (this.pipe) return ok(undefined);
+    const modelId = this.config.bundledModelId ?? this.options.defaultModelId;
+    const startTime = Date.now();
+    embeddingsLog.info('loading model', { modelId });
     if (this.options.preferWebGpu) {
       this.actualBackend = (await configureWebGpu()) ? 'webgpu' : 'cpu';
     }
     try {
       const factory = pipelineFactoryForTests ?? defaultPipelineFactory;
-      this.pipe = await factory('feature-extraction', this.config.bundledModelId ?? this.options.defaultModelId);
+      this.pipe = await factory('feature-extraction', modelId);
     } catch (error) {
       if (this.options.preferWebGpu) {
-        console.warn('research: embeddings WebGPU pipeline failed; retrying on CPU', error);
+        embeddingsLog.warn('GPU unavailable, falling back to CPU', { error: String(error) });
         this.actualBackend = 'cpu';
         try {
           const factory = pipelineFactoryForTests ?? defaultPipelineFactory;
-          this.pipe = await factory('feature-extraction', this.config.bundledModelId ?? this.options.defaultModelId);
+          this.pipe = await factory('feature-extraction', modelId);
         } catch (retryError) {
           return err(providerError('Failed to initialize bundled embedding model', retryError));
         }
@@ -99,6 +103,8 @@ export class BundledEmbeddingProvider implements EmbeddingProvider {
     } else {
       this.detectedDim = this.options.defaultDim;
     }
+    const ms = Date.now() - startTime;
+    embeddingsLog.info('model ready', { modelId, dim: this.detectedDim, ms });
     return ok(undefined);
   }
 
@@ -125,8 +131,14 @@ export class BundledEmbeddingProvider implements EmbeddingProvider {
 
   private async embedOne(text: string): Promise<Result<Float32Array, ElefantError>> {
     if (!this.pipe) return err(providerError('Bundled embedding provider is not initialized'));
+    const startTime = Date.now();
     try {
-      return vectorFromPipelineResult(await this.pipe(text, { pooling: 'mean', normalize: true }));
+      const result = vectorFromPipelineResult(await this.pipe(text, { pooling: 'mean', normalize: true }));
+      const ms = Date.now() - startTime;
+      if (ms > 1000) {
+        embeddingsLog.warn('slow embed detected', { ms });
+      }
+      return result;
     } catch (error) {
       return err(providerError('Bundled embedding failed', error));
     }
