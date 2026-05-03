@@ -506,3 +506,383 @@ describe('undo/redo — streaming guards', () => {
 		expect(readDerivedBool(chatStore.canRedo)).toBe(false);
 	});
 });
+
+// ==========================================================================
+// Fork branch tests (W2.T2.1)
+// ==========================================================================
+
+describe('fork branches — basic fork()', () => {
+	beforeEach(resetStore);
+
+	it('fork() basic case — 3-message conversation, fork(2) at second user msg', () => {
+		// 2 user + 2 assistant = 4 messages
+		addPair('user 1', 'assistant 1');
+		addPair('user 2', 'assistant 2');
+
+		expect(chatStore.messages).toHaveLength(4);
+
+		const returned = chatStore.fork(2);
+
+		// fork(2) truncates to [0,1] (user1 + assistant1), leaving messages = 2
+		expect(chatStore.messages).toHaveLength(2);
+		expect(chatStore.messages[0].content).toBe('user 1');
+		expect(chatStore.messages[1].content).toBe('assistant 1');
+
+		// forkBranches = [root (implicit), newBranch] = 2
+		expect(chatStore.forkBranches).toHaveLength(2);
+
+		// Returned is the user text at index 2
+		expect(returned).toBe('user 2');
+
+		// The new branch's snapshot includes the forked user message
+		const newBranch = chatStore.forkBranches[1];
+		expect(newBranch.messages).toHaveLength(3); // user1, assistant1, user2
+		expect(newBranch.messages[2].content).toBe('user 2');
+	});
+
+	it('fork() at index 0 — single pair, fork(0)', () => {
+		addPair('hello world', 'hi there');
+
+		expect(chatStore.messages).toHaveLength(2);
+
+		const returned = chatStore.fork(0);
+
+		expect(returned).toBe('hello world');
+		expect(chatStore.messages).toHaveLength(0);
+		expect(chatStore.forkBranches).toHaveLength(2); // root + new branch
+		expect(chatStore.forkBranches[1].messages[0].content).toBe('hello world');
+	});
+
+	it('fork() at last user message — 4 messages, fork(2) at second user', () => {
+		addPair('p1', 'a1');
+		addPair('p2', 'a2');
+
+		expect(chatStore.messages).toHaveLength(4);
+
+		const returned = chatStore.fork(2);
+
+		// Messages truncates to [0,1] = p1 + a1
+		expect(chatStore.messages).toHaveLength(2);
+		expect(chatStore.messages[0].content).toBe('p1');
+		expect(returned).toBe('p2');
+	});
+
+	it('fork(-1) returns null, no mutation', () => {
+		addPair('hello', 'world');
+
+		const before = chatStore.forkBranches.length;
+		const result = chatStore.fork(-1);
+
+		expect(result).toBeNull();
+		expect(chatStore.forkBranches).toHaveLength(before);
+		expect(chatStore.messages).toHaveLength(2);
+	});
+
+	it('fork(messages.length) returns null — OOB', () => {
+		addPair('hello', 'world');
+
+		const before = chatStore.forkBranches.length;
+		const result = chatStore.fork(99);
+
+		expect(result).toBeNull();
+		expect(chatStore.forkBranches).toHaveLength(before);
+		expect(chatStore.messages).toHaveLength(2);
+	});
+
+	it('fork() on assistant message index returns null, no mutation', () => {
+		addPair('hello', 'world');
+
+		const before = chatStore.forkBranches.length;
+		// Index 1 is the assistant message
+		const result = chatStore.fork(1);
+
+		expect(result).toBeNull();
+		expect(chatStore.forkBranches).toHaveLength(before);
+		expect(chatStore.messages).toHaveLength(2);
+	});
+
+	it('fork() during streaming returns null, no mutation', () => {
+		addPair('hello', 'world');
+
+		// Start streaming — sets isStreaming=true
+		chatStore.startAssistantMessage();
+
+		const before = chatStore.forkBranches.length;
+		const result = chatStore.fork(0);
+
+		expect(result).toBeNull();
+		expect(chatStore.forkBranches).toHaveLength(before);
+		expect(chatStore.messages).toHaveLength(3); // original 2 + streaming placeholder
+	});
+
+	it('fork() snapshot is immutable — structuredClone prevents shared refs', () => {
+		addPair('user A', 'assistant A');
+
+		chatStore.fork(0);
+		const branchSnapshot = chatStore.forkBranches[1].messages;
+
+		// Add a new message to the active conversation
+		chatStore.addUserMessage('new user message');
+		addPair('after fork', 'response after fork');
+
+		// Branch snapshot must NOT reflect the new messages
+		expect(branchSnapshot).toHaveLength(1);
+		expect(branchSnapshot[0].content).toBe('user A');
+	});
+
+	it('fork() first call creates implicit root branch with label "Root"', () => {
+		addPair('hello', 'world');
+
+		chatStore.fork(0);
+
+		expect(chatStore.forkBranches[0].label).toBe('Root');
+		expect(chatStore.forkBranches[1].label).toBe('hello');
+	});
+
+	it('fork() parentBranchId tracking — second fork parent is first branch id', () => {
+		addPair('first user', 'first assistant');
+		addPair('second user', 'second assistant');
+
+		// First fork: creates root + new branch, activeBranchId = new branch
+		chatStore.fork(0);
+		const firstBranchId = chatStore.forkBranches[1].id;
+		const rootId = chatStore.forkBranches[0].id;
+
+		// Switch to first branch (has empty messages after fork)
+		chatStore.switchToBranch(firstBranchId);
+		// messages = [] after fork(0)
+
+		// Add a pair on first branch
+		chatStore.addUserMessage('third user');
+		chatStore.startAssistantMessage();
+		chatStore.finalizeMessage('stop');
+		// messages = [u3, a3]
+
+		// Undo to populate undoStack
+		chatStore.undo();
+		// messages = [], undoStack = [{u3, a3}]
+
+		// Second fork: from first branch → parentBranchId = firstBranchId
+		chatStore.fork(0);
+
+		const secondForkBranch = chatStore.forkBranches[2];
+		expect(secondForkBranch.parentBranchId).toBe(firstBranchId);
+	});
+});
+
+describe('fork branches — switchToBranch()', () => {
+	beforeEach(resetStore);
+
+	it('switchToBranch() round-trip — fork, add messages, switch back and forth', () => {
+		addPair('root user', 'root assistant');
+
+		// Fork at index 0 — truncates messages to []
+		chatStore.fork(0);
+		const rootBranchId = chatStore.forkBranches[0].id;
+		const newBranchId = chatStore.forkBranches[1].id;
+
+		// Add 2 complete message pairs on the new branch
+		// After fork(0), messages = []. After these 2 pairs: messages = 4 messages
+		chatStore.addUserMessage('new 1');
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('resp 1');
+		chatStore.finalizeMessage('stop');
+		chatStore.addUserMessage('new 2');
+		chatStore.startAssistantMessage();
+		chatStore.appendToken('resp 2');
+		chatStore.finalizeMessage('stop');
+
+		expect(chatStore.messages).toHaveLength(4);
+
+		// Switch to root — messages restore to original 2
+		const switched = chatStore.switchToBranch(rootBranchId);
+		expect(switched).toBe(true);
+		expect(chatStore.messages).toHaveLength(2);
+		expect(chatStore.messages[0].content).toBe('root user');
+
+		// Switch back to new branch — messages restored to the branch snapshot
+		// which only has the 1 message from when fork(0) was called
+		const switched2 = chatStore.switchToBranch(newBranchId);
+		expect(switched2).toBe(true);
+		// The new branch snapshot was taken at fork(0) and only has [root user]
+		expect(chatStore.messages).toHaveLength(1);
+		expect(chatStore.messages[0].content).toBe('root user');
+	});
+
+	it('switchToBranch() clears undoStack and redoStack', () => {
+		addPair('pair 1', 'resp 1');
+		addPair('pair 2', 'resp 2');
+		addPair('pair 3', 'resp 3');
+
+		// Fork at index 4 (the user message "pair 3") — 6 messages, fork at last user
+		// After fork: root = [u1,a1,u2,a2,u3], messages = [u1,a1,u2,a2]
+		chatStore.fork(4);
+		const rootId = chatStore.forkBranches[0].id;
+		const branchId = chatStore.forkBranches[1].id;
+
+		// Switch to branch, add a pair so we can undo it
+		chatStore.switchToBranch(branchId);
+		// Branch has [u1,a1,u2,a2] after switch (snapshot from fork)
+		chatStore.addUserMessage('branch user');
+		chatStore.startAssistantMessage();
+		chatStore.finalizeMessage('stop');
+		// messages = [u1,a1,u2,a2,bu,ba] — 6 messages, 3 pairs
+
+		// Undo removes the last pair [bu,ba], populating undoStack and redoStack
+		const undoResult = chatStore.undo();
+		expect(undoResult).toBe('branch user');
+		expect(readDerivedBool(chatStore.canUndo)).toBe(true);
+		expect(readDerivedBool(chatStore.canRedo)).toBe(true);
+
+		// Switch to root — undo/redo stacks must be cleared
+		chatStore.switchToBranch(rootId);
+
+		expect(readDerivedBool(chatStore.canUndo)).toBe(false);
+		expect(readDerivedBool(chatStore.canRedo)).toBe(false);
+	});
+
+	it('switchToBranch() during streaming returns false, no mutation', () => {
+		addPair('hello', 'world');
+
+		chatStore.startAssistantMessage();
+
+		const rootId = chatStore.forkBranches[0]?.id ?? 'none';
+		const result = chatStore.switchToBranch(rootId);
+
+		expect(result).toBe(false);
+		// isStreaming is still true, message list unchanged (3 msgs)
+		expect(chatStore.messages).toHaveLength(3);
+	});
+
+	it('switchToBranch("nonexistent") returns false', () => {
+		addPair('hello', 'world');
+
+		const result = chatStore.switchToBranch('does-not-exist');
+
+		expect(result).toBe(false);
+		expect(chatStore.activeBranchId).not.toBe('does-not-exist');
+	});
+
+	it('switchToBranch() updates activeBranchId', () => {
+		addPair('user', 'assistant');
+
+		// fork(0): creates root + new branch, activeBranchId = root.id (first branch)
+		chatStore.fork(0);
+
+		const rootId = chatStore.forkBranches[0].id;
+		const newBranchId = chatStore.forkBranches[1].id;
+
+		// After fork(0), activeBranchId is root (the first branch created)
+		expect(chatStore.activeBranchId).toBe(rootId);
+
+		// Switch to new branch — activeBranchId should update
+		chatStore.switchToBranch(newBranchId);
+		expect(chatStore.activeBranchId).toBe(newBranchId);
+
+		// Switch back to root
+		chatStore.switchToBranch(rootId);
+		expect(chatStore.activeBranchId).toBe(rootId);
+	});
+});
+
+describe('fork branches — clearConversation() and caps', () => {
+	beforeEach(resetStore);
+
+	it('clearConversation() resets forkBranches and activeBranchId', () => {
+		addPair('hello', 'world');
+
+		chatStore.fork(0);
+
+		expect(chatStore.forkBranches).toHaveLength(2);
+		expect(chatStore.activeBranchId).not.toBeNull();
+
+		chatStore.clearConversation();
+
+		expect(chatStore.forkBranches).toHaveLength(0);
+		expect(chatStore.forkBranchCount).toBe(0);
+		expect(chatStore.activeBranchId).toBeNull();
+	});
+
+	it('forkBranches 20-entry cap — loop 22 forks, oldest is dropped', () => {
+		// Create a 4-message base (2 pairs) once, then fork 22 times
+		// Each fork adds 2 branches (root + new), so we accumulate up to cap
+		addPair('base user 1', 'base assistant 1');
+		addPair('base user 2', 'base assistant 2');
+
+		for (let i = 0; i < 22; i++) {
+			// Fork at index 0 each time - creates root once, then new branches
+			chatStore.fork(0);
+
+			// After first fork: 2 branches (root + branch-1)
+			// After subsequent forks: add 1 branch each (root stays)
+			// Switch back to root before next fork
+			if (i < 21) {
+				chatStore.switchToBranch(chatStore.forkBranches[0].id);
+				// Restore messages for next fork iteration
+				chatStore.addUserMessage(`fork user ${i}`);
+				chatStore.startAssistantMessage();
+				chatStore.finalizeMessage('stop');
+			}
+		}
+
+		// MAX_FORK_BRANCHES = 20, oldest root entry should be dropped
+		expect(chatStore.forkBranches).toHaveLength(20);
+
+		// The oldest root (from iteration 0, label 'base user 1') should be gone
+		const rootLabels = chatStore.forkBranches.map((b) => b.label);
+		expect(rootLabels).not.toContain('Root');
+	});
+
+	it('3-level nested fork chain — parentBranchId chain is correct', () => {
+		addPair('L1 user', 'L1 assistant');
+
+		// Fork 1: creates root, activeBranchId = branch-1
+		chatStore.fork(0);
+		const rootId = chatStore.forkBranches[0].id;
+		const branch1Id = chatStore.forkBranches[1].id;
+
+		// Fork 2: switch to root, add a pair, fork at user message (index 2)
+		chatStore.switchToBranch(rootId);
+		chatStore.addUserMessage('L2 user');
+		chatStore.startAssistantMessage();
+		chatStore.finalizeMessage('stop');
+		// messages = [u1, a1, L2user, a2]; fork at index 2 (L2user is user role)
+		chatStore.fork(2);
+		const branch2Id = chatStore.forkBranches[2].id;
+
+		// Fork 3: switch to branch-2, add a pair, fork at index 2
+		chatStore.switchToBranch(branch2Id);
+		chatStore.addUserMessage('L3 user');
+		chatStore.startAssistantMessage();
+		chatStore.finalizeMessage('stop');
+		chatStore.fork(2);
+		const branch3Id = chatStore.forkBranches[3].id;
+
+		// Verify chain: branch3.parentBranchId === branch2.id
+		const branch3 = chatStore.forkBranches.find((b) => b.id === branch3Id);
+		const branch2 = chatStore.forkBranches.find((b) => b.id === branch2Id);
+
+		expect(branch3?.parentBranchId).toBe(branch2Id);
+		expect(branch2?.parentBranchId).toBe(rootId);
+	});
+
+	it('forkBranchCount getter reflects forkBranches.length', () => {
+		addPair('p1', 'a1');
+		addPair('p2', 'a2');
+
+		expect(chatStore.forkBranchCount).toBe(0);
+
+		// First fork: creates root + branch-1 = 2
+		chatStore.fork(0);
+		expect(chatStore.forkBranchCount).toBe(2);
+
+		// Fork again: switch to root, add a pair, fork at user message
+		chatStore.switchToBranch(chatStore.forkBranches[0].id);
+		chatStore.addUserMessage('p3');
+		chatStore.startAssistantMessage();
+		chatStore.finalizeMessage('stop');
+		// messages = [u1, a1, u2, a2, u3, a3] — fork at u3 (index 4)
+		chatStore.fork(4);
+		expect(chatStore.forkBranchCount).toBe(3);
+	});
+});
