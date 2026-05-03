@@ -40,7 +40,7 @@ task({
     src/agents/references/handoff-format.md (replace existing placeholder)
 
     ## SOURCE MATERIAL
-    - src/agents/prompts/_shared/response-envelope.md
+    - Load `handoff-format` reference: `reference({ name: "handoff-format" })`
 
     ## ACCEPTANCE
     - Valid YAML frontmatter with tags and audience as list syntax

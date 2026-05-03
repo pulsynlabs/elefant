@@ -22,4 +22,6 @@
 [At least 3 things that look reasonable but are wrong for this agent.]
 
 ## Response Envelope
-{{> _shared/response-envelope.md}}
+See reference: `handoff-format` (`src/agents/references/handoff-format.md`).
+Audience `orchestrator` and `executor` agents get this auto-loaded.
+Other agents should load it on demand: `reference({ name: "handoff-format" })`.

@@ -400,7 +400,7 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 	registry.register(referenceTool);
 	registry.register(lspTool);
 	// Research Base tools — read-only tools available to all agents.
-	// See _shared/research-base-protocol.md for usage guidance.
+	// See reference: research-base-workflow (auto-loaded for researcher/writer agents).
 	registry.register(researchGrepTool);
 	registry.register(researchWriteTool);
 	registry.register(createResearchReadTool({ projectPath: process.cwd() }));

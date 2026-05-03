@@ -57,7 +57,7 @@ task({
     src/agents/references/handoff-format.md
 
     ## SOURCE
-    Use content from src/agents/prompts/_shared/response-envelope.md
+    Use the `handoff-format` reference: `reference({ name: "handoff-format" })`
 
     ## ACCEPTANCE
     - Valid YAML frontmatter (tags, audience use list syntax)
