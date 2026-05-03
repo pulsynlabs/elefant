@@ -94,7 +94,11 @@ describe('commandsStore', () => {
 		expect(commandsStore.commands).toEqual(SAMPLE);
 	});
 
-	it('load() surfaces HTTP errors via the error field', async () => {
+	it('load() surfaces HTTP errors via the error field but still marks loaded', async () => {
+		// On fetch failure the store falls back to FALLBACK_COMMANDS so the
+		// overlay works offline. It marks `loaded = true` so subsequent calls
+		// return immediately rather than spamming the network on every mount.
+		// The `error` field surfaces the reason for diagnostic purposes.
 		const fetchMock = mock(() =>
 			Promise.resolve(new Response('boom', { status: 500 })),
 		);
@@ -102,7 +106,7 @@ describe('commandsStore', () => {
 
 		await commandsStore.load();
 
-		expect(commandsStore.loaded).toBe(false);
+		expect(commandsStore.loaded).toBe(true);
 		expect(commandsStore.error).toMatch(/HTTP 500/);
 	});
 

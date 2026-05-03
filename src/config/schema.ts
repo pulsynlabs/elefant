@@ -136,6 +136,7 @@ const configSchema = z.object({
 	agents: z.record(z.string(), agentProfileSchema).optional(),
 	mcp: z.array(mcpServerSchema).optional().default([]),
 	tokenBudgetPercent: z.number().min(0).max(100).optional().default(10),
+	compactionThreshold: z.number().min(0.5).max(0.95).optional().default(0.8),
 	hardwareAccelerationDisabled: z.boolean().optional().default(false),
 	skills: skillsConfigSchema.optional().default({
 		registries: BUNDLED_REGISTRIES,

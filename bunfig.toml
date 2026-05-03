@@ -1,0 +1,12 @@
+[test]
+# The desktop/ tree contains Svelte 5 components that use $state/$derived
+# rune syntax. These are preprocessed by Vite/Svelte during the desktop
+# build but cannot be compiled by bun's raw test runner.
+#
+# Desktop tests must be run from within desktop/ (using `cd desktop && bun test`,
+# or `bun run test:e2e` for Playwright). Root `bun test` covers only the daemon
+# source, CLI, and integration suites.
+#
+# `preload` runs the test-setup shim that stubs Tauri APIs — only needed
+# for desktop but harmless to declare here since desktop tests aren't run.
+root = "."

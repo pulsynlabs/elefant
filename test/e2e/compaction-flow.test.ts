@@ -73,15 +73,21 @@ function createMockContext(): DaemonContext {
 }
 
 describe('Compaction flow', () => {
-	it('shouldCompact returns true at 70% threshold', () => {
+	it('shouldCompact returns true when tokenCount exceeds default 80% threshold', () => {
+		// Default compactionThreshold is 0.8 (from schema + manager fallback).
+		// 200_000 * 0.8 = 160_000 — values above this should trigger compaction.
 		const manager = new CompactionManager(createMockContext())
-		expect(manager.shouldCompact(140_001, 200_000)).toBe(true)
-		expect(manager.shouldCompact(139_999, 200_000)).toBe(false)
+		expect(manager.shouldCompact(160_001, 200_000)).toBe(true)
+		expect(manager.shouldCompact(159_999, 200_000)).toBe(false)
 	})
 
-	it('compaction threshold constant matches 70%', () => {
-		const THRESHOLD = 0.7
-		const contextWindow = 200_000
-		expect(Math.floor(contextWindow * THRESHOLD)).toBe(140_000)
+	it('shouldCompact respects a config-supplied threshold', () => {
+		// Override the threshold via the mock context to verify the config
+		// path is exercised. 200_000 * 0.7 = 140_000.
+		const ctx = createMockContext()
+		;(ctx as { config: { compactionThreshold: number } }).config = { compactionThreshold: 0.7 }
+		const manager = new CompactionManager(ctx)
+		expect(manager.shouldCompact(140_001, 200_000)).toBe(true)
+		expect(manager.shouldCompact(139_999, 200_000)).toBe(false)
 	})
 })
