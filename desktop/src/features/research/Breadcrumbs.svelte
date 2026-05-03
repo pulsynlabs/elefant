@@ -86,7 +86,7 @@ section-filter affordance can wire in without an API change.
 		margin: 0;
 		padding: 0;
 		list-style: none;
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-xs);
 		color: var(--text-meta);
 		min-width: 0;
@@ -111,9 +111,10 @@ section-filter affordance can wire in without an API change.
 
 	.crumb-root .crumb-label {
 		font-family: var(--font-mono);
-		font-size: 10px;
+		font-size: var(--font-size-2xs);
+		font-weight: var(--font-weight-medium);
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
+		letter-spacing: var(--tracking-widest);
 		color: var(--text-muted);
 	}
 
@@ -123,7 +124,7 @@ section-filter affordance can wire in without an API change.
 		padding: 2px var(--space-1);
 		margin: 0;
 		color: var(--text-meta);
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-xs);
 		cursor: pointer;
 		border-radius: var(--radius-xs);
@@ -144,7 +145,7 @@ section-filter affordance can wire in without an API change.
 
 	.crumb-current .crumb-leaf {
 		color: var(--text-prose);
-		font-weight: 500;
+		font-weight: var(--font-weight-medium);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;

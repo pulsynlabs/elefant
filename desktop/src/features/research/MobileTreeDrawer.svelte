@@ -152,19 +152,19 @@ behavior centralized rather than threading a callback through TreePane.
 
 	.drawer-title {
 		margin: 0;
-		font-family: var(--font-sans);
-		font-size: var(--font-size-sm);
-		font-weight: var(--font-weight-semibold);
-		letter-spacing: 0.06em;
+		font-family: var(--font-mono);
+		font-size: var(--font-size-2xs);
+		font-weight: var(--font-weight-medium);
+		letter-spacing: var(--tracking-widest);
 		text-transform: uppercase;
-		color: var(--text-meta);
+		color: var(--text-muted);
 	}
 
 	.drawer-close {
 		min-height: 44px;
 		min-width: 44px;
 		padding: 0 var(--space-3);
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-sm);
 		color: var(--text-prose);
 		background: transparent;
@@ -172,8 +172,8 @@ behavior centralized rather than threading a callback through TreePane.
 		border-radius: var(--radius-sm);
 		cursor: pointer;
 		transition:
-			background-color var(--duration-fast) var(--ease-out-expo),
-			border-color var(--duration-fast) var(--ease-out-expo);
+			background-color var(--transition-fast),
+			border-color var(--transition-fast);
 	}
 
 	.drawer-close:hover {
@@ -196,11 +196,12 @@ behavior centralized rather than threading a callback through TreePane.
 		position: fixed;
 		inset: 0;
 		z-index: var(--z-sticky);
-		background: rgb(0 0 0 / 0.45);
+		background-color: var(--surface-overlay);
 		border: none;
 		padding: 0;
 		margin: 0;
 		cursor: pointer;
+		backdrop-filter: blur(2px);
 		animation: drawer-backdrop-in var(--duration-base) var(--ease-out-expo) forwards;
 	}
 

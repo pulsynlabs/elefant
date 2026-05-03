@@ -238,20 +238,21 @@ the daemon for tree/file responses, so chip navigation round-trips.
 	}
 
 	.empty-headline {
-		font-family: var(--font-sans);
-		font-size: var(--font-size-md);
-		font-weight: 500;
-		color: var(--text-meta);
+		font-family: var(--font-display);
+		font-size: var(--font-size-xl);
+		font-weight: var(--font-weight-semibold);
+		color: var(--text-prose);
+		letter-spacing: var(--tracking-tight);
 		margin: 0 0 var(--space-2) 0;
 	}
 
 	.empty-body {
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-sm);
 		color: var(--text-muted);
 		margin: 0;
 		max-width: 36ch;
-		line-height: 1.5;
+		line-height: var(--leading-relaxed);
 	}
 
 	/* --- Loading skeleton ----------------------------------------------- */
@@ -269,7 +270,7 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		height: 12px;
 		border-radius: var(--radius-sm);
 		background-color: var(--surface-hover);
-		animation: skeleton-pulse 1.6s ease-in-out infinite;
+		animation: skeleton-pulse 1.6s var(--ease-standard) infinite;
 	}
 
 	.skeleton-title { width: 50%; height: 22px; }
@@ -307,12 +308,13 @@ the daemon for tree/file responses, so chip navigation round-trips.
 	}
 
 	.reader-title {
-		font-family: var(--font-display, var(--font-sans));
-		font-size: clamp(20px, 2.6vw, 28px);
-		font-weight: 600;
+		font-family: var(--font-display);
+		font-size: clamp(22px, 2.6vw, 32px);
+		font-weight: var(--font-weight-semibold);
 		color: var(--text-prose);
-		letter-spacing: -0.01em;
-		line-height: 1.2;
+		letter-spacing: var(--tracking-tight);
+		line-height: var(--leading-tight);
+		font-optical-sizing: auto;
 		margin: 0;
 		overflow-wrap: anywhere;
 	}
@@ -358,40 +360,44 @@ the daemon for tree/file responses, so chip navigation round-trips.
 	 */
 	.research-body {
 		max-width: 72ch;
-		font-family: var(--font-body, var(--font-sans));
-		font-size: var(--font-size-md);
-		line-height: 1.65;
+		font-family: var(--font-body);
+		font-size: var(--font-size-base);
+		line-height: var(--leading-relaxed);
 		color: var(--text-prose);
 		min-width: 0;
 	}
 
 	.research-body :global(h1) {
-		font-family: var(--font-display, var(--font-sans));
+		font-family: var(--font-display);
 		font-size: clamp(22px, 2.4vw, 28px);
-		font-weight: 600;
+		font-weight: var(--font-weight-semibold);
 		margin: var(--space-7) 0 var(--space-3);
 		color: var(--text-prose);
-		letter-spacing: -0.01em;
+		letter-spacing: var(--tracking-tight);
+		font-optical-sizing: auto;
 	}
 
 	.research-body :global(.research-heading) {
 		position: relative;
-		font-family: var(--font-display, var(--font-sans));
-		font-weight: 600;
+		font-family: var(--font-display);
 		color: var(--text-prose);
-		letter-spacing: -0.005em;
+		letter-spacing: var(--tracking-tight);
+		font-optical-sizing: auto;
 		scroll-margin-top: 96px;
 	}
 
 	.research-body :global(h2.research-heading) {
 		font-size: clamp(18px, 2vw, 22px);
+		font-weight: var(--font-weight-semibold);
 		margin: var(--space-7) 0 var(--space-3);
 		padding-bottom: var(--space-2);
 		border-bottom: 1px solid var(--border-hairline);
 	}
 
 	.research-body :global(h3.research-heading) {
-		font-size: var(--font-size-lg, 17px);
+		font-size: var(--font-size-lg);
+		font-weight: var(--font-weight-medium);
+		letter-spacing: var(--tracking-snug);
 		margin: var(--space-5) 0 var(--space-2);
 	}
 
@@ -442,16 +448,37 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		margin: var(--space-1) 0;
 	}
 
+	.research-body :global(blockquote) {
+		margin: var(--space-4) 0;
+		padding: var(--space-2) var(--space-4);
+		border-left: 2px solid var(--border-emphasis);
+		color: var(--text-meta);
+		font-style: italic;
+	}
+
+	.research-body :global(blockquote p:last-child) {
+		margin-bottom: 0;
+	}
+
+	.research-body :global(hr) {
+		border: none;
+		border-top: 1px solid var(--border-hairline);
+		margin: var(--space-6) 0;
+	}
+
 	.research-body :global(a) {
 		color: var(--color-primary);
 		text-decoration: none;
-		border-bottom: 1px solid color-mix(in oklch, var(--color-primary) 30%, transparent);
-		transition: border-color var(--transition-fast), color var(--transition-fast);
+		transition:
+			color var(--transition-fast),
+			text-decoration-color var(--transition-fast);
 	}
 
 	.research-body :global(a:hover) {
 		color: var(--color-primary-hover);
-		border-bottom-color: var(--color-primary);
+		text-decoration: underline;
+		text-decoration-color: var(--color-primary);
+		text-underline-offset: 2px;
 	}
 
 	.research-body :global(a:focus-visible) {
@@ -479,7 +506,7 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		overflow-x: auto;
 		font-family: var(--font-mono);
 		font-size: var(--font-size-sm);
-		line-height: 1.55;
+		line-height: var(--leading-snug);
 	}
 
 	.research-body :global(pre code) {
@@ -506,13 +533,13 @@ the daemon for tree/file responses, so chip navigation round-trips.
 	.research-body :global(th) {
 		background-color: var(--surface-leaf);
 		color: var(--text-prose);
-		font-weight: 600;
+		font-weight: var(--font-weight-semibold);
 		border-bottom-color: var(--border-edge);
 	}
 
 	.research-body :global(strong) {
 		color: var(--text-prose);
-		font-weight: 600;
+		font-weight: var(--font-weight-semibold);
 	}
 
 	.research-body :global(em) {
@@ -540,5 +567,6 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		backdrop-filter: blur(8px);
 	}
 </style>

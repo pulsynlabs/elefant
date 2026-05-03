@@ -245,8 +245,8 @@ is mounted via `keyboard.ts`.
 	}
 
 	.research-no-project p {
-		font-family: var(--font-sans);
-		font-size: var(--font-sans);
+		font-family: var(--font-body);
+		font-size: var(--font-size-sm);
 		color: var(--text-meta);
 		margin: 0;
 	}
@@ -305,7 +305,7 @@ is mounted via `keyboard.ts`.
 		min-height: 44px;
 		min-width: 44px;
 		padding: 0 var(--space-3);
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-sm);
 		color: var(--text-prose);
 		background: transparent;
@@ -313,8 +313,8 @@ is mounted via `keyboard.ts`.
 		border-radius: var(--radius-sm);
 		cursor: pointer;
 		transition:
-			background-color var(--duration-fast) var(--ease-out-expo),
-			border-color var(--duration-fast) var(--ease-out-expo);
+			background-color var(--transition-fast),
+			border-color var(--transition-fast);
 	}
 
 	.research-files-trigger:hover {

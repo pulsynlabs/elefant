@@ -126,7 +126,7 @@ post-processor in `ReaderPane.svelte` uses, so #anchor URLs round-trip.
 
 <style>
 	.toc {
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-xs);
 		color: var(--text-meta);
 		min-width: 0;
@@ -134,9 +134,10 @@ post-processor in `ReaderPane.svelte` uses, so #anchor URLs round-trip.
 
 	.toc-title {
 		font-family: var(--font-mono);
-		font-size: 10px;
+		font-size: var(--font-size-2xs);
+		font-weight: var(--font-weight-medium);
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
+		letter-spacing: var(--tracking-widest);
 		color: var(--text-muted);
 		margin: 0 0 var(--space-2) 0;
 		padding: 0 var(--space-2);
@@ -167,7 +168,7 @@ post-processor in `ReaderPane.svelte` uses, so #anchor URLs round-trip.
 		color: var(--text-meta);
 		font-family: inherit;
 		font-size: inherit;
-		line-height: 1.4;
+		line-height: var(--leading-snug);
 		cursor: pointer;
 		border-left: 2px solid transparent;
 		margin-left: -1px;
@@ -194,6 +195,6 @@ post-processor in `ReaderPane.svelte` uses, so #anchor URLs round-trip.
 	.toc-link.active {
 		color: var(--color-primary);
 		border-left-color: var(--color-primary);
-		font-weight: 500;
+		font-weight: var(--font-weight-medium);
 	}
 </style>

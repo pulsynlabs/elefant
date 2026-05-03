@@ -302,9 +302,9 @@ the query restores the tree.
 		border-radius: var(--radius-md);
 		background-color: var(--surface-leaf);
 		color: var(--text-prose);
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-sm);
-		line-height: 1.4;
+		line-height: var(--leading-snug);
 		transition:
 			border-color var(--transition-fast),
 			box-shadow var(--transition-fast);
@@ -368,9 +368,9 @@ the query restores the tree.
 		padding: var(--space-2) var(--space-3);
 		border: 1px solid var(--color-error);
 		border-radius: var(--radius-sm);
-		background-color: color-mix(in srgb, var(--color-error) 8%, transparent);
+		background-color: color-mix(in oklch, var(--color-error) 8%, transparent);
 		color: var(--color-error);
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-xs);
 	}
 
@@ -392,7 +392,7 @@ the query restores the tree.
 		height: 10px;
 		border-radius: var(--radius-sm);
 		background-color: var(--surface-hover);
-		animation: skeleton-pulse 1.6s ease-in-out infinite;
+		animation: skeleton-pulse 1.6s var(--ease-standard) infinite;
 	}
 
 	.skeleton-line-title { width: 75%; }
@@ -411,7 +411,7 @@ the query restores the tree.
 	.tree-empty {
 		margin: var(--space-3);
 		padding: var(--space-3);
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-xs);
 		color: var(--text-muted);
 		text-align: center;
@@ -444,20 +444,20 @@ the query restores the tree.
 	}
 
 	.zero-headline {
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-sm);
-		font-weight: 500;
+		font-weight: var(--font-weight-medium);
 		color: var(--text-meta);
 		margin: 0;
 	}
 
 	.zero-body {
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-xs);
 		color: var(--text-muted);
 		margin: 0;
 		max-width: 28ch;
-		line-height: 1.5;
+		line-height: var(--leading-base);
 	}
 
 	/* --- Section list ---------------------------------------------------- */
@@ -481,10 +481,12 @@ the query restores the tree.
 		padding: 6px var(--space-3);
 		border: none;
 		background: transparent;
-		color: var(--text-meta);
-		font-family: var(--font-sans);
-		font-size: var(--font-size-xs);
-		font-weight: 500;
+		color: var(--text-muted);
+		font-family: var(--font-mono);
+		font-size: var(--font-size-2xs);
+		font-weight: var(--font-weight-medium);
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-widest);
 		text-align: left;
 		cursor: pointer;
 		border-radius: var(--radius-sm);
@@ -495,7 +497,7 @@ the query restores the tree.
 
 	.section-header:hover {
 		background-color: var(--surface-hover);
-		color: var(--text-prose);
+		color: var(--text-meta);
 	}
 
 	.section-header:focus-visible {
@@ -513,20 +515,17 @@ the query restores the tree.
 
 	.section-label {
 		flex: 1;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		font-family: var(--font-mono);
-		font-size: 11px;
 	}
 
 	.section-count {
 		font-family: var(--font-mono);
-		font-size: 10px;
+		font-size: var(--font-size-2xs);
 		color: var(--text-muted);
 		padding: 1px 6px;
 		border-radius: var(--radius-full);
 		background-color: var(--surface-leaf);
 		border: 1px solid var(--border-hairline);
+		font-variant-numeric: tabular-nums;
 	}
 
 	/* --- Section file collapse animation -------------------------------- */
@@ -565,15 +564,16 @@ the query restores the tree.
 		border-left: 2px solid transparent;
 		background: transparent;
 		color: var(--text-meta);
-		font-family: var(--font-sans);
-		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
 		text-align: left;
 		cursor: pointer;
 		border-radius: var(--radius-sm);
 		transition:
-			background-color var(--transition-fast),
-			color var(--transition-fast),
-			border-color var(--transition-fast);
+			background-color var(--transition-micro),
+			color var(--transition-micro),
+			border-color var(--transition-micro);
 		min-width: 0;
 	}
 
@@ -591,7 +591,6 @@ the query restores the tree.
 		background-color: var(--color-primary-subtle);
 		color: var(--color-primary);
 		border-left-color: var(--color-primary);
-		font-weight: 500;
 	}
 
 	.file-title {
@@ -605,7 +604,7 @@ the query restores the tree.
 	.file-meta {
 		display: inline-flex;
 		align-items: center;
-		gap: 4px;
+		gap: var(--space-1);
 		flex-shrink: 0;
 	}
 
@@ -613,7 +612,7 @@ the query restores the tree.
 		display: inline-block;
 		width: 6px;
 		height: 6px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 	}
 
 	.recency-dot.fresh {
@@ -622,14 +621,14 @@ the query restores the tree.
 	}
 
 	.recency-dot.recent {
-		background-color: var(--color-info);
+		background-color: var(--color-primary);
 	}
 
 	.file-tag {
 		font-family: var(--font-mono);
-		font-size: 9px;
+		font-size: var(--font-size-2xs);
 		text-transform: uppercase;
-		letter-spacing: 0.04em;
+		letter-spacing: var(--tracking-wider);
 		padding: 1px 4px;
 		border-radius: var(--radius-xs);
 		background-color: var(--surface-leaf);
@@ -676,14 +675,14 @@ the query restores the tree.
 
 	.result-row.active {
 		background-color: var(--color-primary-subtle);
-		border-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
+		border-color: var(--border-emphasis);
 	}
 
 	.result-title {
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-sm);
 		color: var(--text-prose);
-		font-weight: 500;
+		font-weight: var(--font-weight-medium);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -691,17 +690,17 @@ the query restores the tree.
 
 	.result-path {
 		font-family: var(--font-mono);
-		font-size: 10px;
+		font-size: var(--font-size-2xs);
 		color: var(--text-muted);
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
+		letter-spacing: var(--tracking-widest);
 	}
 
 	.result-snippet {
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-xs);
 		color: var(--text-meta);
-		line-height: 1.45;
+		line-height: var(--leading-snug);
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
 		line-clamp: 2;

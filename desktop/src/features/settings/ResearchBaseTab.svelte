@@ -640,8 +640,10 @@
 		font-family: var(--font-mono);
 		font-size: 0.92em;
 		padding: 2px 6px;
-		background-color: var(--color-surface-elevated);
+		background-color: var(--surface-leaf);
+		border: 1px solid var(--border-hairline);
 		border-radius: var(--radius-sm);
+		color: var(--text-prose);
 	}
 
 	/* ── Card ──────────────────────────────────────────────────────────── */
@@ -705,20 +707,27 @@
 	}
 
 	.field-input {
-		background-color: var(--color-surface-elevated);
-		border: 1px solid var(--color-border);
+		background-color: var(--surface-leaf);
+		border: 1px solid var(--border-edge);
 		border-radius: var(--radius-md);
-		color: var(--color-text-primary);
-		font-family: var(--font-sans);
+		color: var(--text-prose);
+		font-family: var(--font-body);
 		font-size: var(--font-size-md);
 		padding: var(--space-2) var(--space-3);
 		width: 100%;
 		outline: none;
-		transition: border-color var(--transition-fast);
+		transition:
+			border-color var(--transition-fast),
+			box-shadow var(--transition-fast);
+	}
+
+	.field-input:hover {
+		border-color: var(--border-emphasis);
 	}
 
 	.field-input:focus {
 		border-color: var(--color-primary);
+		box-shadow: var(--glow-focus);
 	}
 
 	.field-hint {
@@ -748,9 +757,9 @@
 		position: relative;
 		width: 36px;
 		height: 20px;
-		background-color: var(--color-surface-elevated);
-		border: 1px solid var(--color-border);
-		border-radius: 999px;
+		background-color: var(--surface-leaf);
+		border: 1px solid var(--border-edge);
+		border-radius: var(--radius-full);
 		transition:
 			background-color var(--transition-fast),
 			border-color var(--transition-fast);
@@ -762,8 +771,8 @@
 		left: 2px;
 		width: 14px;
 		height: 14px;
-		background-color: var(--color-text-secondary);
-		border-radius: 50%;
+		background-color: var(--text-meta);
+		border-radius: var(--radius-full);
 		transition:
 			transform var(--transition-fast),
 			background-color var(--transition-fast);
@@ -776,12 +785,12 @@
 
 	.toggle input:checked + .toggle-track .toggle-thumb {
 		transform: translateX(16px);
-		background-color: #fff;
+		background-color: var(--color-primary-foreground);
 	}
 
 	.toggle input:focus-visible + .toggle-track {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
+		outline: none;
+		box-shadow: var(--glow-focus);
 	}
 
 	.toggle-label {
@@ -804,8 +813,8 @@
 	}
 
 	.banner-warn {
-		background-color: rgba(251, 191, 36, 0.08);
-		border: 1px solid rgba(251, 191, 36, 0.4);
+		background-color: color-mix(in oklch, var(--color-warning) 8%, transparent);
+		border: 1px solid color-mix(in oklch, var(--color-warning) 38%, transparent);
 		color: var(--color-text-primary);
 	}
 
@@ -814,7 +823,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		color: rgb(217, 119, 6);
+		color: var(--color-warning);
 		margin-top: 1px;
 	}
 
@@ -889,8 +898,8 @@
 	}
 
 	.ghost-btn:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
+		outline: none;
+		box-shadow: var(--glow-focus);
 	}
 
 	.ghost-btn:disabled {
@@ -913,8 +922,8 @@
 	}
 
 	.link-btn:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
+		outline: none;
+		box-shadow: var(--glow-focus);
 		border-radius: var(--radius-sm);
 	}
 

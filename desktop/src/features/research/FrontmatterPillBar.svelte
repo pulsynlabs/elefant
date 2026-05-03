@@ -130,11 +130,12 @@ theme switches without an extra paint.
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-1);
-		padding: 4px var(--space-2);
+		min-height: 24px;
+		padding: 0 var(--space-2);
 		border: 1px solid var(--border-hairline);
 		border-radius: var(--radius-sm);
 		background-color: var(--surface-leaf);
-		font-family: var(--font-sans);
+		font-family: var(--font-body);
 		font-size: var(--font-size-xs);
 		color: var(--text-meta);
 		line-height: 1;
@@ -143,16 +144,17 @@ theme switches without an extra paint.
 
 	.pill-label {
 		font-family: var(--font-mono);
-		font-size: 10px;
+		font-size: var(--font-size-2xs);
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
+		letter-spacing: var(--tracking-widest);
 		color: var(--text-muted);
 	}
 
 	.pill-value {
-		font-weight: 500;
+		font-weight: var(--font-weight-medium);
 		color: var(--text-prose);
 		text-transform: capitalize;
+		font-variant-numeric: tabular-nums;
 	}
 
 	/* --- Confidence pill -------------------------------------------------
@@ -165,8 +167,13 @@ theme switches without an extra paint.
 	.confidence-dot {
 		width: 6px;
 		height: 6px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		background-color: var(--text-muted);
+	}
+
+	.confidence-pill[data-level='high'] {
+		background-color: color-mix(in oklch, var(--color-success) 8%, var(--surface-leaf));
+		border-color: color-mix(in oklch, var(--color-success) 28%, transparent);
 	}
 
 	.confidence-pill[data-level='high'] .confidence-dot {
@@ -174,8 +181,18 @@ theme switches without an extra paint.
 		box-shadow: 0 0 6px color-mix(in oklch, var(--color-success) 40%, transparent);
 	}
 
+	.confidence-pill[data-level='medium'] {
+		background-color: color-mix(in oklch, var(--color-warning) 8%, var(--surface-leaf));
+		border-color: color-mix(in oklch, var(--color-warning) 28%, transparent);
+	}
+
 	.confidence-pill[data-level='medium'] .confidence-dot {
 		background-color: var(--color-warning);
+	}
+
+	.confidence-pill[data-level='low'] {
+		background-color: color-mix(in oklch, var(--color-error) 8%, var(--surface-leaf));
+		border-color: color-mix(in oklch, var(--color-error) 28%, transparent);
 	}
 
 	.confidence-pill[data-level='low'] .confidence-dot {
@@ -186,7 +203,7 @@ theme switches without an extra paint.
 	.tag-list {
 		display: inline-flex;
 		flex-wrap: wrap;
-		gap: 6px;
+		gap: var(--space-1);
 		list-style: none;
 		margin: 0;
 		padding: 0;
@@ -195,22 +212,26 @@ theme switches without an extra paint.
 	.tag-chip {
 		display: inline-flex;
 		align-items: center;
-		padding: 3px var(--space-2);
-		border-radius: var(--radius-sm);
+		min-height: 24px;
+		padding: 0 var(--space-2);
+		border-radius: var(--radius-full);
 		background-color: var(--color-primary-subtle);
 		color: var(--color-primary);
-		font-family: var(--font-sans);
-		font-size: var(--font-size-xs);
-		font-weight: 500;
+		font-family: var(--font-mono);
+		font-size: var(--font-size-2xs);
+		font-weight: var(--font-weight-medium);
+		letter-spacing: var(--tracking-wide);
 		line-height: 1;
-		border: 1px solid color-mix(in oklch, var(--color-primary) 18%, transparent);
+		border: 1px solid color-mix(in oklch, var(--color-primary) 22%, transparent);
 	}
 
 	/* --- Sources pill (interactive) ------------------------------------- */
 	.sources-pill {
 		cursor: pointer;
-		transition: background-color var(--transition-fast),
-			border-color var(--transition-fast);
+		transition:
+			background-color var(--transition-fast),
+			border-color var(--transition-fast),
+			color var(--transition-fast);
 	}
 
 	.sources-pill:hover {
@@ -251,11 +272,14 @@ theme switches without an extra paint.
 	.source-item a {
 		color: var(--color-primary);
 		text-decoration: none;
-		transition: color var(--transition-fast);
+		transition:
+			color var(--transition-fast),
+			text-decoration-color var(--transition-fast);
 	}
 
 	.source-item a:hover {
 		text-decoration: underline;
+		text-underline-offset: 2px;
 		color: var(--color-primary-hover);
 	}
 

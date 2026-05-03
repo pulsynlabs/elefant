@@ -130,21 +130,26 @@ emits this component instead of a plain anchor.
 </button>
 
 <style>
+	/*
+	 * Subtle inline badge — reads as part of running text, not a full
+	 * button. Hairline border, primary-subtle wash, gently lifts on
+	 * hover without changing color saturation enough to distract.
+	 */
 	.research-chip {
 		/* Reset native button chrome before re-styling as an inline chip. */
 		appearance: none;
 		font: inherit;
 		display: inline-flex;
 		align-items: center;
-		gap: var(--space-1, 4px);
+		gap: var(--space-1);
 		padding: 1px 6px 1px 5px;
 		margin: 0 1px;
-		font-family: var(--font-sans);
-		font-size: 0.875em;
-		line-height: 1.35;
+		font-family: var(--font-body);
+		font-size: var(--font-size-xs);
+		line-height: var(--leading-snug);
 		color: var(--color-primary);
 		background-color: var(--color-primary-subtle);
-		border: 1px solid var(--border-emphasis);
+		border: 1px solid var(--border-hairline);
 		border-radius: var(--radius-sm);
 		text-decoration: none;
 		cursor: pointer;
@@ -154,18 +159,20 @@ emits this component instead of a plain anchor.
 		overflow: hidden;
 		text-overflow: ellipsis;
 		transition:
-			background-color var(--duration-fast) var(--ease-out-expo),
-			border-color var(--duration-fast) var(--ease-out-expo),
-			transform var(--duration-fast) var(--ease-out-expo);
+			background-color var(--transition-fast),
+			border-color var(--transition-fast),
+			box-shadow var(--transition-fast),
+			transform var(--transition-fast);
 	}
 
 	.research-chip:hover {
 		background-color: color-mix(
 			in oklch,
 			var(--color-primary) 18%,
-			transparent
+			var(--surface-leaf)
 		);
-		border-color: var(--color-primary);
+		border-color: var(--border-emphasis);
+		box-shadow: var(--shadow-xs);
 		transform: translateY(-1px);
 	}
 
@@ -207,7 +214,7 @@ emits this component instead of a plain anchor.
 		padding: 0 4px;
 		margin-left: 2px;
 		font-family: var(--font-mono);
-		font-size: 0.78em;
+		font-size: var(--font-size-2xs);
 		font-weight: var(--font-weight-normal);
 		color: var(--text-muted);
 		background-color: color-mix(
@@ -216,7 +223,7 @@ emits this component instead of a plain anchor.
 			transparent
 		);
 		border-radius: var(--radius-xs);
-		letter-spacing: 0.02em;
+		letter-spacing: var(--tracking-wide);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
