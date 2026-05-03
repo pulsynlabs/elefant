@@ -14,6 +14,9 @@ import type { VizType, VizRendererProps } from './types.js';
 import LoadingViz from './LoadingViz.svelte';
 import MermaidViz from './MermaidViz.svelte';
 import StatGridViz from './StatGridViz.svelte';
+import TableViz from './TableViz.svelte';
+import CodeViz from './CodeViz.svelte';
+import ComparisonViz from './ComparisonViz.svelte';
 
 const vizRendererRegistry = new Map<VizType, Component<VizRendererProps>>();
 
@@ -58,4 +61,16 @@ registerVizRenderer(
 registerVizRenderer(
 	'stat-grid',
 	StatGridViz as unknown as Component<VizRendererProps>,
+);
+registerVizRenderer(
+	'table',
+	TableViz as unknown as Component<VizRendererProps>,
+);
+registerVizRenderer(
+	'code',
+	CodeViz as unknown as Component<VizRendererProps>,
+);
+registerVizRenderer(
+	'comparison',
+	ComparisonViz as unknown as Component<VizRendererProps>,
 );
