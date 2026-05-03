@@ -1,4 +1,4 @@
-import type { ChatMessage, ContentBlock, ToolCallDisplay } from './types.js';
+import type { ChatMessage, ContentBlock, ForkBranch, ToolCallDisplay } from './types.js';
 import type { QuestionEvent } from '$lib/daemon/types.js';
 import type { AgentRunOverride } from '$lib/types/agent-config.js';
 import { getDaemonClient } from '$lib/daemon/client.js';
@@ -12,6 +12,8 @@ function generateId(): string {
 }
 
 type UndoEntry = { user: ChatMessage; assistant: ChatMessage };
+
+const MAX_FORK_BRANCHES = 20;
 
 // Conversation state using Svelte 5 runes
 let messages = $state<ChatMessage[]>([]);
@@ -40,6 +42,10 @@ let thinkingEnabled = $state(false);
 // Undo/redo stacks for chat message pair reversal
 let undoStack = $state<UndoEntry[]>([]);
 let redoStack = $state<UndoEntry[]>([]);
+
+// Fork branch state for conversation branching
+let forkBranches = $state<ForkBranch[]>([]);
+let activeBranchId = $state<string | null>(null);
 
 /**
  * Best-effort, client-side heuristic for whether the currently selected
@@ -296,6 +302,8 @@ export function clearConversation(): void {
 	messages = [];
 	undoStack = [];
 	redoStack = [];
+	forkBranches = [];
+	activeBranchId = null;
 	streamingMessageId = null;
 	isStreaming = false;
 }
@@ -356,6 +364,100 @@ export function redo(): boolean {
 	redoStack = redoStack.slice(0, -1);
 
 	messages = [...messages, entry.user, entry.assistant];
+
+	return true;
+}
+
+/**
+ * Fork the conversation at the given user message index.
+ *
+ * Creates a ForkBranch snapshot capturing the message history up to and
+ * including the forked message, truncates the visible message list to before
+ * the fork point, and returns the forked user message text so the caller can
+ * restore it to the chat input.
+ *
+ * The first fork in a conversation also creates an implicit "root" branch
+ * capturing the pre-fork state so that `switchToBranch()` is symmetric from
+ * the start.
+ *
+ * Returns `null` when the operation is a no-op (streaming, invalid index,
+ * or the target message is not a user message).
+ */
+export function fork(messageIndex: number): string | null {
+	if (isStreaming) return null;
+	if (messageIndex < 0 || messageIndex >= messages.length) return null;
+	if (messages[messageIndex].role !== 'user') return null;
+
+	// First fork in a fresh conversation: create an implicit root branch
+	// capturing the pre-fork state so switchToBranch is always symmetric.
+	if (activeBranchId === null && forkBranches.length === 0) {
+		const rootBranch: ForkBranch = {
+			id: crypto.randomUUID(),
+			label: 'Root',
+			createdAt: new Date(),
+			messages: structuredClone(messages),
+			parentBranchId: null,
+		};
+		forkBranches = [...forkBranches, rootBranch];
+		activeBranchId = rootBranch.id;
+	}
+
+	const userContent = messages[messageIndex].content;
+
+	const newBranch: ForkBranch = {
+		id: crypto.randomUUID(),
+		label: userContent.slice(0, 40).trim(),
+		createdAt: new Date(),
+		messages: structuredClone(messages.slice(0, messageIndex + 1)),
+		parentBranchId: activeBranchId,
+	};
+
+	// Push new branch; if over cap, drop oldest
+	const next = [...forkBranches, newBranch];
+	forkBranches = next.length > MAX_FORK_BRANCHES ? next.slice(-MAX_FORK_BRANCHES) : next;
+
+	// Truncate messages to before the fork point
+	messages = messages.slice(0, messageIndex);
+
+	return userContent;
+}
+
+/**
+ * Switch the conversation view to a previously forked branch.
+ *
+ * Saves the current message state as the active branch's snapshot (so
+ * round-trip switching is lossless), restores the target branch's message
+ * snapshot, updates `activeBranchId`, and clears the undo/redo stacks
+ * (per-branch linear history).
+ *
+ * Returns `false` when the operation is a no-op (streaming or the target
+ * branch does not exist).
+ */
+export function switchToBranch(branchId: string): boolean {
+	if (isStreaming) return false;
+
+	const target = forkBranches.find((b) => b.id === branchId);
+	if (!target) return false;
+
+	// Save current messages as the snapshot for the currently active branch
+	if (activeBranchId !== null) {
+		forkBranches = forkBranches.map((b) =>
+			b.id === activeBranchId ? { ...b, messages: structuredClone(messages) } : b,
+		);
+	}
+	// If activeBranchId is null (switching from implicit root — shouldn't
+	// normally happen if fork() always creates root first, but handle
+	// defensively): skip the snapshot save; root state is lost.
+
+	// Restore target branch's message snapshot
+	messages = structuredClone(target.messages);
+
+	// Update active branch
+	activeBranchId = branchId;
+
+	// Reset undo/redo stacks — each branch has its own linear history
+	undoStack = [];
+	redoStack = [];
 
 	return true;
 }
@@ -539,6 +641,15 @@ export const chatStore = {
 	get redoCount() {
 		return redoStack.length;
 	},
+	get forkBranches() {
+		return forkBranches;
+	},
+	get activeBranchId() {
+		return activeBranchId;
+	},
+	get forkBranchCount() {
+		return forkBranches.length;
+	},
 	setActiveSession: (id: string | null) => {
 		activeSessionId = id;
 	},
@@ -578,6 +689,8 @@ export const chatStore = {
 	clearConversation,
 	undo,
 	redo,
+	fork,
+	switchToBranch,
 	getApiMessages,
 	setAvailableProviders,
 };
