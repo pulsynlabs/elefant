@@ -58,9 +58,67 @@ This reads `.references/models.dev-dev/providers/` and generates 100+ provider e
 
 ---
 
-## The Research Database
+## Research Base System
 
-`markdown-db/` contains competitive research and design reference material, organized into five sections:
+Every Elefant project has a **Research Base** at `.elefant/markdown-db/` — a structured, agent-curated knowledge garden for long-form findings, comparisons, and reference notes. This is separate from the SQLite memory system (which holds ephemeral decision logs).
+
+### Structure
+
+The Research Base is organized into 8 sections:
+
+```
+.elefant/markdown-db/
+├── 00-index/              Index and changelog (auto-maintained by writer agent)
+├── 01-domain/             Domain-specific findings
+├── 02-tech/               Technology research and comparisons
+├── 03-decisions/          Architecture and design decisions
+├── 04-comparisons/        Comparative analyses
+├── 05-references/         Reference summaries and citations
+├── 06-synthesis/          Synthesis and strategic notes
+└── 99-scratch/            Rough notes (no strict frontmatter required)
+```
+
+Each file includes YAML frontmatter with: `id`, `title`, `section`, `tags`, `sources`, `confidence`, `created`, `updated`, `author_agent`, `workflow`, `summary`.
+
+### Agent Tools
+
+Five tools enable agents to interact with the Research Base:
+
+| Tool | Purpose | Who Can Write |
+|------|---------|---------------|
+| `research_search` | Semantic/hybrid/keyword search | All agents (read-only) |
+| `research_grep` | Ripgrep pattern matching | All agents (read-only) |
+| `research_read` | Read a file by ID, path, or `research://` link | All agents (read-only) |
+| `research_write` | Write or append to a file; enforces frontmatter | `researcher`, `writer`, `librarian` |
+| `research_index` | List/browse by section, tag, or recency | All agents (read-only) |
+
+### Desktop UI
+
+The **Research View** in the sidebar provides:
+- Two-pane layout: tree (left) + reader (right)
+- Read-only markdown renderer with TOC, syntax highlighting, and "Open in editor" button
+- Mobile-responsive drawer at ≤640 px
+- Keyboard shortcuts: `j`/`k` navigate, `/` search, `g r` focus reader, `Escape` close drawer
+
+### Vector Index & Embedding Providers
+
+The Research Base is indexed by SQLite + `sqlite-vec` with `Xenova/all-MiniLM-L6-v2` (384-dim) by default. Hardware auto-scaling recommends `bundled-gpu` or `bundled-large` (768-dim) if GPU/NPU detected and ≥16 GB RAM available.
+
+Supported providers: `bundled-cpu`, `bundled-gpu`, `bundled-large`, `ollama`, `lm-studio`, `vllm`, `openai`, `openai-compatible`, `google`, `disabled` (keyword-only).
+
+Provider switching is non-destructive: source files preserved, only derived chunks/embeddings rebuilt.
+
+### Chat Integration
+
+Agents emit `research://` links in handoff envelopes and chat output. These render as clickable chips that navigate to the Research View with the file open and optional anchor scrolled.
+
+→ See [docs/research-base.md](docs/research-base.md) for full architecture, provider matrix, tool reference, and UI walkthrough.
+
+---
+
+## Legacy Research Seed
+
+The Elefant monorepo's own `markdown-db/` at the repository root is kept as a **legacy research seed** (read-only reference). It contains competitive research and design reference material, organized into five sections:
 
 ```
 markdown-db/

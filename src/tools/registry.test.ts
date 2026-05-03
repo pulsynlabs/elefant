@@ -2,10 +2,10 @@ import { describe, expect, it } from 'bun:test'
 
 import { HookRegistry } from '../hooks/index.ts'
 import type { ToolDefinition } from '../types/tools.ts'
-import { createToolRegistry, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
+import { createToolRegistry, createToolRegistryForRun, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all 16 tools', () => {
+	it('registers all 21 tools including research_* tools', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
@@ -18,6 +18,11 @@ describe('ToolRegistry', () => {
 			'lsp',
 			'question',
 			'read',
+			'research_grep',
+			'research_index',
+			'research_read',
+			'research_search',
+			'research_write',
 			'skill',
 			'slider',
 			'todoread',
@@ -27,7 +32,7 @@ describe('ToolRegistry', () => {
 			'websearch',
 			'write',
 		])
-		expect(names.length).toBe(16)
+		expect(names.length).toBe(21)
 	})
 
 	it('execute() calls the matching tool', async () => {
@@ -376,5 +381,110 @@ describe('ToolRegistry', () => {
 		expect(afterResults).toHaveLength(1)
 		expect(afterResults[0]?.isError).toBe(true)
 		expect(afterResults[0]?.content).toContain('Output truncated')
+	})
+
+	it('rejects disallowed agent when allowedAgents is set on tool', async () => {
+		const registry = new ToolRegistry(new HookRegistry())
+		registry.setCurrentAgentName('executor-medium')
+
+		registry.register({
+			name: 'restricted-tool',
+			description: 'Only for researcher/writer/librarian',
+			parameters: {},
+			allowedAgents: ['researcher', 'writer', 'librarian'],
+			execute: async () => ({ ok: true, data: 'should not run' }),
+		})
+
+		const result = await registry.execute('restricted-tool', {})
+
+		expect(result.ok).toBe(false)
+		if (!result.ok) {
+			expect(result.error.code).toBe('PERMISSION_DENIED')
+			expect(result.error.message).toContain('restricted to agents')
+			expect(result.error.message).toContain('called by executor-medium')
+		}
+	})
+
+	it('allows matching agent when allowedAgents is set', async () => {
+		const registry = new ToolRegistry(new HookRegistry())
+		registry.setCurrentAgentName('researcher')
+
+		registry.register({
+			name: 'restricted-tool',
+			description: 'Only for researcher/writer/librarian',
+			parameters: {},
+			allowedAgents: ['researcher', 'writer', 'librarian'],
+			execute: async () => ({ ok: true, data: 'allowed' }),
+		})
+
+		const result = await registry.execute('restricted-tool', {})
+
+		expect(result.ok).toBe(true)
+		if (result.ok) {
+			expect(result.data).toBe('allowed')
+		}
+	})
+
+	it('skips allowedAgents check when the registry has no current agent', async () => {
+		const registry = new ToolRegistry(new HookRegistry())
+		// No setCurrentAgentName call — simulate createToolRegistry path
+
+		registry.register({
+			name: 'restricted-tool',
+			description: 'Only for researcher/writer/librarian',
+			parameters: {},
+			allowedAgents: ['researcher', 'writer', 'librarian'],
+			execute: async () => ({ ok: true, data: 'no agent set — passes through' }),
+		})
+
+		const result = await registry.execute('restricted-tool', {})
+
+		expect(result.ok).toBe(true)
+		if (result.ok) {
+			expect(result.data).toBe('no agent set — passes through')
+		}
+	})
+
+	it('registers all 5 research_* tools in createToolRegistryForRun', () => {
+		const database = {
+			db: {
+				query() {
+					return { get: () => ({ path: '/tmp/test-project' }) }
+				},
+			},
+		} as never
+		const registry = createToolRegistryForRun({
+			hookRegistry: new HookRegistry(),
+			database: database as never,
+			runRegistry: {} as never,
+			providerRouter: {} as never,
+			configManager: {} as never,
+			currentRun: {
+				runId: 'run-1',
+				depth: 0,
+				agentType: 'researcher',
+				title: 'Test',
+				sessionId: 'session-1',
+				projectId: 'project-1',
+				signal: new AbortController().signal,
+				discoveredMcpTools: new Set<string>(),
+			},
+		})
+
+		const names = registry.getAll().map((t) => t.name)
+		expect(names).toContain('research_search')
+		expect(names).toContain('research_grep')
+		expect(names).toContain('research_read')
+		expect(names).toContain('research_write')
+		expect(names).toContain('research_index')
+	})
+
+	it('research_write lists allowedAgents for researcher/writer/librarian only', () => {
+		const registry = createToolRegistry(new HookRegistry())
+		const tool = registry.get('research_write')
+		expect(tool.ok).toBe(true)
+		if (tool.ok) {
+			expect(tool.data.allowedAgents).toEqual(['researcher', 'writer', 'librarian'])
+		}
 	})
 })

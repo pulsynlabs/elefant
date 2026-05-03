@@ -58,22 +58,30 @@ is mounted via `keyboard.ts`.
 
 	// Recompute the j/k navigation order from the live tree. Searches
 	// flatten to the result list while a query is active; otherwise we
-	// walk every section's files in display order. Done as a $derived
-	// so the order stays in sync with `researchStore`.
-	$effect(() => {
+	// walk every section's files in display order.
+	// Split into two effects to avoid effect_update_depth_exceeded:
+	// the first derives the order list (read-only), the second resets
+	// the cursor index (write-only) when the list shrinks.
+	const treeRowOrderDerived = $derived.by(() => {
 		const q = researchStore.searchQuery.trim();
 		if (q) {
-			treeRowOrder = researchStore.searchResults.map((r) => r.path);
-		} else {
-			const out: string[] = [];
-			for (const section of researchStore.tree?.sections ?? []) {
-				for (const file of section.files) out.push(file.path);
-			}
-			treeRowOrder = out;
+			return researchStore.searchResults.map((r) => r.path);
 		}
+		const out: string[] = [];
+		for (const section of researchStore.tree?.sections ?? []) {
+			for (const file of section.files) out.push(file.path);
+		}
+		return out;
+	});
+
+	$effect(() => {
+		treeRowOrder = treeRowOrderDerived;
+	});
+
+	$effect(() => {
 		// Reset the cursor when the underlying list shrinks past it.
-		if (treeRowIndex >= treeRowOrder.length) {
-			treeRowIndex = treeRowOrder.length > 0 ? 0 : -1;
+		if (treeRowIndex >= treeRowOrderDerived.length) {
+			treeRowIndex = treeRowOrderDerived.length > 0 ? 0 : -1;
 		}
 	});
 

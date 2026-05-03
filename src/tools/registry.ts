@@ -6,6 +6,8 @@ import type { RunRegistry } from '../runs/registry.ts';
 import type { RunContext } from '../runs/types.ts';
 import type { MCPManager } from '../mcp/manager.ts';
 import { createMcpSearchToolsTool } from '../mcp/meta-tools.ts';
+import { createDisabledProvider } from '../research/embeddings/disabled.js';
+import { ResearchStore } from '../research/store.ts';
 import type { ElefantError } from '../types/errors.ts';
 import { err, ok, type Result } from '../types/result.ts';
 import type { ParameterDefinition, ToolDefinition, ToolResult } from '../types/tools.ts';
@@ -28,6 +30,11 @@ import { createToolListTool } from './tool_list/index.js';
 import { webfetchTool } from './webfetch.js';
 import { websearchTool } from './websearch.js';
 import { writeTool } from './write.js';
+import { createResearchSearchTool } from './research_search/index.js';
+import { researchGrepTool } from './research_grep/index.js';
+import { createResearchReadTool } from './research_read/index.js';
+import { researchWriteTool, createResearchWriteTool } from './research_write/index.js';
+import { createResearchIndexTool } from './research_index/index.js';
 
 export const MAX_TOOL_OUTPUT_CHARS = 100_000;
 
@@ -180,18 +187,30 @@ export function validateToolArgs(
 export class ToolRegistry {
 	private readonly tools: Map<string, ToolDefinition<unknown, string>>;
 	private readonly hookRegistry: HookRegistry;
+	private currentAgentName?: string;
 
 	public constructor(hookRegistry: HookRegistry) {
 		this.tools = new Map<string, ToolDefinition<unknown, string>>();
 		this.hookRegistry = hookRegistry;
 	}
 
+	/**
+	 * Set the calling agent name for this registry instance. When set, the
+	 * registry enforces per-tool `allowedAgents` at the execute() boundary
+	 * before the tool's own execute() runs.
+	 */
+	public setCurrentAgentName(name: string): void {
+		this.currentAgentName = name;
+	}
+
 	public register<TParams, TResult>(tool: ToolDefinition<TParams, TResult>): void {
 		const normalized: ToolDefinition<unknown, string> = {
 			name: tool.name,
 			description: tool.description,
+			category: tool.category,
 			parameters: tool.parameters,
 			inputJSONSchema: tool.inputJSONSchema,
+			allowedAgents: tool.allowedAgents,
 			execute: async (params): Promise<Result<string, ElefantError>> => {
 				const result = await tool.execute(params as TParams)
 				if (!result.ok) {
@@ -224,6 +243,19 @@ export class ToolRegistry {
 		}
 
 		const tool = toolResult.data;
+
+		// Belt-and-suspenders: if the tool declares an allowed-agents list and
+		// the registry knows the calling agent, reject disallowed callers before
+		// hooks, validation, or tool execution run.
+		if (tool.allowedAgents && tool.allowedAgents.length > 0 && this.currentAgentName) {
+			if (!tool.allowedAgents.includes(this.currentAgentName)) {
+				return err({
+					code: 'PERMISSION_DENIED',
+					message: `Tool "${name}" is restricted to agents: ${tool.allowedAgents.join(', ')} (called by ${this.currentAgentName}).`,
+				});
+			}
+		}
+
 		const hookArgs = toHookArgs(args);
 		const conversationId = toConversationId(hookArgs);
 		const startedAt = Date.now();
@@ -335,6 +367,17 @@ export class ToolRegistry {
 	}
 }
 
+/**
+ * Resolve a project's absolute filesystem path from the daemon database.
+ * Used by createToolRegistryForRun to provide projectPath to research tools.
+ */
+function resolveProjectPath(database: Database, projectId: string): string {
+	const row = database.db
+		.query('SELECT path FROM projects WHERE id = ?')
+		.get(projectId) as { path: string } | undefined;
+	return row?.path ?? process.cwd();
+}
+
 export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 	const registry = new ToolRegistry(hookRegistry);
 	registry.register(readTool);
@@ -354,6 +397,15 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 	}
 	registry.register(skillTool);
 	registry.register(lspTool);
+	// Research Base tools — read-only tools available to all agents.
+	// See _shared/research-base-protocol.md for usage guidance.
+	registry.register(researchGrepTool);
+	registry.register(researchWriteTool);
+	registry.register(createResearchReadTool({ projectPath: process.cwd() }));
+	registry.register(createResearchSearchTool({ embeddingProvider: createDisabledProvider() }));
+	registry.register(createResearchIndexTool({
+		listDocuments: () => ok([]),
+	}));
 	// tool_list is registered last so it reflects the complete set, including
 	// any tools registered above it. Plugins that register tools after startup
 	// are also included since the factory closes over the live registry instance.
@@ -376,6 +428,9 @@ export interface ToolRegistryRunDeps {
 
 export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistry {
 	const registry = new ToolRegistry(deps.hookRegistry)
+	// Set the calling agent so the registry can enforce per-tool
+	// allowedAgents at the execute() boundary.
+	registry.setCurrentAgentName(deps.currentRun.agentType);
 
 	// Register all static tools (same list as createToolRegistry)
 	registry.register(readTool)
@@ -395,6 +450,29 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	}
 	registry.register(skillTool)
 	registry.register(lspTool)
+
+	// ── Research Base tools (per-run deps) ────────────────────────────────
+	// All agents get read-only research access; researcher/writer/librarian
+	// also get research_write (enforced via allowedAgents on the tool def
+	// and double-checked at the registry execute() boundary).
+	registry.register(researchGrepTool);
+	registry.register(researchWriteTool);
+	{
+		const projectPath = resolveProjectPath(deps.database, deps.currentRun.projectId);
+		registry.register(createResearchReadTool({ projectPath }));
+		registry.register(createResearchSearchTool({
+			embeddingProvider: createDisabledProvider(),
+			projectPath,
+			database: deps.database,
+			currentRun: deps.currentRun,
+		}));
+		// ResearchStore.open is a lazy-init — if the index DB hasn't been
+		// created yet the store opens cleanly with zero documents.
+		const storeResult = ResearchStore.open(projectPath);
+		if (storeResult.ok) {
+			registry.register(createResearchIndexTool(storeResult.data));
+		}
+	}
 
 	if (deps.sseManager) {
 		// Register task tool (needs per-run deps)

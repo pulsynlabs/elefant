@@ -16,7 +16,8 @@ export type ErrorCode =
   | 'STREAM_ERROR'
   | 'VALIDATION_ERROR'
   | 'INVALID_PHASE'
-  | 'TOOL_VETOED';
+  | 'TOOL_VETOED'
+  | 'VECTOR_DIM_MISMATCH';
 
 export interface ElefantError {
   code: ErrorCode;

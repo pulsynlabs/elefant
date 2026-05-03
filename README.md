@@ -75,6 +75,19 @@ Or use the Spec panel in the sidebar for a GUI-driven workflow.
 
 ---
 
+## Research Base
+
+Every Elefant project has a **Research Base** at `.elefant/markdown-db/` — a structured, agent-curated knowledge garden.
+
+- **Agents write here:** researcher, writer, and librarian agents save findings, comparisons, and reference notes as markdown with frontmatter.
+- **Searchable:** agents use `research_search` (semantic/hybrid) and `research_grep` (ripgrep) to query it.
+- **Browsable:** open the **Research View** in the Elefant sidebar to browse and read files.
+- **Powered by:** local embeddings via `@xenova/transformers` (no internet required by default), with pluggable providers including Ollama, OpenAI, and others.
+
+→ See [docs/research-base.md](docs/research-base.md) for full documentation.
+
+---
+
 ## Tech stack
 
 | Layer | Tech |

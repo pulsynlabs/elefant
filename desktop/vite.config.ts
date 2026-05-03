@@ -32,6 +32,7 @@ export default defineConfig(async () => ({
       '/health': { target: 'http://localhost:1337', ws: true },
       '/api': { target: 'http://localhost:1337', ws: true },
       '/tools': { target: 'http://localhost:1337', ws: true },
+      '/v1/research': { target: 'http://localhost:1337', ws: true },
     },
   },
 }));

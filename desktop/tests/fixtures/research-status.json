@@ -1,0 +1,22 @@
+{
+  "projectId": "test",
+  "provider": "bundled-cpu",
+  "providerIsLocal": true,
+  "embeddingDim": 384,
+  "vectorEnabled": true,
+  "recommendedTier": "bundled-cpu",
+  "hardware": {
+    "ramGB": 16,
+    "cpuCores": 8,
+    "hasGPU": false,
+    "hasNPU": false,
+    "platform": "linux",
+    "gpuName": null
+  },
+  "totalDocs": 1,
+  "totalChunks": 3,
+  "lastIndexedAt": "2026-05-03T10:00:00Z",
+  "driftCount": 0,
+  "diskSizeBytes": 204800,
+  "indexExists": true
+}
