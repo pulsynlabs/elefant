@@ -3,9 +3,9 @@
  * `.elefant/markdown-db/` relative paths.
  */
 
-import type { Result } from '../types/result.ts';
-import type { ElefantError } from '../types/errors.ts';
-import { ok, err } from '../types/result.ts';
+import type { Result } from '../types/result.js';
+import type { ElefantError } from '../types/errors.js';
+import { ok, err } from '../types/result.js';
 
 // ─── ResearchLink type ─────────────────────────────────────────────────────
 
