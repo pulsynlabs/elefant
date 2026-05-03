@@ -64,3 +64,19 @@ export interface ForkBranch {
 	/** ID of the branch active at fork time; null if forking from root */
 	parentBranchId: string | null;
 }
+
+/**
+ * Ephemeral state for a side-context session triggered by /btw.
+ * Lives only in memory on the chat store — never persisted to disk
+ * and never pushed into forkBranches. Restored to mainSnapshot on exit.
+ */
+export interface SideContext {
+	/** Snapshot of main-thread messages at entry (deep clone, restored on exit). */
+	mainSnapshot: ChatMessage[];
+	/** Side-context messages: starts as a clone of mainSnapshot, then user question + assistant reply append here. */
+	messages: ChatMessage[];
+	/** When the side context was entered. */
+	enteredAt: Date;
+	/** Original user question (the part after `/btw `). */
+	question: string;
+}
