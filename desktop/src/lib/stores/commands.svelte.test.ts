@@ -110,6 +110,19 @@ describe('commandsStore', () => {
 		expect(commandsStore.error).toMatch(/HTTP 500/);
 	});
 
+	it('fallback commands include /btw and /back', async () => {
+		// Force a failing fetch so the store falls back to FALLBACK_COMMANDS.
+		const fetchMock = mock(() =>
+			Promise.resolve(new Response('boom', { status: 500 })),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+		await commandsStore.load();
+		const triggers = commandsStore.commands.map((c) => c.trigger);
+		expect(triggers).toContain('/btw');
+		expect(triggers).toContain('/back');
+	});
+
 	it('load() surfaces malformed responses', async () => {
 		const fetchMock = mock(() =>
 			Promise.resolve(

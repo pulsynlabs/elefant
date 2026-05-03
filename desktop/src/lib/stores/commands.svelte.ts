@@ -32,6 +32,8 @@ const FALLBACK_COMMANDS: Command[] = [
 	{ trigger: '/debug', description: 'Debug with a systematic workflow' },
 	{ trigger: '/map-codebase', description: 'Map and understand an existing codebase' },
 	{ trigger: '/pr-review', description: 'Review a GitHub pull request end-to-end' },
+	{ trigger: '/btw', description: 'Ask a question in side context without polluting main history' },
+	{ trigger: '/back', description: 'Return to the main conversation from side context' },
 ];
 
 let commands = $state<Command[]>([]);
