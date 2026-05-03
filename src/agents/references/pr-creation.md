@@ -107,8 +107,8 @@ filtering, and section extraction.
 
 ## Notes
 
-- The legacy `wf_reference` tool (SpecReferenceTool) continues to work
-  without changes; unification is planned for a follow-up PR
+- The reference tool is the single supported interface for loading references;
+  no legacy spec-mode reference alias is retained
 - Reference files use a flat layout (`name.md`) unlike skills which use
   directory-based layout (`name/SKILL.md`)
 - No new runtime dependencies were added
@@ -155,7 +155,8 @@ Adds a reference tool for loading bundled markdown guidance files.
 
 ## Notes
 
-No breaking changes. Legacy wf_reference continues to work.
+Breaking change: the previous spec-mode reference alias has been removed; use the
+global `reference` tool instead.
 EOF
 )"
 ```

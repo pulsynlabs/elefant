@@ -44,7 +44,7 @@ function registry(...tools: ToolDefinition[]): ToolInventorySource {
 	return { getAll: () => tools }
 }
 
-// All 10 wf_* tools per MH4 rename spec
+// All workflow tools registered for Spec Mode.
 const WF_TOOLS: ToolDefinition[] = [
 	tool('wf_status', 'Check current workflow phase and status'),
 	tool('wf_state', 'Transition workflow state, lock or unlock spec'),
@@ -55,7 +55,6 @@ const WF_TOOLS: ToolDefinition[] = [
 	tool('wf_chronicle', 'Append to or read from the CHRONICLE log'),
 	tool('wf_adl', 'Manage the architectural decision log'),
 	tool('wf_checkpoint', 'Save, load, or list execution checkpoints'),
-	tool('wf_reference', 'List or load reference markdown resources'),
 ]
 
 const INTERACTIVE_TOOLS: ToolDefinition[] = [
@@ -153,7 +152,7 @@ describe('buildToolInventorySection', () => {
 	// Category placement
 	// -----------------------------------------------------------------------
 
-	it('places all 10 wf_* tools under the Workflow category', () => {
+	it('places all wf_* tools under the Workflow category', () => {
 		const result = buildToolInventorySection(registry(...WF_TOOLS))
 
 		// Every wf_ tool should appear after the Workflow heading and before

@@ -22,6 +22,7 @@ import { createInteractiveTools } from './interactive/index.js';
 import { readTool } from './read.js';
 import { bashTool } from './shell/index.js';
 import { skillTool } from './skill/index.js';
+import { referenceTool } from './reference/index.js';
 import { createSpecToolContext, createSpecTools } from './workflow/index.ts';
 import { createTaskTool, type TaskToolDeps } from './task/index.js';
 import type { MetadataEmitter } from './task/metadata-emitter.js';
@@ -396,6 +397,7 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 		registry.register(tool);
 	}
 	registry.register(skillTool);
+	registry.register(referenceTool);
 	registry.register(lspTool);
 	// Research Base tools — read-only tools available to all agents.
 	// See _shared/research-base-protocol.md for usage guidance.
@@ -449,6 +451,7 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 		registry.register(tool)
 	}
 	registry.register(skillTool)
+	registry.register(referenceTool)
 	registry.register(lspTool)
 
 	// ── Research Base tools (per-run deps) ────────────────────────────────

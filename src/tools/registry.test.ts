@@ -5,7 +5,7 @@ import type { ToolDefinition } from '../types/tools.ts'
 import { createToolRegistry, createToolRegistryForRun, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all 21 tools including research_* tools', () => {
+	it('registers all 22 tools including research_* tools', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
@@ -18,6 +18,7 @@ describe('ToolRegistry', () => {
 			'lsp',
 			'question',
 			'read',
+			'reference',
 			'research_grep',
 			'research_index',
 			'research_read',
@@ -32,7 +33,7 @@ describe('ToolRegistry', () => {
 			'websearch',
 			'write',
 		])
-		expect(names.length).toBe(21)
+		expect(names.length).toBe(22)
 	})
 
 	it('execute() calls the matching tool', async () => {

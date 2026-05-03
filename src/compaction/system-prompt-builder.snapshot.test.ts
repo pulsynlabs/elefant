@@ -12,7 +12,7 @@ import type { SkillInfo } from '../tools/skill/resolver.ts';
 
 // ---------------------------------------------------------------------------
 // Realistic mock ToolRegistry — reflects the CURRENT set of tools registered
-// by createToolRegistryForRun() (src/tools/registry.ts), including all 10
+// by createToolRegistryForRun() (src/tools/registry.ts), including all
 // wf_* workflow tools, interactive tools, filesystem tools, and misc.
 // ---------------------------------------------------------------------------
 
@@ -28,7 +28,7 @@ function tool(name: string, description: string, category?: string): ToolDefinit
 
 const mockRegistry: Pick<ToolRegistry, 'getAll'> = {
 	getAll: (): ToolDefinition[] => [
-		// ---- Workflow tools (10) ----
+		// ---- Workflow tools ----
 		tool('wf_status', 'Read the active Spec Mode workflow status with an invariant payload shape.'),
 		tool('wf_state', 'Read or mutate Spec Mode workflow state through StateManager operations.'),
 		tool('wf_workflow', 'List, create, or activate Spec Mode workflows for a project.'),
@@ -38,8 +38,6 @@ const mockRegistry: Pick<ToolRegistry, 'getAll'> = {
 		tool('wf_chronicle', 'Append to or read from the Spec Mode CHRONICLE log.'),
 		tool('wf_adl', 'Append to or read from the Spec Mode architectural decision log.'),
 		tool('wf_checkpoint', 'Save, load, or list workflow checkpoints stored in CHRONICLE entries.'),
-		tool('wf_reference', 'List, load, or extract sections from bundled reference markdown resources.'),
-
 		// ---- Interactive tools (2) ----
 		tool('question', 'Ask the user a structured question with options. Returns the selected option label(s).'),
 		tool('slider', 'Present a slider to the user to collect a numeric value. The user adjusts the slider and submits a value.'),

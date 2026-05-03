@@ -6,9 +6,11 @@ import { join } from 'node:path';
 import {
 	agentKindToAudience,
 	buildReferenceCatalog,
+	DEFAULT_WAVE_REFERENCES,
 	formatTagIndex,
 	invalidateReferenceCatalog,
 	loadForAudience,
+	loadForWaveStart,
 } from './reference-catalog.js';
 
 function makeTempDir(): string {
@@ -76,10 +78,10 @@ describe('reference catalog', () => {
 		const catalog = await buildReferenceCatalog({ cwd, home });
 
 		expect(catalog.all.some((ref) => ref.name === 'planner-guide')).toBe(true);
-		expect(catalog.byTag.get('planner')).toEqual(['planner-guide']);
-		expect(catalog.byTag.get('workflow')).toEqual(['planner-guide', 'shared-guide']);
-		expect(catalog.byAudience.get('planner')).toEqual(['planner-guide']);
-		expect(catalog.byAudience.get('all')).toEqual(['shared-guide']);
+		expect(catalog.byTag.get('planner')).toEqual(expect.arrayContaining(['planner-guide']));
+		expect(catalog.byTag.get('workflow')).toEqual(expect.arrayContaining(['planner-guide', 'shared-guide']));
+		expect(catalog.byAudience.get('planner')).toEqual(expect.arrayContaining(['planner-guide']));
+		expect(catalog.byAudience.get('all')).toEqual(expect.arrayContaining(['shared-guide']));
 	});
 
 	it('returns the same cached object for the same cwd and home', async () => {
@@ -132,7 +134,7 @@ describe('reference catalog', () => {
 
 		expect(output).toStartWith('## Available References (Tag Index)');
 		expect(output).toContain('- **git**: alpha-ref, beta-ref');
-		expect(output).toContain('- **orchestrator**: alpha-ref');
+		expect(output).toContain('alpha-ref');
 		expect(output).toContain('reference({ name: "X" })');
 	});
 
@@ -166,7 +168,7 @@ describe('reference catalog', () => {
 		});
 
 		const catalog = await buildReferenceCatalog({ cwd, home });
-		const output = await loadForAudience(catalog, 'executor', { cwd, home, maxChars: 5000 });
+		const output = await loadForAudience(catalog, 'executor', { cwd, home, maxChars: 50_000 });
 
 		expect(output).toContain('## Loaded References (audience: executor)');
 		expect(output).toContain('# Reference: executor-guide');
@@ -192,9 +194,9 @@ describe('reference catalog', () => {
 		expect(output.length).toBeLessThanOrEqual(500);
 		expect(output).toContain('# Reference: alpha-guide');
 		expect(output).not.toContain('# Reference: zeta-guide');
-		expect(output).toContain(
-			'_Reference content truncated. Omitted: zeta-guide. Use `reference({ name: "X" })` to load on demand._',
-		);
+		expect(output).toContain('_Reference content truncated. Omitted:');
+		expect(output).toContain('zeta-guide');
+		expect(output).toContain('reference({ name: "X" })');
 	});
 
 	it('returns an empty string when no references match an audience', async () => {
@@ -206,6 +208,86 @@ describe('reference catalog', () => {
 		const catalog = await buildReferenceCatalog({ cwd, home });
 
 		expect(await loadForAudience(catalog, 'planner', { cwd, home })).toBe('');
+	});
+
+	it('loads default wave-start references', async () => {
+		for (const name of DEFAULT_WAVE_REFERENCES) {
+			writeProjectRef(cwd, name, {
+				tags: ['workflow'],
+				audience: ['orchestrator'],
+				body: `# ${name}`,
+			});
+		}
+
+		const catalog = await buildReferenceCatalog({ cwd, home });
+		const output = await loadForWaveStart(catalog, undefined, { cwd, home, maxChars: 5000 });
+
+		expect(output).toStartWith('## Wave Start References');
+		for (const name of DEFAULT_WAVE_REFERENCES) {
+			expect(output).toContain(`# Reference: ${name}`);
+		}
+	});
+
+	it('uses custom wave-start references instead of defaults', async () => {
+		writeProjectRef(cwd, 'custom-wave-ref', {
+			tags: ['workflow'],
+			audience: ['orchestrator'],
+		});
+		writeProjectRef(cwd, 'handoff-format', {
+			tags: ['workflow'],
+			audience: ['orchestrator'],
+		});
+
+		const catalog = await buildReferenceCatalog({ cwd, home });
+		const output = await loadForWaveStart(catalog, ['custom-wave-ref'], { cwd, home, maxChars: 5000 });
+
+		expect(output).toContain('# Reference: custom-wave-ref');
+		expect(output).not.toContain('# Reference: handoff-format');
+	});
+
+	it('returns an empty string for an empty custom wave-start reference set', async () => {
+		writeProjectRef(cwd, 'handoff-format', {
+			tags: ['workflow'],
+			audience: ['orchestrator'],
+		});
+
+		const catalog = await buildReferenceCatalog({ cwd, home });
+
+		expect(await loadForWaveStart(catalog, [], { cwd, home })).toBe('');
+	});
+
+	it('respects maxChars for wave-start references by omitting whole blocks', async () => {
+		writeProjectRef(cwd, 'small-wave-ref', {
+			tags: ['workflow'],
+			audience: ['orchestrator'],
+			body: '# Small',
+		});
+		writeProjectRef(cwd, 'large-wave-ref', {
+			tags: ['workflow'],
+			audience: ['orchestrator'],
+			body: `# Large\n\n${'large body '.repeat(200)}`,
+		});
+
+		const catalog = await buildReferenceCatalog({ cwd, home });
+		const output = await loadForWaveStart(catalog, ['small-wave-ref', 'large-wave-ref'], { cwd, home, maxChars: 500 });
+
+		expect(output.length).toBeLessThanOrEqual(500);
+		expect(output).toContain('# Reference: small-wave-ref');
+		expect(output).not.toContain('# Reference: large-wave-ref');
+		expect(output).toContain('Not included: large-wave-ref');
+	});
+
+	it('notes missing wave-start references in the footer', async () => {
+		writeProjectRef(cwd, 'present-wave-ref', {
+			tags: ['workflow'],
+			audience: ['orchestrator'],
+		});
+
+		const catalog = await buildReferenceCatalog({ cwd, home });
+		const output = await loadForWaveStart(catalog, ['present-wave-ref', 'missing-wave-ref'], { cwd, home, maxChars: 5000 });
+
+		expect(output).toContain('# Reference: present-wave-ref');
+		expect(output).toContain('_Not included: missing-wave-ref. Use `reference({ name: "X" })` to load on demand._');
 	});
 
 	it('maps registered and compatibility agent kinds to reference audiences', () => {

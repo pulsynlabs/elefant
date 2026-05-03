@@ -12,6 +12,16 @@ export interface ReferenceCatalog {
 	byAudience: Map<string, string[]>;
 }
 
+/**
+ * Default reference set injected at wave start in spec mode.
+ * Override by passing a custom set in wave metadata.
+ */
+export const DEFAULT_WAVE_REFERENCES = [
+	'handoff-format',
+	'deviation-rules',
+	'wave-execution',
+];
+
 let catalogCache: ReferenceCatalog | null = null;
 let cacheKey: string | null = null;
 
@@ -201,8 +211,84 @@ export async function loadForAudience(
 	return output;
 }
 
+/**
+ * Load references for a wave start context.
+ *
+ * Elefant has a `wave:started` lifecycle event, but that event currently has
+ * no prompt-context mutation channel. Until a consumer is added, orchestrators
+ * should call this helper explicitly when assembling wave-start spec-mode
+ * execution prompts. Passing `customRefs` replaces the default reference set;
+ * pass an empty array to disable wave-start reference content.
+ *
+ * @param catalog - Pre-built reference catalog
+ * @param customRefs - Optional override set (replaces default when provided)
+ * @param opts - Resolver options
+ */
+export async function loadForWaveStart(
+	catalog: ReferenceCatalog,
+	customRefs?: string[],
+	opts: { cwd?: string; home?: string; maxChars?: number } = {},
+): Promise<string> {
+	void catalog;
+	const maxChars = opts.maxChars ?? 4000;
+	const refs = customRefs ?? DEFAULT_WAVE_REFERENCES;
+
+	if (refs.length === 0) return '';
+
+	const { resolveReference } = await import('../tools/reference/resolver.js');
+	const { formatReferenceBlock, REFERENCE_SEPARATOR } = await import(
+		'../tools/reference/format.js'
+	);
+
+	const header = '## Wave Start References\n\n';
+	const parts: Array<{ name: string; block: string }> = [];
+	const missing: string[] = [];
+
+	for (const name of refs) {
+		const result = await resolveReference(name, { cwd: opts.cwd, home: opts.home });
+		if (!result) {
+			missing.push(name);
+			continue;
+		}
+
+		const block = formatReferenceBlock(name, result.source, result.content);
+		const candidateParts = [...parts.map((part) => part.block), block];
+		const candidate = header + candidateParts.join(REFERENCE_SEPARATOR);
+
+		if (candidate.length > maxChars) {
+			missing.push(name);
+			continue;
+		}
+
+		parts.push({ name, block });
+	}
+
+	if (parts.length === 0) return '';
+
+	let output = header + parts.map((part) => part.block).join(REFERENCE_SEPARATOR);
+	while (missing.length > 0) {
+		const footer = notIncludedFooter(missing);
+		if (output.length + footer.length <= maxChars) {
+			output += footer;
+			break;
+		}
+
+		const dropped = parts.pop();
+		if (!dropped) return '';
+		missing.unshift(dropped.name);
+		output = header + parts.map((part) => part.block).join(REFERENCE_SEPARATOR);
+		if (parts.length === 0) return '';
+	}
+
+	return output;
+}
+
 function truncationFooter(omitted: string[]): string {
 	return `\n\n_Reference content truncated. Omitted: ${omitted.join(
 		', ',
 	)}. Use \`reference({ name: "X" })\` to load on demand._`;
+}
+
+function notIncludedFooter(missing: string[]): string {
+	return `\n\n_Not included: ${missing.join(', ')}. Use \`reference({ name: "X" })\` to load on demand._`;
 }
