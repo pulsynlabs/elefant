@@ -19,20 +19,22 @@ export interface ReferenceParams {
   cwd?: string;
 }
 
-// ── Frontmatter type placeholder (filled in by Wave 2, Task 2.1) ───────────
+// ── Frontmatter schema ─────────────────────────────────────────────────────
 
-/**
- * YAML frontmatter fields expected on every reference file.
- * Wave 2 will replace this placeholder with a Zod-validated schema.
- */
-export interface ReferenceFrontmatter {
-  id: string;
-  title: string;
-  description: string;
-  tags: string[];
-  audience: string[];
-  version?: string;
-}
+import { z } from 'zod';
+
+export const ReferenceFrontmatterSchema = z.object({
+  id: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Must be kebab-case'),
+  title: z.string().min(1).max(200),
+  description: z.string().min(1).max(500),
+  tags: z.array(z.string()).default([]),
+  audience: z.array(z.string()).default([]),
+  version: z.string().optional(),
+}).strict();
+
+export type ReferenceFrontmatter = z.infer<typeof ReferenceFrontmatterSchema>;
 
 // ── Re-export ReferenceInfo from the resolver ─────────────────────────────
 export type { ReferenceInfo } from './resolver.js';
