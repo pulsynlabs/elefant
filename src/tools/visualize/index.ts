@@ -20,6 +20,7 @@ export function createVisualizeTool(): ToolDefinition<VisualizeParams, Visualize
 	return {
 		name: 'visualize',
 		description: VISUALIZE_DESCRIPTION,
+		allowedAgents: ['orchestrator'],
 		parameters: {
 			type: {
 				type: 'string',
@@ -58,26 +59,25 @@ export function createVisualizeTool(): ToolDefinition<VisualizeParams, Visualize
 			if (!topResult.success) {
 				return invalidResult(`Invalid visualize params: ${topResult.error.message}`)
 			}
+			const { type, data, intent, title } = topResult.data
 
 			const dataResult = VizPayloadSchema.safeParse({
-				type: topResult.data.type,
-				...topResult.data.data,
+				type,
+				...data,
 			})
 			if (!dataResult.success) {
-				return invalidResult(`Invalid viz data for type "${topResult.data.type}": ${dataResult.error.message}`)
+				return invalidResult(`Invalid viz data for type "${type}": ${dataResult.error.message}`)
 			}
 
-			const vizType: VizType = dataResult.data.type
 			const envelope: VizEnvelope = {
 				id: crypto.randomUUID(),
-				type: vizType,
-				intent: topResult.data.intent,
-				title: topResult.data.title,
+				type: type as VizType,
+				intent,
+				title,
 				data: dataResult.data,
 			}
-			void envelope
 
-			throw new Error('not implemented')
+			return ok({ content: JSON.stringify(envelope), isError: false })
 		},
 	}
 }
