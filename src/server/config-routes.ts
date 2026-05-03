@@ -7,6 +7,7 @@ import {
 	agentProfileSchema,
 	configSchema,
 	providerSchema,
+	researchConfigSchema,
 	ConfigManager,
 	type AgentProfile,
 	type ConfigError,
@@ -216,6 +217,7 @@ export function createConfigRoutes<TApp extends Elysia>(
 				defaultProvider: z.string().min(1).optional(),
 				logLevel: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 				compactionThreshold: z.number().min(0.5).max(0.95).optional(),
+				research: researchConfigSchema.partial().optional(),
 			})
 			.strict();
 
@@ -235,17 +237,29 @@ export function createConfigRoutes<TApp extends Elysia>(
 			return { ok: false, error: 'No config file found — create a provider first' };
 		}
 
+		// Merge research block — incoming patch is shallow-merged onto existing
+		// research config. providerConfig is treated atomically (replace, not merge)
+		// so callers can fully reset provider-specific fields by sending an empty
+		// object or undefined.
+		const mergedResearch = parsed.data.research !== undefined
+			? {
+				...existing.research,
+				...parsed.data.research,
+			}
+			: existing.research;
+
 		const updated: ElefantConfig = {
 			...existing,
 			...(parsed.data.port !== undefined ? { port: parsed.data.port } : {}),
 			...(parsed.data.defaultProvider !== undefined
 				? { defaultProvider: parsed.data.defaultProvider }
 				: {}),
-		...(parsed.data.logLevel !== undefined ? { logLevel: parsed.data.logLevel } : {}),
-		...(parsed.data.compactionThreshold !== undefined
-			? { compactionThreshold: parsed.data.compactionThreshold }
-			: {}),
-	};
+			...(parsed.data.logLevel !== undefined ? { logLevel: parsed.data.logLevel } : {}),
+			...(parsed.data.compactionThreshold !== undefined
+				? { compactionThreshold: parsed.data.compactionThreshold }
+				: {}),
+			...(parsed.data.research !== undefined ? { research: mergedResearch } : {}),
+		};
 
 		await writeConfigFile(updated);
 		providerRouter.reload(updated);

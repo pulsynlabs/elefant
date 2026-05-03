@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EmbeddingProviderNameSchema } from "../research/embeddings/provider.ts";
 
 const providerSchema = z.object({
 	name: z.string().min(1),
@@ -106,6 +107,20 @@ const registryConfigSchema = z.discriminatedUnion('type', [
 	}),
 ]);
 
+const researchProviderConfigSchema = z.object({
+	baseUrl: z.string().optional(),
+	apiKey: z.string().optional(),
+	model: z.string().optional(),
+	bundledModelId: z.string().optional(),
+}).strict();
+
+const researchConfigSchema = z.object({
+	enabled: z.boolean().default(true),
+	provider: EmbeddingProviderNameSchema.default('bundled-cpu'),
+	editorOverride: z.string().optional(),
+	providerConfig: researchProviderConfigSchema.optional(),
+}).strict();
+
 const skillsConfigSchema = z.object({
 	registries: z.array(registryConfigSchema).default([
 		{ type: 'clawhub' as const, url: 'https://clawhub.com', enabled: true },
@@ -141,6 +156,10 @@ const configSchema = z.object({
 	skills: skillsConfigSchema.optional().default({
 		registries: BUNDLED_REGISTRIES,
 		cacheTtlHours: 24,
+	}),
+	research: researchConfigSchema.optional().default({
+		enabled: true,
+		provider: 'bundled-cpu',
 	}),
 }).strict();
 
@@ -195,6 +214,8 @@ export {
 	mcpRemoteConfigSchema,
 	registryConfigSchema,
 	skillsConfigSchema,
+	researchProviderConfigSchema,
+	researchConfigSchema,
 	BUNDLED_REGISTRIES,
 };
 export type ElefantConfig = z.infer<typeof configSchema>;
@@ -210,3 +231,5 @@ export type McpStdioConfig = z.infer<typeof mcpStdioConfigSchema>;
 export type McpRemoteConfig = z.infer<typeof mcpRemoteConfigSchema>;
 export type RegistryConfig = z.infer<typeof registryConfigSchema>;
 export type SkillsConfig = z.infer<typeof skillsConfigSchema>;
+export type ResearchProviderConfig = z.infer<typeof researchProviderConfigSchema>;
+export type ResearchConfig = z.infer<typeof researchConfigSchema>;

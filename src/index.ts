@@ -8,3 +8,4 @@ export type { AgentRunRow, AgentRunStatus, AgentRunContextMode, RunContext, Agen
 export { RunRegistry } from './runs/registry.ts'
 export type { WorktreeSummary, WorktreeError } from './worktree/types.ts'
 export { MCPManager } from './mcp/manager.ts'
+export * as research from './research/index.ts'

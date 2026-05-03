@@ -1,0 +1,63 @@
+{
+  "sections": [
+    {
+      "name": "01-domain",
+      "label": "Domain",
+      "files": [
+        {
+          "name": "sqlite-vec-notes.md",
+          "path": "01-domain/sqlite-vec-notes.md",
+          "title": "SQLite-Vec Notes",
+          "summary": "Notes on sqlite-vec integration for vector search",
+          "tags": ["sqlite", "vector-search", "integration"],
+          "confidence": "high",
+          "updated": "2026-05-01T10:00:00Z",
+          "research_link": "research://project-1/01-domain/sqlite-vec-notes.md"
+        }
+      ]
+    },
+    {
+      "name": "02-tech",
+      "label": "Tech",
+      "files": [
+        {
+          "name": "opencode-analysis.md",
+          "path": "02-tech/opencode-analysis.md",
+          "title": "OpenCode Analysis",
+          "summary": "Deep dive into OpenCode architecture",
+          "tags": ["opencode", "architecture", "agent"],
+          "confidence": "high",
+          "updated": "2026-05-02T14:30:00Z",
+          "research_link": "research://project-1/02-tech/opencode-analysis.md"
+        },
+        {
+          "name": "goopspec-research.md",
+          "path": "02-tech/goopspec-research.md",
+          "title": "GoopSpec Research",
+          "summary": "GoopSpec plugin architecture analysis",
+          "tags": ["goopspec", "plugin", "orchestration"],
+          "confidence": "medium",
+          "updated": "2026-05-01T08:00:00Z",
+          "research_link": "research://project-1/02-tech/goopspec-research.md"
+        }
+      ]
+    },
+    {
+      "name": "05-synthesis",
+      "label": "Synthesis",
+      "files": [
+        {
+          "name": "master-synthesis.md",
+          "path": "05-synthesis/master-synthesis.md",
+          "title": "Master Synthesis",
+          "summary": "Strategic synthesis of all research findings",
+          "tags": ["synthesis", "strategy", "planning"],
+          "confidence": "high",
+          "updated": "2026-05-03T09:00:00Z",
+          "research_link": "research://project-1/05-synthesis/master-synthesis.md"
+        }
+      ]
+    }
+  ],
+  "lastRefreshed": "2026-05-03T12:00:00Z"
+}

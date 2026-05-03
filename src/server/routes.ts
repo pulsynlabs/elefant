@@ -9,6 +9,7 @@ import { createConfigRoutes } from './config-routes.ts'
 import { ConfigManager } from '../config/index.ts'
 import { getProjectById } from '../db/repo/projects.ts'
 import { err, ok } from '../types/result.ts'
+import { mountResearchRoutes } from './routes-research.ts'
 
 export function registerServerRoutes(
 	app: Elysia,
@@ -30,6 +31,7 @@ export function registerServerRoutes(
 	})
 
 	createConfigRoutes(app as unknown as Elysia, providerRouter, configManager)
+	mountResearchRoutes(app, db)
 	return createConversationRoute(app, providerRouter, toolRegistry, hookRegistry, runDeps)
 }
 

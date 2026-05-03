@@ -26,8 +26,17 @@ the throttle for a synchronous first paint.
 	import { onDestroy, untrack } from 'svelte';
 	import SvelteMarkdown, { buildUnsupportedHTML } from '@humanspeak/svelte-markdown';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import ResearchChip from './ResearchChip.svelte';
 	import { sanitizeUrl } from './url-sanitizer.js';
 	import { splitAtOpenFence } from './markdown-stream.js';
+	import {
+		autoLinkResearchRefs,
+		RESEARCH_LINK_REGEX,
+	} from './markdown-autolinker.js';
+
+	// Reusable single-match regex (the global one above mutates lastIndex
+	// so it can't be used directly inside the link-snippet predicate).
+	const RESEARCH_LINK_TEST = new RegExp(RESEARCH_LINK_REGEX.source);
 
 	type Props = {
 		source: string;
@@ -48,6 +57,26 @@ the throttle for a synchronous first paint.
 	// Everything before the open fence is rendered as markdown, and the
 	// trailing unclosed fence is rendered as plain <pre> until it closes.
 	const split = $derived(splitAtOpenFence(displayedSource));
+
+	// Pre-process the markdown source so bare research:// URIs become
+	// real anchors that the link snippet can intercept and replace with
+	// a ResearchChip. Skipped for the partial trailing chunk because
+	// streamed text might split a URI mid-character.
+	const linkedMarkdown = $derived(autoLinkResearchRefs(split.markdown));
+
+	function isResearchHref(href: string | undefined | null): boolean {
+		if (!href) return false;
+		return RESEARCH_LINK_TEST.test(href);
+	}
+
+	function extractText(value: unknown): string {
+		// svelte-markdown link labels arrive as either a plain string
+		// (when the visible text equals the href, our autolinker case)
+		// or a snippet renderer. We only need the plain-text fast path
+		// here because the autolinker always emits `[uri](uri)`.
+		if (typeof value === 'string') return value;
+		return '';
+	}
 
 	let pendingFrame: number | null = null;
 	let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -128,7 +157,7 @@ the throttle for a synchronous first paint.
 
 <div class="markdown">
 	<SvelteMarkdown
-		source={split.markdown}
+		source={linkedMarkdown}
 		{streaming}
 		{renderers}
 		sanitizeUrl={sanitize}
@@ -142,18 +171,30 @@ the throttle for a synchronous first paint.
 			<code class="inline-code">{text ?? ''}</code>
 		{/snippet}
 
-		{#snippet link({ href, title, children })}
-			<a
-				href={sanitize(href ?? '')}
-				{title}
-				target="_blank"
-				rel="noopener noreferrer"
-				class="markdown-link"
-			>
-				{#if children}
-					{@render children()}
-				{/if}
-			</a>
+		{#snippet link({ href, title, children, text })}
+			{#if isResearchHref(href)}
+				<!--
+					Research chips intercept the normal anchor render
+					path. The visible label may either be the URI itself
+					(autolinked case) or an explicit `[label](uri)` from
+					the agent. We pass either through to ResearchChip so
+					it can prefer the label and fall back to a fetched
+					title.
+				-->
+				<ResearchChip uri={href!} label={extractText(text) || undefined} />
+			{:else}
+				<a
+					href={sanitize(href ?? '')}
+					{title}
+					target="_blank"
+					rel="noopener noreferrer"
+					class="markdown-link"
+				>
+					{#if children}
+						{@render children()}
+					{/if}
+				</a>
+			{/if}
 		{/snippet}
 
 		{#snippet image({ text })}

@@ -1,0 +1,20 @@
+{
+  "projectId": "project-1",
+  "provider": "bundled-cpu",
+  "providerIsLocal": true,
+  "embeddingDim": 384,
+  "vectorEnabled": true,
+  "recommendedTier": "bundled-gpu",
+  "hardware": {
+    "cpuCores": 8,
+    "ramGB": 32,
+    "hasGPU": true,
+    "gpuName": "Apple M2 Pro"
+  },
+  "totalDocs": 42,
+  "totalChunks": 156,
+  "lastIndexedAt": "2026-05-03T08:00:00Z",
+  "driftCount": 2,
+  "diskSizeBytes": 4194304,
+  "indexExists": true
+}

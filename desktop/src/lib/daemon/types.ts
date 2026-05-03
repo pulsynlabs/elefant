@@ -138,12 +138,143 @@ export interface ProviderEntry {
 	format: ProviderFormat;
 }
 
+export type EmbeddingProviderName =
+	| 'bundled-cpu'
+	| 'bundled-gpu'
+	| 'bundled-large'
+	| 'ollama'
+	| 'lm-studio'
+	| 'vllm'
+	| 'openai'
+	| 'openai-compatible'
+	| 'google'
+	| 'disabled';
+
+export interface ResearchProviderConfig {
+	baseUrl?: string;
+	apiKey?: string;
+	model?: string;
+	bundledModelId?: string;
+}
+
+export interface ResearchConfig {
+	enabled: boolean;
+	provider: EmbeddingProviderName;
+	editorOverride?: string;
+	providerConfig?: ResearchProviderConfig;
+}
+
 export interface ElefantConfig {
 	port: number;
 	providers: ProviderEntry[];
 	defaultProvider: string;
 	logLevel: LogLevel;
 	hardwareAccelerationDisabled?: boolean;
+	research?: ResearchConfig;
+}
+
+export interface ResearchHardwareProfile {
+	ramGB: number;
+	cpuCores: number;
+	hasGPU: boolean;
+	hasNPU: boolean;
+	platform: 'linux' | 'darwin' | 'win32' | 'other';
+	gpuName: string | null;
+}
+
+export type RecommendedTier = 'bundled-large' | 'bundled-gpu' | 'bundled-cpu';
+
+export interface ResearchStatus {
+	projectId: string;
+	provider: EmbeddingProviderName;
+	providerIsLocal: boolean;
+	embeddingDim: number;
+	vectorEnabled: boolean;
+	recommendedTier: RecommendedTier | null;
+	hardware: ResearchHardwareProfile | null;
+	totalDocs: number;
+	totalChunks: number;
+	lastIndexedAt: string | null;
+	driftCount: number;
+	diskSizeBytes: number;
+	indexExists: boolean;
+}
+
+// ─── Research tree, file, and search shapes ─────────────────────────────────
+//
+// Mirror the payloads served by `src/server/routes-research.ts`. Frontmatter
+// is a permissive shape because the canonical Zod-validated definition lives
+// in the daemon and the desktop only needs a handful of fields.
+
+export interface ResearchFrontmatter {
+	id?: string | null;
+	title?: string;
+	section?: string;
+	tags?: string[];
+	sources?: string[];
+	confidence?: 'high' | 'medium' | 'low' | string;
+	created?: string;
+	updated?: string;
+	author_agent?: string;
+	workflow?: string | null;
+	summary?: string;
+	[key: string]: unknown;
+}
+
+export interface ResearchTreeFile {
+	name: string;
+	/** Section-relative path, e.g. `02-tech/sqlite-vec.md`. */
+	path: string;
+	title: string;
+	summary: string;
+	tags: string[];
+	confidence: string;
+	updated: string;
+	research_link: string;
+}
+
+export interface ResearchTreeSection {
+	/** Folder name, e.g. `02-tech`. */
+	name: string;
+	/** Human label, e.g. `Tech`. */
+	label: string;
+	files: ResearchTreeFile[];
+}
+
+export interface ResearchTree {
+	sections: ResearchTreeSection[];
+	/** ISO-8601 timestamp of when the tree was assembled. */
+	lastRefreshed: string;
+}
+
+export interface ResearchFile {
+	path: string;
+	frontmatter: ResearchFrontmatter;
+	/** Sanitized HTML rendered by the daemon. Empty when `meta=true`. */
+	html: string;
+	rawBody: string;
+	research_link: string;
+}
+
+export interface ResearchSearchResult {
+	path: string;
+	section: string;
+	title: string;
+	summary: string;
+	score: number;
+	snippet: string;
+	frontmatter: ResearchFrontmatter;
+	research_link: string;
+}
+
+export type ResearchSearchMode = 'semantic' | 'keyword' | 'hybrid';
+
+export interface ResearchSearchOptions {
+	k?: number;
+	section?: string;
+	tags?: string[];
+	mode?: ResearchSearchMode;
+	minScore?: number;
 }
 
 /** A single model entry within a provider's model list. */

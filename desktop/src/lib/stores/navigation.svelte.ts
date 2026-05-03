@@ -1,4 +1,4 @@
-type View = "chat" | "settings" | "models" | "about" | "projects" | "agent-config" | "agent-runs" | "worktrees" | "child-run" | "spec-mode";
+type View = "chat" | "settings" | "models" | "about" | "projects" | "agent-config" | "agent-runs" | "worktrees" | "child-run" | "spec-mode" | "research";
 
 let currentView = $state<View>("projects");
 
@@ -94,6 +94,13 @@ export const navigationStore = {
 			return;
 		}
 		currentView = "spec-mode";
+	},
+	goToResearch(): void {
+		if (_getActiveProjectId?.() === null) {
+			currentView = "projects";
+			return;
+		}
+		currentView = "research";
 	},
 	/** Open a child run: push onto stack and switch to child-run view (MH2) */
 	openChildRun,

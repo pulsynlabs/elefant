@@ -12,6 +12,17 @@ export interface ToolDefinition<TParams = unknown, TResult = string> {
   category?: string;
   parameters: Record<string, ParameterDefinition>;
   inputJSONSchema?: unknown;
+  /**
+   * Restrict tool execution to specific agent types. When set, the registry
+   * checks the calling agent's type against this list before invoking
+   * execute(). If the agent is not allowed, PERMISSION_DENIED is returned
+   * before the tool's own execute() runs.
+   *
+   * Tools that handle their own permission checks internally (e.g.
+   * research_write) SHOULD also set this field as a belt-and-suspenders
+   * guard at the registry boundary.
+   */
+  allowedAgents?: string[];
   execute: (params: TParams) => Promise<Result<TResult, ElefantError>>;
 }
 
