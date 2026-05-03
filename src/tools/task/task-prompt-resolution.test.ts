@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it } from 'bun:test'
 
 import { defaultAgentProfiles, type AgentProfile } from '../../config/index.ts'
 import { ok, err } from '../../types/result.ts'
+import { invalidateReferenceCatalog } from '../../agents/reference-catalog.ts'
 import { resolveAgentPrompt } from './index.ts'
 
 function createConfigManager(profileByAgent: Record<string, AgentProfile>) {
@@ -17,10 +18,14 @@ function createConfigManager(profileByAgent: Record<string, AgentProfile>) {
 				_sources: {},
 			})
 		},
-	} as Parameters<typeof resolveAgentPrompt>[1]
+	} as unknown as Parameters<typeof resolveAgentPrompt>[1]
 }
 
 describe('task agent prompt resolution', () => {
+	afterEach(() => {
+		invalidateReferenceCatalog()
+	})
+
 	it('resolves prompt_file content at runtime', async () => {
 		const configManager = createConfigManager({
 			planner: defaultAgentProfiles.planner,
@@ -72,5 +77,33 @@ describe('task agent prompt resolution', () => {
 
 	it('verifier profile defaults to fresh context', () => {
 		expect(defaultAgentProfiles.verifier.contextMode).toBe('none')
+	})
+
+	it('appends the reference tag index to the orchestrator prompt', async () => {
+		const configManager = createConfigManager({
+			orchestrator: defaultAgentProfiles.orchestrator,
+		})
+
+		const prompt = await resolveAgentPrompt('orchestrator', configManager)
+
+		expect(prompt).not.toBeNull()
+		expect(prompt).toContain('# Orchestrator — The Conductor')
+		expect(prompt).toContain('## Available References (Tag Index)')
+		expect(prompt).toContain('- **orchestrator**: handoff-format')
+		expect(prompt).not.toContain('## Loaded References (audience: orchestrator)')
+	})
+
+	it('appends audience-matched references to executor prompts', async () => {
+		const configManager = createConfigManager({
+			'executor-high': defaultAgentProfiles['executor-high'],
+		})
+
+		const prompt = await resolveAgentPrompt('executor-high', configManager)
+
+		expect(prompt).not.toBeNull()
+		expect(prompt).toContain('# Executor High — Senior Architect')
+		expect(prompt).toContain('## Loaded References (audience: executor)')
+		expect(prompt).toContain('# Reference: handoff-format')
+		expect(prompt).not.toContain('## Available References (Tag Index)')
 	})
 })
