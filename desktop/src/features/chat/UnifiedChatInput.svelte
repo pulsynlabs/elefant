@@ -35,9 +35,29 @@
 		streaming?: boolean;
 		onSend: (content: string) => void;
 		onStop: () => void;
+		/**
+		 * Fired when the user presses Cmd/Ctrl+Z while the textarea is
+		 * empty. Empty-only is deliberate: when the textarea has content,
+		 * Cmd+Z must keep its native text-editing-undo semantics so the
+		 * user can scrub back through their typing without surprise.
+		 */
+		onUndoShortcut?: () => void;
+		/**
+		 * Fired when the user presses Cmd/Ctrl+Shift+Z (or Ctrl+Y on
+		 * Windows convention) while the textarea is empty.
+		 */
+		onRedoShortcut?: () => void;
+		/**
+		 * When set to a non-empty string, the input value is replaced
+		 * programmatically and the cursor is positioned at the end. Used
+		 * by ChatView to restore the undone prompt text after
+		 * `chatStore.undo()` — set once, then the parent should reset it
+		 * back to '' so the effect does not re-fire.
+		 */
+		restoreValue?: string;
 	};
 
-	let { disabled = false, streaming = false, onSend, onStop }: Props = $props();
+	let { disabled = false, streaming = false, onSend, onStop, onUndoShortcut, onRedoShortcut, restoreValue = '' }: Props = $props();
 
 	// --- Input state ----------------------------------------------------
 
@@ -55,6 +75,28 @@
 
 	const overlayOpen = $derived(shouldOpenOverlay(inputValue, isComposing));
 	const query = $derived(overlayOpen ? extractQuery(inputValue) : '');
+
+	// --- Restore undone prompt ------------------------------------------
+	//
+	// When the parent sets `restoreValue` to a non-empty string (after a
+	// successful `chatStore.undo()`), we populate the textarea and focus
+	// it so the user can immediately re-edit or re-send the recovered text.
+	// The $effect re-runs only when `restoreValue` changes, and the parent
+	// is expected to reset it to '' after one frame so the effect doesn't
+	// fire again on unrelated re-renders.
+	$effect(() => {
+		if (restoreValue) {
+			inputValue = restoreValue;
+			// Defer focus + cursor placement until after Svelte has updated
+			// the DOM so the textarea value reflects `inputValue`.
+			requestAnimationFrame(() => {
+				if (textareaEl) {
+					textareaEl.focus();
+					textareaEl.setSelectionRange(inputValue.length, inputValue.length);
+				}
+			});
+		}
+	});
 
 	// --- Thinking toggle ------------------------------------------------
 	//
@@ -122,7 +164,31 @@
 			// chose not to handle it (no results). Suppress submit so the
 			// user can keep typing or Escape out — they almost certainly
 			// didn't mean to send `/foo` as a literal message.
-			if (event.key === 'Enter' && !event.shiftKey) {
+		// Undo / redo keyboard shortcuts. Intercepted BEFORE the Enter
+		// branch so the shortcut can short-circuit cleanly, but only when
+		// the textarea is empty — when there is content, Cmd+Z must retain
+		// its native text-editing-undo semantics. `inputValue.trim() === ''`
+		// is a clean "user is not editing text" heuristic.
+		if (inputValue.trim() === '' && (onUndoShortcut || onRedoShortcut)) {
+			const isMod = event.metaKey || event.ctrlKey;
+			const isUndo = isMod && !event.shiftKey && event.key === 'z';
+			const isRedo =
+				(isMod && event.shiftKey && event.key === 'z') ||
+				(event.ctrlKey && !event.shiftKey && event.key === 'y');
+
+			if (isUndo && onUndoShortcut) {
+				event.preventDefault();
+				onUndoShortcut();
+				return;
+			}
+			if (isRedo && onRedoShortcut) {
+				event.preventDefault();
+				onRedoShortcut();
+				return;
+			}
+		}
+
+		if (event.key === 'Enter' && !event.shiftKey) {
 				event.preventDefault();
 				return;
 			}

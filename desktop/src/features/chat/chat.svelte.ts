@@ -11,6 +11,8 @@ function generateId(): string {
 	return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+type UndoEntry = { user: ChatMessage; assistant: ChatMessage };
+
 // Conversation state using Svelte 5 runes
 let messages = $state<ChatMessage[]>([]);
 let isStreaming = $state(false);
@@ -34,6 +36,12 @@ let defaultProvider = $state<string | null>(null);
 // the previous session was using. REQ-004 mandates a disabled-by-default
 // fallback when capability is unknown — see currentModelSupportsThinking.
 let thinkingEnabled = $state(false);
+
+// Undo/redo stacks for chat message pair reversal. `undo()` pushes the
+// last user+assistant pair onto both stacks and removes it from the
+// visible message list; `redo()` pops from the redo stack and re-appends.
+let undoStack = $state<UndoEntry[]>([]);
+let redoStack = $state<UndoEntry[]>([]);
 
 /**
  * Best-effort, client-side heuristic for whether the currently selected
@@ -68,6 +76,11 @@ const currentModelSupportsThinking = $derived.by(() => {
 	return false;
 });
 
+// Derive canUndo/canRedo once instead of repeating the guard in every
+// call site. Both are false while streaming so the UI can't offer an
+// undo/redo affordance mid-generation.
+const canUndo = $derived(undoStack.length > 0 && !isStreaming);
+const canRedo = $derived(redoStack.length > 0 && !isStreaming);
 // Per-run agent override applied to the NEXT chat POST. Confirmed via
 // AgentOverrideDialog from the composer. Each field is optional so the
 // UI can clear individual slots without nuking the whole override.
@@ -82,6 +95,7 @@ export function setAvailableProviders(providers: string[], def: string | null): 
 }
 
 export function addUserMessage(content: string): ChatMessage {
+	redoStack = [];
 	const msg: ChatMessage = {
 		id: generateId(),
 		role: 'user',
@@ -285,8 +299,70 @@ export function setStreamingError(error: string): void {
 
 export function clearConversation(): void {
 	messages = [];
+	undoStack = [];
+	redoStack = [];
 	streamingMessageId = null;
 	isStreaming = false;
+}
+
+/**
+ * Remove the last user+assistant message pair from `messages`, push it onto
+ * both the undo and redo stacks, and return the user prompt text so callers
+ * can restore it to the input field. Returns `null` when there is no complete
+ * pair to undo or when a response is currently streaming.
+ */
+export function undo(): string | null {
+	if (isStreaming) return null;
+
+	// Walk messages from the end to find the last assistant message and its
+	// immediately preceding user message — that is the "pair" to undo.
+	let assistantIdx = -1;
+	for (let i = messages.length - 1; i >= 0; i--) {
+		if (messages[i].role === 'assistant') {
+			assistantIdx = i;
+			break;
+		}
+	}
+	if (assistantIdx === -1 || assistantIdx === 0) return null;
+
+	const userIdx = assistantIdx - 1;
+	if (messages[userIdx].role !== 'user') return null;
+
+	const user = messages[userIdx];
+	const assistant = messages[assistantIdx];
+	const entry: UndoEntry = { user, assistant };
+
+	// Remove the pair from the visible message list
+	messages = [
+		...messages.slice(0, userIdx),
+		...messages.slice(assistantIdx + 1),
+	];
+
+	// Push to undo stack (FIFO-capped at 50)
+	undoStack = [...undoStack, entry];
+	if (undoStack.length > 50) undoStack = undoStack.slice(-50);
+
+	// Populate redo stack so the pair can be restored
+	redoStack = [...redoStack, entry];
+
+	return user.content;
+}
+
+/**
+ * Pop the most recently undone entry from the redo stack and re-append its
+ * user and assistant messages to `messages`. Returns `false` when there is
+ * nothing to redo or a response is currently streaming.
+ */
+export function redo(): boolean {
+	if (isStreaming) return false;
+	if (redoStack.length === 0) return false;
+
+	const entry = redoStack[redoStack.length - 1];
+	redoStack = redoStack.slice(0, -1);
+
+	messages = [...messages, entry.user, entry.assistant];
+
+	return true;
 }
 
 /**
@@ -470,6 +546,15 @@ export const chatStore = {
 	get currentModelSupportsThinking() {
 		return currentModelSupportsThinking;
 	},
+	get canUndo() {
+		return canUndo;
+	},
+	get canRedo() {
+		return canRedo;
+	},
+	get redoCount() {
+		return redoStack.length;
+	},
 	setActiveSession: (id: string | null) => {
 		activeSessionId = id;
 		// Each session starts in "fast" mode — the toggle is opt-in per
@@ -512,6 +597,8 @@ export const chatStore = {
 	finalizeMessage,
 	setStreamingError,
 	clearConversation,
+	undo,
+	redo,
 	getApiMessages,
 	setAvailableProviders,
 };
