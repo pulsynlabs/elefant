@@ -17,6 +17,7 @@ import StatGridViz from './StatGridViz.svelte';
 import TableViz from './TableViz.svelte';
 import CodeViz from './CodeViz.svelte';
 import ComparisonViz from './ComparisonViz.svelte';
+import ResearchCardViz from './ResearchCardViz.svelte';
 
 const vizRendererRegistry = new Map<VizType, Component<VizRendererProps>>();
 
@@ -73,4 +74,8 @@ registerVizRenderer(
 registerVizRenderer(
 	'comparison',
 	ComparisonViz as unknown as Component<VizRendererProps>,
+);
+registerVizRenderer(
+	'research-card',
+	ResearchCardViz as unknown as Component<VizRendererProps>,
 );
