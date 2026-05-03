@@ -68,6 +68,18 @@ describe('referenceTool validation', () => {
 			expect(result.error.code).toBe('VALIDATION_ERROR');
 		}
 	});
+
+	it('returns VALIDATION_ERROR when names and section are both provided', async () => {
+		const result = await executeRef({ names: ['a'], section: 'X' });
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('VALIDATION_ERROR');
+			expect(result.error.message).toBe(
+				'Cannot use section with names (multi-load). Load individually.',
+			);
+		}
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -338,7 +350,7 @@ describe('referenceTool load by name', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.data).toContain('# Reference: handoff-format');
-			expect(result.data).toContain('**Source:** builtin');
+			expect(result.data).toContain('_Source: builtin_');
 			expect(result.data).toContain('## Overview');
 		}
 	});
@@ -355,7 +367,7 @@ describe('referenceTool load by name', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.data).toContain('# Reference: my-protocol');
-			expect(result.data).toContain('**Source:** project');
+			expect(result.data).toContain('_Source: project_');
 			expect(result.data).toContain('# My Protocol');
 		}
 	});
@@ -387,7 +399,7 @@ describe('referenceTool load by name', () => {
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.data).toContain('**Source:** project');
+			expect(result.data).toContain('_Source: project_');
 			expect(result.data).toContain('# Project Override Content');
 		}
 	});
@@ -503,9 +515,83 @@ describe('referenceTool multi-load (names[])', () => {
 		if (result.ok) {
 			expect(result.data).toContain('# Reference: my-local');
 			expect(result.data).toContain('# Reference: handoff-format');
-			expect(result.data).toContain('**Source:** project');
-			expect(result.data).toContain('**Source:** builtin');
+			expect(result.data).toContain('_Source: project_');
+			expect(result.data).toContain('_Source: builtin_');
 			expect(result.data).toContain('---');
+		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Section extraction (single load + section)
+// ---------------------------------------------------------------------------
+
+describe('referenceTool section extraction', () => {
+	let projectDir: string;
+	let homeDir: string;
+
+	beforeEach(() => {
+		projectDir = makeTempDir();
+		homeDir = makeTempDir();
+		mkdirSync(projectDir, { recursive: true });
+		mkdirSync(homeDir, { recursive: true });
+	});
+
+	afterEach(() => {
+		try { rmSync(projectDir, { recursive: true, force: true }); } catch {}
+		try { rmSync(homeDir, { recursive: true, force: true }); } catch {}
+	});
+
+	it('extracts a specific section from a reference', async () => {
+		const result = await executeRef({
+			name: 'handoff-format',
+			section: 'Status Values',
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toContain('# handoff-format');
+			expect(result.data).toContain('\u2014');
+			expect(result.data).toContain('Status Values');
+			expect(result.data).toContain('| `COMPLETE` | Task fully finished');
+			expect(result.data).not.toContain('## Overview');
+			expect(result.data).not.toContain('## Basic Structure');
+		}
+	});
+
+	it('returns error with available sections when section not found', async () => {
+		const result = await executeRef({
+			name: 'handoff-format',
+			section: 'nonexistent',
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('NOT_FOUND');
+			expect(result.error.message).toContain('Section "nonexistent" not found');
+			expect(result.error.message).toContain('Available sections');
+			// handoff-format has Overview, Basic Structure, Status Values sections
+			expect(result.error.message).toContain('Overview');
+			expect(result.error.message).toContain('Basic Structure');
+			expect(result.error.message).toContain('Status Values');
+		}
+	});
+
+	it('matches section name case-insensitively', async () => {
+		const result = await executeRef({
+			name: 'handoff-format',
+			section: 'overview',
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toContain('The handoff format defines how Elefant agents');
 		}
 	});
 });

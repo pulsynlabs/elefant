@@ -16,6 +16,8 @@ import { ok, err } from '../../types/result.js';
 import { resolveReference, listReferences } from './resolver.js';
 import type { ReferenceInfo } from './resolver.js';
 import type { ReferenceParams } from './types.js';
+import { formatReferenceBlock, formatCatalogEntry } from './format.js';
+import { extractSection } from './sections.js';
 
 // import type avoids a runtime circular dependency (registry.ts imports this file).
 import type { ToolRegistry } from '../registry.js';
@@ -34,13 +36,14 @@ function formatReferencesList(refs: ReferenceInfo[]): string {
   }
 
   return refs
-    .map((r) => {
-      let line = `${r.name} [${r.source}]: ${r.description}`;
-      if (r.frontmatter?.tags && r.frontmatter.tags.length > 0) {
-        line += ` [${r.frontmatter.tags.join(', ')}]`;
-      }
-      return line;
-    })
+    .map((r) =>
+      formatCatalogEntry(
+        r.name,
+        r.source,
+        r.description,
+        r.frontmatter?.tags ?? [],
+      ),
+    )
     .join('\n');
 }
 
@@ -128,7 +131,7 @@ const referenceParamsSchema: Record<string, {
 async function executeReference(
 	params: ReferenceParams,
 ): Promise<Result<string, ElefantError>> {
-  const { name, names, list, tag, tags, home, cwd } = params;
+  const { name, names, list, tag, tags, section, home, cwd } = params;
 	const opts = { home, cwd };
 
 	// Must provide at least one action
@@ -164,6 +167,13 @@ async function executeReference(
 
 	// -- Multi-load (names[]) -------------------------------------------------
 	if (names && names.length > 0) {
+		if (section) {
+			return err({
+				code: 'VALIDATION_ERROR',
+				message: 'Cannot use section with names (multi-load). Load individually.',
+			});
+		}
+
 		const parts: string[] = [];
 		const missing: string[] = [];
 
@@ -173,15 +183,7 @@ async function executeReference(
 				missing.push(n);
 				continue;
 			}
-			parts.push(
-				`# Reference: ${n}\n**Source:** ${result.source}\n\n${result.content}`,
-			);
-		}
-
-		let output = parts.join('\n\n---\n\n');
-
-		if (missing.length > 0) {
-			output += `\n\n_Not found: ${missing.join(', ')}_`;
+			parts.push(formatReferenceBlock(n, result.source, result.content));
 		}
 
 		if (parts.length === 0) {
@@ -191,6 +193,10 @@ async function executeReference(
 			});
 		}
 
+		let output = parts.join('\n\n---\n\n');
+		if (missing.length > 0) {
+			output += `\n\n_Not found: ${missing.join(', ')}_`;
+		}
 		return ok(output);
 	}
 
@@ -203,9 +209,23 @@ async function executeReference(
 		});
 	}
 
-	// section extraction stubbed — Wave 3 wires real section parser
-	const header = `# Reference: ${name}\n**Source:** ${result.source}\n\n`;
-	return ok(header + result.content);
+	// Section extraction
+	if (section) {
+		const extracted = extractSection(result.content, section);
+		if (!extracted.found) {
+			const available =
+				extracted.available.length > 0
+					? `\n\nAvailable sections: ${extracted.available.join(', ')}`
+					: '';
+			return err({
+				code: 'NOT_FOUND',
+				message: `Section "${section}" not found in "${name}"${available}`,
+			});
+		}
+		return ok(`# ${name} \u2014 ${section}\n\n${extracted.content}`);
+	}
+
+	return ok(formatReferenceBlock(name!, result.source, result.content));
 }
 
 // ---------------------------------------------------------------------------
