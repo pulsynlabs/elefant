@@ -1,5 +1,3 @@
-import { readdir } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
 import { z } from 'zod';
 
 import type { Database } from '../../db/database.ts';
@@ -135,48 +133,4 @@ export class SpecCheckpointTool extends SpecTool<CheckpointArgs, unknown> {
 		if (args.action === 'list') return checkpoints;
 		return checkpoints.find((entry) => entry.payload.id === args.id) ?? null;
 	}
-}
-
-const referenceSchema = z.discriminatedUnion('action', [z.object({ action: z.literal('list') }), z.object({ action: z.literal('load'), name: z.string().min(1) }), z.object({ action: z.literal('section'), name: z.string().min(1), section: z.string().min(1) })]);
-type ReferenceArgs = z.infer<typeof referenceSchema>;
-
-/** @example {"action":"list"} */
-export class SpecReferenceTool extends SpecTool<ReferenceArgs, unknown> {
-	readonly name = 'wf_reference';
-	readonly description = 'List, load, or extract sections from bundled reference markdown resources.';
-	readonly schema = referenceSchema;
-	readonly allowedPhases = [];
-	readonly permissions = { read: true, write: false, execute: false };
-	readonly examples = [{ name: 'list', payload: { action: 'list' } }];
-
-	async run(ctx: SpecToolContext, rawArgs: unknown): Promise<unknown | SpecToolError> { return this.runWithoutWorkflow(ctx, rawArgs); }
-	private async runWithoutWorkflow(ctx: SpecToolContext, rawArgs: unknown): Promise<unknown | SpecToolError> {
-		const parsed = this.schema.safeParse(rawArgs);
-		if (!parsed.success) return new SpecToolError('VALIDATION_FAILED', `Invalid payload for ${this.name}`, parsed.error.flatten());
-		return this.execute(ctx, parsed.data);
-	}
-	protected async execute(_ctx: SpecToolContext, args: ReferenceArgs): Promise<unknown> { return readResource('src/agents/references', args); }
-}
-
-async function readResource(root: string, args: { action: string; name?: string; section?: string }): Promise<unknown> {
-	const dir = resolve(process.cwd(), root);
-	if (args.action === 'list') {
-		try { return (await readdir(dir)).filter((name) => name.endsWith('.md')).sort(); }
-		catch { return []; }
-	}
-	const name = args.name?.endsWith('.md') ? args.name : `${args.name}.md`;
-	const filePath = join(dir, name ?? '');
-	const file = Bun.file(filePath);
-	if (!(await file.exists())) return new SpecToolError('VALIDATION_FAILED', `Resource not found: ${args.name}`, { root });
-	const content = await file.text();
-	if (args.action !== 'section') return { name: args.name, content };
-	return { name: args.name, section: args.section, content: extractMarkdownSection(content, args.section ?? '') };
-}
-
-function extractMarkdownSection(content: string, section: string): string {
-	const lines = content.split('\n');
-	const start = lines.findIndex((line) => line.trim().toLowerCase() === `## ${section}`.toLowerCase());
-	if (start === -1) return '';
-	const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
-	return lines.slice(start + 1, end === -1 ? undefined : end).join('\n').trim();
 }

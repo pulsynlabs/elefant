@@ -4,15 +4,14 @@ import { SpecTool } from './base.ts';
 import { createSpecTools, instantiateSpecTools, toToolDefinition } from './index.ts';
 
 describe('spec tool lint', () => {
-	it('all 10 tools extend SpecTool and declare structural metadata', () => {
+	it('all 9 tools extend SpecTool and declare structural metadata', () => {
 		const tools = instantiateSpecTools();
-		expect(tools).toHaveLength(10);
+		expect(tools).toHaveLength(9);
 		expect(tools.map((tool) => tool.name).sort()).toEqual([
 			'wf_adl',
 			'wf_blueprint',
 			'wf_checkpoint',
 			'wf_chronicle',
-			'wf_reference',
 			'wf_requirements',
 			'wf_spec',
 			'wf_state',
@@ -51,7 +50,7 @@ describe('spec tool lint', () => {
 			workflowId: 'spec-mode',
 		};
 		const definitions = createSpecTools(ctx);
-		expect(definitions).toHaveLength(10);
+		expect(definitions).toHaveLength(9);
 		for (const definition of definitions) {
 			expect(definition.name.startsWith('wf_')).toBe(true);
 			expect(definition.execute).toBeFunction();
