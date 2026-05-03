@@ -25,10 +25,12 @@
 	 * redundant and visually noisy.
 	 */
 	import { chatStore } from './chat.svelte.js';
+	import { parseSlashCommand } from './slash-parser.js';
 	import MessageList, { type GhostEntry } from './MessageList.svelte';
 	import UnifiedChatInput from './UnifiedChatInput.svelte';
 	import ConnectionBanner from './ConnectionBanner.svelte';
 	import RedoBanner from './RedoBanner.svelte';
+	import SideContextBanner from './SideContextBanner.svelte';
 	import BranchNavigator from './BranchNavigator.svelte';
 	import { getDaemonClient } from '$lib/daemon/client.js';
 	import type { MessageRole } from '$lib/daemon/types.js';
@@ -136,35 +138,56 @@
 	async function handleSend(content: string): Promise<void> {
 		// Client-side slash command intercepts. These commands operate on
 		// in-memory chat state only and must NEVER reach the daemon — even
-		// when they're a no-op (no pair to undo, empty redo stack), we
+		// when they're a no-op (no pair to undo, empty redo stack, empty
+		// side-context question, or already in/out of side context), we
 		// always early-return so the slash literal isn't streamed as a
-		// user prompt. Match is exact trimmed equality so genuine messages
-		// like "/undo something I wrote" still forward as normal text.
-		const trimmed = content.trim();
-		if (trimmed === '/undo') {
-			const promptText = chatStore.undo();
-			pendingInputRestore = promptText ?? '';
-			if (promptText !== null) {
-				pushGhost(promptText);
-				clearPendingRestore();
+		// user prompt. The parser preserves exact-match semantics so genuine
+		// messages like "/undo something I wrote" still forward as normal text.
+		const parsed = parseSlashCommand(content);
+
+		switch (parsed.command) {
+			case 'undo': {
+				const promptText = chatStore.undo();
+				pendingInputRestore = promptText ?? '';
+				if (promptText !== null) {
+					pushGhost(promptText);
+					clearPendingRestore();
+				}
+				return;
 			}
-			return;
-		}
-		if (trimmed === '/redo') {
-			chatStore.redo();
-			return;
+			case 'redo': {
+				chatStore.redo();
+				return;
+			}
+			case 'back': {
+				chatStore.exitSideContext();
+				return;
+			}
+			case 'btw': {
+				const entered = chatStore.enterSideContext(parsed.body);
+				if (!entered) return;
+				break;
+			}
+			case null: {
+				break;
+			}
 		}
 
+		const trimmed = content.trim();
+		if (trimmed === '/btw') return;
 		if (chatStore.isStreaming || !content.trim()) return;
 
-		// A real send invalidates every pending tombstone: the redo stack
-		// is cleared inside `addUserMessage`, so any ghost still on screen
-		// would point at history the user can no longer reach. Mirror that
-		// store-side reset here in lock-step.
-		ghostEntries = [];
+		if (parsed.command !== 'btw') {
+			// A real send invalidates every pending tombstone: the redo stack
+			// is cleared inside `addUserMessage`, so any ghost still on screen
+			// would point at history the user can no longer reach. Mirror that
+			// store-side reset here in lock-step.
+			ghostEntries = [];
 
-		// Add user message to conversation
-		chatStore.addUserMessage(content.trim());
+			// Add user message to conversation. `/btw` skips this because
+			// `enterSideContext` already appended the side-context question.
+			chatStore.addUserMessage(trimmed);
+		}
 
 		// Build API messages from conversation history (user messages only, before the assistant placeholder)
 		const apiMessages: MessageRole[] = chatStore.getApiMessages().map((m) => ({
@@ -240,6 +263,15 @@
 		abortController?.abort();
 		chatStore.finalizeMessage('stop');
 		abortController = null;
+	}
+
+	// Side-context banner exit affordance. Mirrors the `/back` slash
+	// intercept above so the button click and the typed command share
+	// a single store mutation path. Kept as a named handler (rather
+	// than inlined into the prop) so the call site reads clearly and
+	// future telemetry/instrumentation has a single hook to wrap.
+	function handleReturnToMain(): void {
+		chatStore.exitSideContext();
 	}
 	// Holds the prompt text returned by `chatStore.undo()` so the
 	// input component can restore it programmatically. Reset to '' on
@@ -345,6 +377,16 @@
 			aria-label="Chat conversation"
 			aria-hidden={!hasMessages}
 		>
+			<!--
+				Side-context banner sits at the very top of the active-state
+				branch — above the message list, above any branch/redo
+				affordances — so the mode indicator is the first thing the
+				eye lands on whenever the user is in a `/btw` detour. The
+				banner self-gates on `chatStore.isSideContext`, so this
+				slot is a zero-cost no-op outside side-context mode.
+			-->
+			<SideContextBanner onReturn={handleReturnToMain} />
+
 			<div class="chat-messages" aria-live="polite">
 				<MessageList
 					messages={chatStore.messages}

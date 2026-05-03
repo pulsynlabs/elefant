@@ -178,3 +178,16 @@ When adding a new view to the app:
 3. Fix any touch-target or overflow issues found
 4. Add assertions for the new view in `mobile-regression.spec.ts`
 5. Commit updated baseline screenshots
+
+---
+
+## Chat Features
+
+### Slash Commands
+
+The chat input supports client-side slash commands intercepted before reaching the daemon:
+
+- `/undo` — Undo the last assistant response and restore the prior turn.
+- `/redo` — Redo a previously undone response.
+- `/btw [question]` — Ask a tangential question in ephemeral side context without polluting main conversation history.
+- `/back` — Return to the main conversation from side context.

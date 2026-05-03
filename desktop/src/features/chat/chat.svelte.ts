@@ -1,4 +1,4 @@
-import type { ChatMessage, ContentBlock, ForkBranch, ToolCallDisplay } from './types.js';
+import type { ChatMessage, ContentBlock, ForkBranch, SideContext, ToolCallDisplay } from './types.js';
 import type { QuestionEvent } from '$lib/daemon/types.js';
 import type { AgentRunOverride } from '$lib/types/agent-config.js';
 import { getDaemonClient } from '$lib/daemon/client.js';
@@ -48,6 +48,18 @@ let redoStack = $state<UndoEntry[]>([]);
 // Fork branch state for conversation branching
 let forkBranches = $state<ForkBranch[]>([]);
 let activeBranchId = $state<string | null>(null);
+
+// Ephemeral side-context state for `/btw` detours. Main history is restored
+// from `mainSnapshot` on exit and never persisted while active.
+let sideContext = $state<SideContext | null>(null);
+const isSideContext = $derived(sideContext !== null);
+
+function setMessages(next: ChatMessage[]): void {
+	messages = next;
+	if (sideContext !== null) {
+		sideContext = { ...sideContext, messages: next };
+	}
+}
 
 /**
  * Best-effort, client-side heuristic for whether the currently selected
@@ -108,7 +120,7 @@ export function addUserMessage(content: string): ChatMessage {
 		content,
 		timestamp: new Date(),
 	};
-	messages = [...messages, msg];
+	setMessages([...messages, msg]);
 	return msg;
 }
 
@@ -122,7 +134,7 @@ export function startAssistantMessage(): string {
 		isStreaming: true,
 		timestamp: new Date(),
 	};
-	messages = [...messages, msg];
+	setMessages([...messages, msg]);
 	streamingMessageId = id;
 	isStreaming = true;
 	return id;
@@ -131,7 +143,7 @@ export function startAssistantMessage(): string {
 export function appendToken(text: string): void {
 	if (!streamingMessageId) return;
 
-	messages = messages.map((msg) => {
+	setMessages(messages.map((msg) => {
 		if (msg.id !== streamingMessageId) return msg;
 		const updated = { ...msg, content: msg.content + text };
 
@@ -145,17 +157,17 @@ export function appendToken(text: string): void {
 		}
 		updated.blocks = blocks;
 		return updated;
-	});
+	}));
 }
 
 export function addToolCall(toolCall: ToolCallDisplay): void {
 	if (!streamingMessageId) return;
 
-	messages = messages.map((msg) => {
+	setMessages(messages.map((msg) => {
 		if (msg.id !== streamingMessageId) return msg;
 		const blocks: ContentBlock[] = [...(msg.blocks ?? []), { type: 'tool_call', toolCall }];
 		return { ...msg, blocks };
-	});
+	}));
 }
 
 /**
@@ -167,7 +179,7 @@ export function addToolCall(toolCall: ToolCallDisplay): void {
 export function updateToolCallArguments(toolCallId: string, args: Record<string, unknown>): void {
 	if (!streamingMessageId) return;
 
-	messages = messages.map((msg) => {
+	setMessages(messages.map((msg) => {
 		if (msg.id !== streamingMessageId) return msg;
 
 		const blocks: ContentBlock[] = (msg.blocks ?? []).map((block) => {
@@ -184,7 +196,7 @@ export function updateToolCallArguments(toolCallId: string, args: Record<string,
 		});
 
 		return { ...msg, blocks };
-	});
+	}));
 }
 
 /**
@@ -205,7 +217,7 @@ export function patchToolCallMetadata(
 ): void {
 	if (!streamingMessageId) return;
 
-	messages = messages.map((msg) => {
+	setMessages(messages.map((msg) => {
 		if (msg.id !== streamingMessageId) return msg;
 
 		const blocks: ContentBlock[] = (msg.blocks ?? []).map((block) => {
@@ -222,13 +234,13 @@ export function patchToolCallMetadata(
 		});
 
 		return { ...msg, blocks };
-	});
+	}));
 }
 
 export function addToolResult(toolCallId: string, content: string, resultIsError: boolean): void {
 	if (!streamingMessageId) return;
 
-	messages = messages.map((msg) => {
+	setMessages(messages.map((msg) => {
 		if (msg.id !== streamingMessageId) return msg;
 
 		const blocks: ContentBlock[] = (msg.blocks ?? []).map((block) => {
@@ -245,7 +257,7 @@ export function addToolResult(toolCallId: string, content: string, resultIsError
 		});
 
 		return { ...msg, blocks };
-	});
+	}));
 }
 
 export function addQuestion(event: QuestionEvent): void {
@@ -266,27 +278,27 @@ export function addQuestion(event: QuestionEvent): void {
 		},
 	};
 
-	messages = messages.map((msg) => {
+	setMessages(messages.map((msg) => {
 		if (msg.id !== streamingMessageId) return msg;
 		const blocks: ContentBlock[] = [...(msg.blocks ?? []), { type: 'tool_call', toolCall }];
 		return { ...msg, blocks };
-	});
+	}));
 }
 
 export function finalizeMessage(_finishReason: string): void {
 	if (!streamingMessageId) return;
 
-	messages = messages.map((msg) => {
+	setMessages(messages.map((msg) => {
 		if (msg.id !== streamingMessageId) return msg;
 		return { ...msg, isStreaming: false };
-	});
+	}));
 
 	streamingMessageId = null;
 	isStreaming = false;
 
 	// Persist after every completed turn so session restore always has
 	// up-to-date history. Fire-and-forget — never block the UI.
-	if (activeSessionId) {
+	if (activeSessionId && sideContext === null) {
 		void saveSessionHistory(activeSessionId, messages);
 	}
 }
@@ -294,16 +306,17 @@ export function finalizeMessage(_finishReason: string): void {
 export function setStreamingError(error: string): void {
 	if (!streamingMessageId) return;
 
-	messages = messages.map((msg) => {
+	setMessages(messages.map((msg) => {
 		if (msg.id !== streamingMessageId) return msg;
 		return { ...msg, isStreaming: false, isError: true, errorMessage: error };
-	});
+	}));
 
 	streamingMessageId = null;
 	isStreaming = false;
 }
 
 export function clearConversation(): void {
+	sideContext = null;
 	messages = [];
 	undoStack = [];
 	redoStack = [];
@@ -311,6 +324,43 @@ export function clearConversation(): void {
 	activeBranchId = null;
 	streamingMessageId = null;
 	isStreaming = false;
+}
+
+export function enterSideContext(question: string): boolean {
+	if (isStreaming || sideContext !== null || question.trim() === '') return false;
+
+	const trimmedQuestion = question.trim();
+	const snapshot = structuredClone(messages);
+	const userMsg: ChatMessage = {
+		id: generateId(),
+		role: 'user',
+		content: trimmedQuestion,
+		timestamp: new Date(),
+	};
+	const sideMessages = [...snapshot, userMsg];
+
+	sideContext = {
+		mainSnapshot: snapshot,
+		messages: sideMessages,
+		enteredAt: new Date(),
+		question: trimmedQuestion,
+	};
+	setMessages(sideMessages);
+	undoStack = [];
+	redoStack = [];
+
+	return true;
+}
+
+export function exitSideContext(): boolean {
+	if (sideContext === null) return false;
+
+	messages = structuredClone(sideContext.mainSnapshot);
+	sideContext = null;
+	undoStack = [];
+	redoStack = [];
+
+	return true;
 }
 
 /**
@@ -341,10 +391,10 @@ export function undo(): string | null {
 	const entry: UndoEntry = { user, assistant };
 
 	// Remove the pair from the visible message list
-	messages = [
+	setMessages([
 		...messages.slice(0, userIdx),
 		...messages.slice(assistantIdx + 1),
-	];
+	]);
 
 	// Push to undo stack (FIFO-capped at 50)
 	undoStack = [...undoStack, entry];
@@ -368,7 +418,7 @@ export function redo(): boolean {
 	const entry = redoStack[redoStack.length - 1];
 	redoStack = redoStack.slice(0, -1);
 
-	messages = [...messages, entry.user, entry.assistant];
+	setMessages([...messages, entry.user, entry.assistant]);
 
 	return true;
 }
@@ -422,7 +472,7 @@ export function fork(messageIndex: number): string | null {
 	forkBranches = next.length > MAX_FORK_BRANCHES ? next.slice(-MAX_FORK_BRANCHES) : next;
 
 	// Truncate messages to before the fork point
-	messages = messages.slice(0, messageIndex);
+	setMessages(messages.slice(0, messageIndex));
 
 	return userContent;
 }
@@ -455,7 +505,7 @@ export function switchToBranch(branchId: string): boolean {
 	// defensively): skip the snapshot save; root state is lost.
 
 	// Restore target branch's message snapshot
-	messages = structuredClone(target.messages);
+	setMessages(structuredClone(target.messages));
 
 	// Update active branch
 	activeBranchId = branchId;
@@ -503,7 +553,7 @@ export async function loadSessionHistory(projectId: string, sessionId: string): 
 	try {
 		const stored = await loadFromStore(sessionId);
 		if (stored.length > 0) {
-			messages = stored;
+			setMessages(stored);
 			return;
 		}
 	} catch {
@@ -516,7 +566,7 @@ export async function loadSessionHistory(projectId: string, sessionId: string): 
 		const rows = await client.fetchSessionMessages(projectId, sessionId);
 		const mapped = mapDaemonMessages(rows);
 		if (mapped.length > 0) {
-			messages = mapped;
+			setMessages(mapped);
 			// Backfill the Tauri Store so next load is instant
 			void saveSessionHistory(sessionId, mapped);
 		}
@@ -663,11 +713,18 @@ export const chatStore = {
 	get activeBranchId() {
 		return activeBranchId;
 	},
+	get isSideContext() {
+		return isSideContext;
+	},
+	get sideContext() {
+		return sideContext;
+	},
 	get forkBranchCount() {
 		return forkBranches.length;
 	},
 	setActiveSession: (id: string | null) => {
 		activeSessionId = id;
+		sideContext = null;
 		// Each session starts in "fast" mode — the toggle is opt-in per
 		// conversation. This avoids surprising users who turned thinking on
 		// in a previous session and then opened a fresh one.
@@ -708,6 +765,8 @@ export const chatStore = {
 	finalizeMessage,
 	setStreamingError,
 	clearConversation,
+	enterSideContext,
+	exitSideContext,
 	undo,
 	redo,
 	fork,
