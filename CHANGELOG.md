@@ -4,6 +4,31 @@
 
 ### Added
 
+#### Research Base System
+
+- Added per-project **Research Base** at `.elefant/markdown-db/` — a structured, versionable, agent-curated knowledge garden for long-form findings, comparisons, and reference notes.
+- Added bundled vector index: **SQLite + `sqlite-vec`** at `.elefant/research-index.sqlite` with zero-config setup.
+- Added default embedder: **`bundled-cpu`** — `Xenova/all-MiniLM-L6-v2` (384-dim) via `@xenova/transformers`, running on CPU with WebGPU acceleration where available.
+- Added hardware auto-scaling: profiles host machine (RAM, GPU, NPU) on first run and recommends embedding tier (`bundled-cpu`, `bundled-gpu`, `bundled-large`).
+- Added 10 configurable embedding providers: `bundled-cpu`, `bundled-gpu`, `bundled-large`, `ollama`, `lm-studio`, `vllm`, `openai`, `openai-compatible`, `google`, `disabled` (keyword-only).
+- Added provider switching: non-destructive, preserves source files and chunks, rebuilds index in background with progress events.
+- Added **5 new agent tools**: `research_search` (hybrid semantic/keyword RRF), `research_grep` (ripgrep scoped to Research Base), `research_read` (by id/path/`research://` link), `research_write` (enforces frontmatter schema), `research_index` (list/browse by section/tag/recency).
+- Added YAML frontmatter schema: `id`, `title`, `section`, `tags`, `sources`, `confidence`, `created`, `updated`, `author_agent`, `workflow`, `summary` — auto-filled and validated by `research_write`.
+- Added daemon REST/SSE/WS API: `/v1/research/{tree,file,search,status,reindex,index/progress,open-in-editor}` with WebSocket events for indexing progress and provider changes.
+- Added **Desktop Research View** — two-pane sidebar (tree + reader) with read-only markdown rendering, TOC, syntax highlighting, "Open in editor" escape hatch, and frontmatter pill-bar.
+- Added mobile responsiveness: Research View drawer at ≤640px, keyboard navigation (`j`/`k` navigate, `/` search, `g r` focus reader, `Escape` close).
+- Added **Settings → Research Base** tab: provider configuration, hardware tier indicator, enable/disable toggle, reindex button, last-indexed timestamp, editor override, "open in OS file manager".
+- Added `research://` URI scheme for deep-linking: `research://<workflow>/<section>/<filename>.md[#anchor]` renders as clickable chips in chat output.
+- Added file watcher on `.elefant/markdown-db/` per active project; debounced 500 ms incremental re-index.
+- Added markdown-aware chunking: H2/H3 boundaries, ≤512 tokens, 1-sentence overlap; frontmatter is metadata, never embedded as content.
+- Added index health endpoint: reports total docs, total chunks, last-indexed timestamp, embedding provider, drift count, disk size.
+- Added fallback to ripgrep + BM25-style scoring when vector index is disabled; search degrades gracefully.
+- Added migration helper: `scripts/migrate-markdown-db.ts` rewrites in-repo references from legacy `markdown-db/` to `.elefant/markdown-db/`; legacy Elefant-monorepo seed kept as soft-alias.
+- Added **ADR-0006**: documents sqlite-vec + transformers.js as defaults; rationale for rejected alternatives (LanceDB, Qdrant, Chroma, FAISS); fallback strategies.
+- Added updated agent prompts: researcher, writer, and librarian agents now write to and cite from the Research Base; shared snippet `_shared/research-base-protocol.md` included in all three.
+- Added privacy guarantees: zero outbound traffic in `bundled-*` and `disabled` modes; remote providers gated behind explicit warning in Settings.
+- Added cross-platform support: macOS, Linux, Windows; Linux is primary CI target; Windows path handling explicitly tested.
+
 #### MCP Tool Support
 
 - Added daemon-side MCP tool support for stdio, SSE, and StreamableHTTP servers.
