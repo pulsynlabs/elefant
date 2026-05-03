@@ -45,3 +45,22 @@ export interface ChatMessage {
 	errorMessage?: string;
 	timestamp: Date;
 }
+
+/**
+ * A saved snapshot of a conversation branch.
+ * Created when the user forks the conversation at a user message.
+ * Stores the message history up to (and including) the forked message,
+ * along with metadata for navigation and parentage tracking.
+ */
+export interface ForkBranch {
+	/** Unique identifier (crypto.randomUUID()) */
+	id: string;
+	/** Auto-derived label from first ~40 chars of the forked user message */
+	label: string;
+	/** When this branch was created */
+	createdAt: Date;
+	/** Deep clone (structuredClone) of messages[0..N] inclusive at fork time */
+	messages: ChatMessage[];
+	/** ID of the branch active at fork time; null if forking from root */
+	parentBranchId: string | null;
+}

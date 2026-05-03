@@ -25,6 +25,16 @@
 		 */
 		onUndoMessage?: () => void;
 		/**
+		 * Per-message fork handler. Forwarded down to each
+		 * MessageBubble so the user-message fork affordance can call
+		 * back into ChatView with the index of the message being
+		 * forked from. ChatView routes that index into
+		 * `chatStore.fork()` and surfaces the returned user text via
+		 * the existing `pendingInputRestore` handshake — the same
+		 * pattern undo() uses.
+		 */
+		onFork?: (messageIndex: number) => void;
+		/**
 		 * Active ghost tombstones rendered after the last real message.
 		 * Owned by ChatView so `addUserMessage` (which clears the redo
 		 * stack) can clear them in lock-step on a real send. Optional so
@@ -40,6 +50,7 @@
 	let {
 		messages,
 		onUndoMessage,
+		onFork,
 		ghostEntries = [],
 		onGhostRedo,
 		onGhostDismiss,
@@ -99,11 +110,13 @@
 			</p>
 		</div>
 	{:else}
-		{#each messages as message (message.id)}
+		{#each messages as message, i (message.id)}
 			<MessageBubble
 				{message}
+				messageIndex={i}
 				isLastUndoablePair={chatStore.canUndo && message.id === lastUserMessageId}
 				onUndo={onUndoMessage}
+				{onFork}
 			/>
 		{/each}
 

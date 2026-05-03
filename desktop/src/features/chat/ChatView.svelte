@@ -29,6 +29,7 @@
 	import UnifiedChatInput from './UnifiedChatInput.svelte';
 	import ConnectionBanner from './ConnectionBanner.svelte';
 	import RedoBanner from './RedoBanner.svelte';
+	import BranchNavigator from './BranchNavigator.svelte';
 	import { getDaemonClient } from '$lib/daemon/client.js';
 	import type { MessageRole } from '$lib/daemon/types.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
@@ -278,6 +279,20 @@
 		chatStore.redo();
 	}
 
+	// Per-message fork handler invoked by the inline fork button on
+	// every user message bubble. Mirrors the undo restore handshake:
+	// `chatStore.fork(idx)` returns the original user-message text
+	// (or `null` for any no-op path — streaming, OOB index, or a
+	// non-user message), which we route through `pendingInputRestore`
+	// so the existing `$effect` flushes it into the active
+	// UnifiedChatInput via `chatInputRef.setValue()`. Keeping a
+	// single restore mechanism means fork and undo share the exact
+	// same input-restore pipeline regardless of trigger.
+	function handleFork(messageIndex: number): void {
+		const restored = chatStore.fork(messageIndex);
+		if (restored !== null) pendingInputRestore = restored;
+	}
+
 	// --- Layout state ---------------------------------------------------
 	//
 	// The view picks one of two arrangements based on whether the
@@ -334,11 +349,22 @@
 				<MessageList
 					messages={chatStore.messages}
 					onUndoMessage={handleUndoMessage}
+					onFork={handleFork}
 					{ghostEntries}
 					onGhostRedo={handleGhostRedo}
 					onGhostDismiss={handleGhostDismiss}
 				/>
 			</div>
+
+			<!--
+				Branch navigator stacks ABOVE the redo banner. Branch context
+				is the higher-level conversation-tree position ("which branch
+				am I on?"); redo context is the lower-level per-branch linear
+				history. BranchNavigator self-gates on forkBranchCount > 0 and
+				uses its own slide transition, so it cleanly collapses to zero
+				height when no branches exist.
+			-->
+			<BranchNavigator />
 
 			{#if chatStore.canRedo}
 				<RedoBanner
