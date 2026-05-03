@@ -11,6 +11,7 @@
 
 import type { Component } from 'svelte';
 import type { VizType, VizRendererProps } from './types.js';
+import LoadingViz from './LoadingViz.svelte';
 
 const vizRendererRegistry = new Map<VizType, Component<VizRendererProps>>();
 
@@ -37,3 +38,14 @@ export function resolveVizRenderer(
 export function unregisterVizRenderer(type: VizType): void {
 	vizRendererRegistry.delete(type);
 }
+
+// Built-in registrations.
+//
+// Each concrete renderer registers itself here at module load so
+// `VizRenderer.svelte` can resolve it on first paint without any
+// runtime side-channel. Mirrors the eager-import pattern used by
+// `chat/tools/registry.ts`.
+registerVizRenderer(
+	'loading',
+	LoadingViz as unknown as Component<VizRendererProps>,
+);
