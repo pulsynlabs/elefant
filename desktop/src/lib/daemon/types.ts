@@ -143,6 +143,13 @@ export interface ElefantConfig {
 	providers: ProviderEntry[];
 	defaultProvider: string;
 	logLevel: LogLevel;
+	/**
+	 * Fraction of the model context window at which the daemon compacts
+	 * older messages. Persisted as a decimal in `[0.5, 0.95]`. The desktop
+	 * UI surfaces this as an integer percentage (50–95). Defaults to 0.8
+	 * on the daemon side when unset.
+	 */
+	compactionThreshold?: number;
 }
 
 /** A single model entry within a provider's model list. */

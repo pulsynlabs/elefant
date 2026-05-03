@@ -9,6 +9,11 @@
 	let logLevel = $state<LogLevel>('info');
 	let defaultProvider = $state('');
 	let availableProviders = $state<string[]>([]);
+	// Compaction threshold is shown as an integer percentage (50–95) in the
+	// UI but persisted as a decimal (0.5–0.95) on the daemon. Default to 80%
+	// to match the daemon's `compactionThreshold` schema default of 0.8.
+	let compactionThresholdPercent = $state(80);
+	let compactionThresholdError = $state('');
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let saveMessage = $state('');
 
@@ -19,17 +24,46 @@
 			logLevel = config.logLevel;
 			defaultProvider = config.defaultProvider;
 			availableProviders = config.providers.map(p => p.name);
+			// Daemon stores threshold as a decimal; surface it as a whole-number
+			// percentage so users think in human-readable terms. Falls back to
+			// the daemon-side default (0.8 → 80) when the field is unset.
+			const decimal = config.compactionThreshold ?? 0.8;
+			compactionThresholdPercent = Math.round(decimal * 100);
 		}
 	});
 
+	function validateCompactionThreshold(): boolean {
+		const value = compactionThresholdPercent;
+		if (!Number.isFinite(value) || !Number.isInteger(value)) {
+			compactionThresholdError = 'Enter a whole-number percentage between 50 and 95.';
+			return false;
+		}
+		if (value < 50 || value > 95) {
+			compactionThresholdError = `Threshold must be between 50 and 95.`;
+			return false;
+		}
+		compactionThresholdError = '';
+		return true;
+	}
+
 	async function handleSave(): Promise<void> {
+		if (!validateCompactionThreshold()) {
+			saveStatus = 'error';
+			saveMessage = compactionThresholdError;
+			setTimeout(() => { saveStatus = 'idle'; }, 4000);
+			return;
+		}
 		saveStatus = 'saving';
 		try {
 			await settingsStore.setDaemonUrl(daemonUrl);
+			// UI shows percentage; daemon stores decimal in [0.5, 0.95].
+			// Round to 2 decimal places to avoid float artifacts like 0.7500000001.
+			const compactionThreshold = Math.round(compactionThresholdPercent) / 100;
 			await configService.updateConfig({
 				port,
 				logLevel,
 				...(defaultProvider ? { defaultProvider } : {}),
+				compactionThreshold,
 			});
 
 			saveStatus = 'saved';
@@ -94,6 +128,27 @@
 			<option value="error">Error</option>
 		</select>
 		<span class="field-hint">Written to elefant.config.json. Requires daemon restart.</span>
+	</div>
+
+	<div class="form-group">
+		<label class="field-label" for="compactionThreshold">Context compaction threshold (%)</label>
+		<input
+			id="compactionThreshold"
+			type="number"
+			class="field-input field-input-narrow"
+			bind:value={compactionThresholdPercent}
+			min={50}
+			max={95}
+			step={1}
+			aria-label="Context compaction threshold in percent"
+		/>
+		<span class="field-hint">
+			When the conversation reaches this % of the context window, Elefant compacts older messages.
+			Range: 50–95. Applied on the next compaction trigger — no restart required.
+		</span>
+		{#if compactionThresholdError}
+			<span class="field-error" role="alert">{compactionThresholdError}</span>
+		{/if}
 	</div>
 
 	<div class="form-actions">
@@ -176,6 +231,12 @@
 	.field-hint {
 		font-size: var(--font-size-xs);
 		color: var(--color-text-disabled);
+	}
+
+	.field-error {
+		font-size: var(--font-size-xs);
+		color: var(--color-error);
+		font-weight: var(--font-weight-medium);
 	}
 
 	.form-actions {
