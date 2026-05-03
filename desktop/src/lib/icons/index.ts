@@ -64,6 +64,7 @@ export { default as RunsIcon } from '@hugeicons/core-free-icons/PlayIcon';
 export { default as WorktreesIcon } from '@hugeicons/core-free-icons/FolderTreeIcon';
 export { default as SpecModeIcon } from '@hugeicons/core-free-icons/CheckListIcon';
 export { default as ResearchIcon } from '@hugeicons/core-free-icons/Book02Icon';
+export { default as ExternalLinkIcon } from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
 
 // MCP (Model Context Protocol)
 export { default as McpServerIcon } from '@hugeicons/core-free-icons/McpServerIcon';

@@ -393,6 +393,63 @@ describe('config routes - top-level config CRUD', () => {
 		expect(payload.error).toBe('Invalid request');
 	});
 
+	it('PUT /api/config persists the research block and round-trips via GET', async () => {
+		const putResponse = await app.handle(
+			new Request('http://localhost/api/config', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					research: {
+						enabled: true,
+						provider: 'ollama',
+						editorOverride: '/usr/local/bin/code',
+						providerConfig: {
+							baseUrl: 'http://localhost:11434',
+						},
+					},
+				}),
+			}),
+		);
+		expect(putResponse.status).toBe(200);
+		const putPayload = (await putResponse.json()) as { ok: boolean };
+		expect(putPayload.ok).toBe(true);
+
+		const getResponse = await app.handle(new Request('http://localhost/api/config'));
+		expect(getResponse.status).toBe(200);
+		const getPayload = (await getResponse.json()) as {
+			ok: boolean;
+			config: {
+				research?: {
+					enabled: boolean;
+					provider: string;
+					editorOverride?: string;
+					providerConfig?: { baseUrl?: string };
+				};
+			};
+		};
+		expect(getPayload.ok).toBe(true);
+		expect(getPayload.config.research?.enabled).toBe(true);
+		expect(getPayload.config.research?.provider).toBe('ollama');
+		expect(getPayload.config.research?.editorOverride).toBe('/usr/local/bin/code');
+		expect(getPayload.config.research?.providerConfig?.baseUrl).toBe('http://localhost:11434');
+	});
+
+	it('PUT /api/config rejects an invalid research provider value', async () => {
+		const response = await app.handle(
+			new Request('http://localhost/api/config', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					research: { provider: 'not-a-real-provider' },
+				}),
+			}),
+		);
+		expect(response.status).toBe(400);
+		const payload = (await response.json()) as { ok: boolean; error: string };
+		expect(payload.ok).toBe(false);
+		expect(payload.error).toBe('Invalid request');
+	});
+
 	it('PUT /api/config with empty body does not change existing compactionThreshold', async () => {
 		// First set a known value
 		writeFileSync(CONFIG_FILE, buildMinimalConfig({ compactionThreshold: 0.75 }));

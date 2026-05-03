@@ -41,7 +41,12 @@ export async function readConfig(): Promise<MaskedConfig | null> {
 }
 
 export async function updateConfig(
-	patch: Partial<Pick<ElefantConfig, 'port' | 'defaultProvider' | 'logLevel' | 'hardwareAccelerationDisabled'>>,
+	patch: Partial<
+		Pick<
+			ElefantConfig,
+			'port' | 'defaultProvider' | 'logLevel' | 'hardwareAccelerationDisabled' | 'research'
+		>
+	>,
 ): Promise<void> {
 	const res = await apiFetch('/api/config', {
 		method: 'PUT',

@@ -1,10 +1,13 @@
 // Research feature barrel.
 //
-// Re-exports the Research Base reader surface so consumers (App.svelte,
-// the sidebar nav entry, and tests) import from one place.
-//
-// W4.1 ships a placeholder ResearchView; W4.2 / W4.3 will replace it
-// with the real two-pane reader (tree + markdown) and add additional
-// sub-component exports here.
+// Re-exports the Research View surface and its sub-components so consumers
+// (App.svelte, the sidebar nav entry, tests) can import from one place.
 
 export { default as ResearchView } from './ResearchView.svelte';
+export { default as TreePane } from './TreePane.svelte';
+export { default as ReaderPane } from './ReaderPane.svelte';
+export { default as FrontmatterPillBar } from './FrontmatterPillBar.svelte';
+export { default as TableOfContents } from './TableOfContents.svelte';
+export { default as Breadcrumbs } from './Breadcrumbs.svelte';
+
+export { researchStore } from './research-store.svelte.js';
