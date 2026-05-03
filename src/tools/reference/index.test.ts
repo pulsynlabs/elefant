@@ -591,7 +591,7 @@ describe('referenceTool section extraction', () => {
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.data).toContain('The handoff format defines how Elefant agents');
+			expect(result.data).toContain('The XML response envelope is the contract between a subagent and the orchestrator');
 		}
 	});
 });
