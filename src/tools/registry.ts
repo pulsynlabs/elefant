@@ -36,6 +36,7 @@ import { researchGrepTool } from './research_grep/index.js';
 import { createResearchReadTool } from './research_read/index.js';
 import { researchWriteTool, createResearchWriteTool } from './research_write/index.js';
 import { createResearchIndexTool } from './research_index/index.js';
+import { createVisualizeTool } from './visualize/index.js';
 
 export const MAX_TOOL_OUTPUT_CHARS = 100_000;
 
@@ -399,6 +400,8 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 	registry.register(skillTool);
 	registry.register(referenceTool);
 	registry.register(lspTool);
+	const visualizeTool = createVisualizeTool();
+	registry.register(visualizeTool);
 	// Research Base tools — read-only tools available to all agents.
 	// See reference: research-base-workflow (auto-loaded for researcher/writer agents).
 	registry.register(researchGrepTool);
@@ -453,6 +456,8 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	registry.register(skillTool)
 	registry.register(referenceTool)
 	registry.register(lspTool)
+	const visualizeTool = createVisualizeTool()
+	registry.register(visualizeTool)
 
 	// ── Research Base tools (per-run deps) ────────────────────────────────
 	// All agents get read-only research access; researcher/writer/librarian
