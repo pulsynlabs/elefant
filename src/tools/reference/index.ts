@@ -26,16 +26,22 @@ import type { ToolRegistry } from '../registry.js';
 
 /**
  * Format a flat list of references for the `list: true` action.
- * Each line: `name [source]: description`
+ * Each line: `name [source]: description [tag1, tag2, ...]`
  */
 function formatReferencesList(refs: ReferenceInfo[]): string {
-	if (refs.length === 0) {
-		return 'No references available.';
-	}
+  if (refs.length === 0) {
+    return 'No references available.';
+  }
 
-	return refs
-		.map((r) => `${r.name} [${r.source}]: ${r.description}`)
-		.join('\n');
+  return refs
+    .map((r) => {
+      let line = `${r.name} [${r.source}]: ${r.description}`;
+      if (r.frontmatter?.tags && r.frontmatter.tags.length > 0) {
+        line += ` [${r.frontmatter.tags.join(', ')}]`;
+      }
+      return line;
+    })
+    .join('\n');
 }
 
 /**
@@ -122,7 +128,7 @@ const referenceParamsSchema: Record<string, {
 async function executeReference(
 	params: ReferenceParams,
 ): Promise<Result<string, ElefantError>> {
-	const { name, names, list, home, cwd } = params;
+  const { name, names, list, tag, tags, home, cwd } = params;
 	const opts = { home, cwd };
 
 	// Must provide at least one action
@@ -133,12 +139,28 @@ async function executeReference(
 		});
 	}
 
-	// -- List mode -----------------------------------------------------------
-	if (list) {
-		// tag / tags filtering stubbed — Wave 2 wires real filtering
-		const refs = await listReferences(opts);
-		return ok(formatReferencesList(refs));
-	}
+  // -- List mode -----------------------------------------------------------
+  if (list) {
+    let refs = await listReferences(opts);
+
+    // Apply tag filtering (OR logic)
+    const filterTags: string[] = [];
+    if (tag) filterTags.push(tag);
+    if (tags && tags.length > 0) filterTags.push(...tags);
+
+    if (filterTags.length > 0) {
+      refs = refs.filter(
+        (r) =>
+          r.frontmatter?.tags.some((t) => filterTags.includes(t)) ?? false,
+      );
+    }
+
+    if (refs.length === 0 && filterTags.length > 0) {
+      return ok(`No references match tag(s): ${filterTags.join(', ')}`);
+    }
+
+    return ok(formatReferencesList(refs));
+  }
 
 	// -- Multi-load (names[]) -------------------------------------------------
 	if (names && names.length > 0) {

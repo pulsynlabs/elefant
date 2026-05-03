@@ -148,6 +148,164 @@ describe('referenceTool list action', () => {
 			expect(handoffLine).not.toContain('[builtin]');
 		}
 	});
+
+	// -- Tag filtering ----------------------------------------------------
+
+	it('displays tags for refs with valid frontmatter', async () => {
+		// The builtin handoff-format.md has tags: orchestrator, executor, format
+		const result = await executeRef({
+			list: true,
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toContain('handoff-format');
+			expect(result.data).toContain('[orchestrator, executor, format]');
+		}
+	});
+
+	it('filters by single tag', async () => {
+		writeProjectRef(
+			projectDir,
+			'git-workflow',
+			'---\nid: git-workflow\ntitle: Git Workflow\ndescription: Git workflow conventions.\ntags:\n  - git\n  - workflow\n---\n\n# Git\n',
+		);
+
+		const result = await executeRef({
+			list: true,
+			tag: 'git',
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toContain('git-workflow');
+			// Builtin handoff-format has orchestrator, executor, format — not "git"
+			expect(result.data).not.toContain('handoff-format');
+		}
+	});
+
+	it('filters by multiple tags (OR logic)', async () => {
+		writeProjectRef(
+			projectDir,
+			'ref-a',
+			'---\nid: ref-a\ntitle: Ref A\ndescription: First reference.\ntags:\n  - testing\n---\n\n# A\n',
+		);
+		writeProjectRef(
+			projectDir,
+			'ref-b',
+			'---\nid: ref-b\ntitle: Ref B\ndescription: Second reference.\ntags:\n  - review\n---\n\n# B\n',
+		);
+
+		const result = await executeRef({
+			list: true,
+			tags: ['testing', 'review'],
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toContain('ref-a');
+			expect(result.data).toContain('ref-b');
+			// Builtin should not match these tags
+			expect(result.data).not.toContain('handoff-format');
+		}
+	});
+
+	it('combines tag and tags params (treated as OR set)', async () => {
+		writeProjectRef(
+			projectDir,
+			'ref-x',
+			'---\nid: ref-x\ntitle: Ref X\ndescription: X marks the spot.\ntags:\n  - alpha\n---\n\n# X\n',
+		);
+		writeProjectRef(
+			projectDir,
+			'ref-y',
+			'---\nid: ref-y\ntitle: Ref Y\ndescription: Y follows X.\ntags:\n  - beta\n---\n\n# Y\n',
+		);
+
+		const result = await executeRef({
+			list: true,
+			tag: 'alpha',
+			tags: ['beta'],
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toContain('ref-x');
+			expect(result.data).toContain('ref-y');
+		}
+	});
+
+	it('returns clear message when no refs match tag', async () => {
+		const result = await executeRef({
+			list: true,
+			tag: 'nonexistent',
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toBe('No references match tag(s): nonexistent');
+		}
+	});
+
+	it('returns clear message when no refs match multiple tags', async () => {
+		const result = await executeRef({
+			list: true,
+			tags: ['ghost', 'phantom'],
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toBe('No references match tag(s): ghost, phantom');
+		}
+	});
+
+	it('returns all refs when no tag filter is applied', async () => {
+		writeProjectRef(
+			projectDir,
+			'tagged-ref',
+			'---\nid: tagged-ref\ntitle: Tagged Ref\ndescription: A tagged ref.\ntags:\n  - special\n---\n\n# Special\n',
+		);
+
+		const result = await executeRef({
+			list: true,
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toContain('handoff-format'); // builtin
+			expect(result.data).toContain('tagged-ref');    // project
+		}
+	});
+
+	it('refs without frontmatter are excluded by tag filter', async () => {
+		writeProjectRef(projectDir, 'no-fm', '# No Frontmatter\n');
+
+		const result = await executeRef({
+			list: true,
+			tag: 'anything',
+			cwd: projectDir,
+			home: homeDir,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).not.toContain('no-fm');
+		}
+	});
 });
 
 // ---------------------------------------------------------------------------
