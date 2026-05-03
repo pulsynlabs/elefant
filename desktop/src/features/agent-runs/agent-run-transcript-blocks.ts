@@ -14,6 +14,12 @@
 //     block (rendered as AgentTaskCard). The child run's `tool_result`
 //     is suppressed — the task card already represents the whole
 //     delegation; a trailing result block would be noise.
+//   • A `tool_call` with `name === 'visualize'` is silently skipped.
+//     Per MH9, subagents never call `visualize` (orchestrator-only via
+//     toolkit allowlist); this is a defensive guard so any stray viz
+//     calls in subagent transcripts don't render rich viz cards in a
+//     surface where they don't belong. The paired `tool_result` is
+//     also suppressed to keep the transcript clean.
 //   • Any other `tool_call` emits a regular `tool` block and its
 //     `tool_result` is merged back onto the paired display.
 //   • `question` and `terminal` events produce their own blocks.
@@ -84,6 +90,10 @@ export function computeRenderBlocks(
 	const toolCallsById = new Map<string, ToolCallDisplay>();
 	// Track task tool_call_ids so we can suppress their tool_result.
 	const taskToolCallIds = new Set<string>();
+	// Track visualize tool_call_ids so we can suppress their tool_result.
+	// Subagent transcripts never render rich viz; the paired result would
+	// otherwise leak through as a generic ToolCallCard.
+	const vizToolCallIds = new Set<string>();
 	let currentText: { id: string; text: string } | null = null;
 
 	const flushText = (): void => {
@@ -112,6 +122,11 @@ export function computeRenderBlocks(
 			}
 			case 'tool_call': {
 				flushText();
+				if (entry.name === 'visualize') {
+					// Silently skip — see header doc for rationale.
+					vizToolCallIds.add(entry.id);
+					break;
+				}
 				if (entry.name === 'task') {
 					// Dedicated task render block — AgentTaskCard consumes this.
 					const title =
@@ -162,6 +177,10 @@ export function computeRenderBlocks(
 				// Suppress the trailing tool_result for task calls — the
 				// AgentTaskCard already represents the full delegation.
 				if (taskToolCallIds.has(entry.toolCallId)) {
+					break;
+				}
+				// Suppress trailing tool_result for skipped visualize calls.
+				if (vizToolCallIds.has(entry.toolCallId)) {
 					break;
 				}
 				const existing = toolCallsById.get(entry.toolCallId);
