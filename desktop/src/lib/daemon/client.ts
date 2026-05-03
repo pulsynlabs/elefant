@@ -6,6 +6,7 @@ import type {
 	ProviderEntry,
 	ProviderFormat,
 	RegistryProvider,
+	VisualizeModelOverride,
 } from './types.js';
 import { parseSSEStream } from './sse-parser.js';
 import { registry } from './registry.js';
@@ -200,6 +201,30 @@ export class DaemonClient {
 
 			const data = (await response.json()) as { models: FetchedModel[] };
 			return Array.isArray(data?.models) ? data.models : [];
+		} finally {
+			clearTimeout(timeoutId);
+		}
+	}
+
+	async setVisualizeModelOverride(override: VisualizeModelOverride | null): Promise<void> {
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+		try {
+			const response = await fetch(`${this.baseUrl}/api/config`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+					Accept: 'application/json',
+				},
+				body: JSON.stringify({ visualizeModelOverride: override }),
+				signal: controller.signal,
+			});
+
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({})) as { error?: string };
+				throw new Error(body.error ?? `HTTP ${response.status}`);
+			}
 		} finally {
 			clearTimeout(timeoutId);
 		}

@@ -456,7 +456,12 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	registry.register(skillTool)
 	registry.register(referenceTool)
 	registry.register(lspTool)
-	const visualizeTool = createVisualizeTool()
+	const visualizeTool = createVisualizeTool({
+		getConfig: async () => {
+			const config = await deps.configManager.getConfig()
+			return config.ok ? config.data : null
+		},
+	})
 	registry.register(visualizeTool)
 
 	// ── Research Base tools (per-run deps) ────────────────────────────────

@@ -138,6 +138,11 @@ export interface ProviderEntry {
 	format: ProviderFormat;
 }
 
+export interface VisualizeModelOverride {
+	provider: string;
+	model: string;
+}
+
 export type EmbeddingProviderName =
 	| 'bundled-cpu'
 	| 'bundled-gpu'
@@ -170,6 +175,7 @@ export interface ElefantConfig {
 	defaultProvider: string;
 	logLevel: LogLevel;
 	hardwareAccelerationDisabled?: boolean;
+	visualizeModelOverride?: VisualizeModelOverride | null;
 	research?: ResearchConfig;
 }
 

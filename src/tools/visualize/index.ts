@@ -4,10 +4,16 @@ import { ok } from '../../types/result.js'
 import type { ToolDefinition } from '../../types/tools.js'
 import { VisualizeParamsSchema, VizPayloadSchema } from './schemas.js'
 import type { VisualizeParams, VizEnvelope, VizType } from './types.js'
+import type { ElefantConfig } from '../../config/schema.js'
 
 interface VisualizeToolResult {
 	content: string
 	isError: boolean
+}
+
+interface VisualizeToolDeps {
+	config?: Pick<ElefantConfig, 'visualizeModelOverride'>
+	getConfig?: () => Promise<Pick<ElefantConfig, 'visualizeModelOverride'> | null>
 }
 
 const VISUALIZE_DESCRIPTION = 'Render inline viz: mermaid|table|stat-grid|code|research-card|loading|comparison. Pass type, data payload, intent, optional title.'
@@ -16,7 +22,15 @@ function invalidResult(content: string): Result<VisualizeToolResult, ElefantErro
 	return ok({ content, isError: true })
 }
 
-export function createVisualizeTool(): ToolDefinition<VisualizeParams, VisualizeToolResult> {
+async function resolveOverride(deps?: VisualizeToolDeps): Promise<ElefantConfig['visualizeModelOverride']> {
+	if (deps?.config) {
+		return deps.config.visualizeModelOverride
+	}
+
+	return (await deps?.getConfig?.())?.visualizeModelOverride ?? null
+}
+
+export function createVisualizeTool(deps?: VisualizeToolDeps): ToolDefinition<VisualizeParams, VisualizeToolResult> {
 	return {
 		name: 'visualize',
 		description: VISUALIZE_DESCRIPTION,
@@ -75,6 +89,11 @@ export function createVisualizeTool(): ToolDefinition<VisualizeParams, Visualize
 				intent,
 				title,
 				data: dataResult.data,
+			}
+
+			const override = await resolveOverride(deps)
+			if (override) {
+				console.log(`[visualize] routing via override: ${override.provider}/${override.model}`)
 			}
 
 			return ok({ content: JSON.stringify(envelope), isError: false })

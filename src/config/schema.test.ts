@@ -754,6 +754,73 @@ describe('configSchema with MCP fields', () => {
 		}
 	});
 
+	it('defaults visualizeModelOverride to null when not provided', () => {
+		const result = configSchema.safeParse({
+			providers: [],
+			defaultProvider: '',
+		});
+
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.visualizeModelOverride).toBeNull();
+		}
+	});
+
+	it('accepts a strict visualizeModelOverride object', () => {
+		const result = configSchema.safeParse({
+			providers: [],
+			defaultProvider: '',
+			visualizeModelOverride: {
+				provider: 'openai-compatible',
+				model: 'fast-viz-model',
+			},
+		});
+
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.visualizeModelOverride).toEqual({
+				provider: 'openai-compatible',
+				model: 'fast-viz-model',
+			});
+		}
+	});
+
+	it('rejects extra fields in visualizeModelOverride', () => {
+		const result = configSchema.safeParse({
+			providers: [],
+			defaultProvider: '',
+			visualizeModelOverride: {
+				provider: 'openai-compatible',
+				model: 'fast-viz-model',
+				extra: true,
+			},
+		});
+
+		expect(result.success).toBe(false);
+	});
+
+	it('existing config without visualizeModelOverride parses and defaults to null', () => {
+		const config = {
+			port: 8080,
+			providers: [
+				{
+					name: 'openai',
+					baseURL: 'https://api.openai.com/v1',
+					apiKey: 'sk-test123',
+					model: 'gpt-4',
+					format: 'openai' as const,
+				},
+			],
+			defaultProvider: 'openai',
+			logLevel: 'debug' as const,
+		};
+		const result = configSchema.safeParse(config);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.visualizeModelOverride).toBeNull();
+		}
+	});
+
 	it('rejects config with invalid MCP server in mcp array', () => {
 		const config = {
 			providers: [],

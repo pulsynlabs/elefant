@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, mock } from 'bun:test'
 
 import { createVisualizeTool } from './index.js'
 import type { VisualizeParams, VizEnvelope, VizType } from './types.js'
@@ -171,5 +171,32 @@ describe('visualize tool', () => {
 		}
 		expect(result.data.isError).toBe(true)
 		expect(result.data.content).toContain('unknown')
+	})
+
+	it('logs the configured model override after successful validation', async () => {
+		const log = mock(() => undefined)
+		const originalLog = console.log
+		console.log = log
+		try {
+			const overrideTool = createVisualizeTool({
+				config: {
+					visualizeModelOverride: {
+						provider: 'openai-compatible',
+						model: 'fast-viz-model',
+					},
+				},
+			})
+
+			const result = await overrideTool.execute({
+				type: 'loading',
+				data: { msg: 'Routing...', pct: 10 },
+				intent: 'Show routing decision',
+			})
+
+			expect(result.ok).toBe(true)
+			expect(log).toHaveBeenCalledWith('[visualize] routing via override: openai-compatible/fast-viz-model')
+		} finally {
+			console.log = originalLog
+		}
 	})
 })

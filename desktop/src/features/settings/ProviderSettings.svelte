@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { configService } from '$lib/services/config-service.js';
-	import type { ProviderEntry, RegistryProvider } from '$lib/daemon/types.js';
+	import type { ProviderEntry, RegistryProvider, VisualizeModelOverride } from '$lib/daemon/types.js';
 	import ProviderForm from './ProviderForm.svelte';
 	import ProviderQuickAdd from './ProviderQuickAdd.svelte';
 	import { onMount } from 'svelte';
@@ -12,6 +12,11 @@
 	let selectedTemplate = $state<RegistryProvider | undefined>(undefined);
 	let registryMap = $state<Map<string, RegistryProvider>>(new Map());
 	let status = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+	let visualizeOverrideProvider = $state('');
+	let visualizeOverrideModel = $state('');
+	let visualizeOverrideSaved = $state<VisualizeModelOverride | null>(null);
+	let visualizeOverrideSaving = $state(false);
+	let visualizeOverrideError = $state('');
 
 	/**
 	 * Generic fallback icon used when a registry lookup fails.
@@ -35,46 +40,85 @@
 	async function loadProviders(): Promise<void> {
 		const config = await configService.readConfig();
 		providers = config?.providers ?? [];
+		visualizeOverrideSaved = config?.visualizeModelOverride ?? null;
+		visualizeOverrideProvider = visualizeOverrideSaved?.provider ?? '';
+		visualizeOverrideModel = visualizeOverrideSaved?.model ?? '';
+	}
+
+	function setStatus(type: 'success' | 'error', message: string): void {
+		status = { type, message };
+		setTimeout(() => {
+			status = null;
+		}, 3000);
 	}
 
 	async function handleSave(provider: ProviderEntry): Promise<void> {
 		try {
 			if (editingProvider) {
 				await configService.updateProvider(editingProvider.name, provider);
-				status = { type: 'success', message: 'Provider updated' };
+				setStatus('success', 'Provider updated');
 			} else {
 				await configService.addProvider(provider);
-				status = { type: 'success', message: 'Provider added' };
+				setStatus('success', 'Provider added');
 			}
 			await loadProviders();
 			showForm = false;
 			editingProvider = undefined;
 			selectedTemplate = undefined;
 		} catch (error) {
-			status = {
-				type: 'error',
-				message: error instanceof Error ? error.message : 'Failed to save provider',
-			};
+			setStatus('error', error instanceof Error ? error.message : 'Failed to save provider');
 		}
-		setTimeout(() => {
-			status = null;
-		}, 3000);
 	}
 
 	async function handleDelete(name: string): Promise<void> {
 		try {
 			await configService.deleteProvider(name);
 			await loadProviders();
-			status = { type: 'success', message: `Provider "${name}" deleted` };
+			setStatus('success', `Provider "${name}" deleted`);
 		} catch (error) {
-			status = {
-				type: 'error',
-				message: error instanceof Error ? error.message : 'Failed to delete provider',
-			};
+			setStatus('error', error instanceof Error ? error.message : 'Failed to delete provider');
 		}
-		setTimeout(() => {
-			status = null;
-		}, 3000);
+	}
+
+	async function saveVisualizeOverride(): Promise<void> {
+		const provider = visualizeOverrideProvider.trim();
+		const model = visualizeOverrideModel.trim();
+		visualizeOverrideError = '';
+
+		if (!provider || !model) {
+			visualizeOverrideError = 'Provider and model are required. Use Clear to restore the default route.';
+			return;
+		}
+
+		visualizeOverrideSaving = true;
+		try {
+			const nextOverride = { provider, model };
+			await configService.setVisualizeModelOverride(nextOverride);
+			visualizeOverrideSaved = nextOverride;
+			visualizeOverrideProvider = provider;
+			visualizeOverrideModel = model;
+			setStatus('success', 'Visualization override saved');
+		} catch (error) {
+			setStatus('error', error instanceof Error ? error.message : 'Failed to save visualization override');
+		} finally {
+			visualizeOverrideSaving = false;
+		}
+	}
+
+	async function clearVisualizeOverride(): Promise<void> {
+		visualizeOverrideError = '';
+		visualizeOverrideSaving = true;
+		try {
+			await configService.setVisualizeModelOverride(null);
+			visualizeOverrideSaved = null;
+			visualizeOverrideProvider = '';
+			visualizeOverrideModel = '';
+			setStatus('success', 'Visualization override cleared');
+		} catch (error) {
+			setStatus('error', error instanceof Error ? error.message : 'Failed to clear visualization override');
+		} finally {
+			visualizeOverrideSaving = false;
+		}
 	}
 
 	function handleEdit(provider: ProviderEntry): void {
@@ -136,6 +180,65 @@
 			{status.message}
 		</div>
 	{/if}
+
+	<section class="override-card" aria-labelledby="visualize-override-heading">
+		<div class="override-header">
+			<div>
+				<h4 id="visualize-override-heading" class="override-heading">Visualization Model Override</h4>
+				<p class="override-description">
+					Route future visualization structuring through a cheaper or faster provider/model.
+				</p>
+			</div>
+			<span class="override-badge">{visualizeOverrideSaved ? 'Override on' : 'Default route'}</span>
+		</div>
+
+		<div class="override-grid">
+			<label class="field-group" for="visualize-provider">
+				<span class="field-label">Provider</span>
+				<input
+					id="visualize-provider"
+					class="field-input"
+					type="text"
+					bind:value={visualizeOverrideProvider}
+					placeholder="openai-compatible"
+				/>
+			</label>
+
+			<label class="field-group" for="visualize-model">
+				<span class="field-label">Model</span>
+				<input
+					id="visualize-model"
+					class="field-input"
+					type="text"
+					bind:value={visualizeOverrideModel}
+					placeholder="fast-viz-model"
+				/>
+			</label>
+		</div>
+
+		{#if visualizeOverrideError}
+			<p class="field-error">{visualizeOverrideError}</p>
+		{/if}
+
+		<div class="override-actions">
+			<button
+				class="btn-save-override"
+				type="button"
+				onclick={saveVisualizeOverride}
+				disabled={visualizeOverrideSaving}
+			>
+				{visualizeOverrideSaving ? 'Saving...' : 'Save Override'}
+			</button>
+			<button
+				class="btn-clear-override"
+				type="button"
+				onclick={clearVisualizeOverride}
+				disabled={visualizeOverrideSaving || !visualizeOverrideSaved}
+			>
+				Clear
+			</button>
+		</div>
+	</section>
 
 	{#if showQuickAdd}
 		<ProviderQuickAdd
@@ -295,6 +398,134 @@
 		border-color: var(--color-error);
 	}
 
+	.override-card {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		padding: var(--space-4);
+		background-color: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+	}
+
+	.override-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: var(--space-3);
+	}
+
+	.override-heading {
+		font-size: var(--font-size-md);
+		font-weight: var(--font-weight-semibold);
+		color: var(--color-text-primary);
+	}
+
+	.override-description {
+		margin-top: var(--space-1);
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
+	}
+
+	.override-badge {
+		flex-shrink: 0;
+		padding: var(--space-1) var(--space-2);
+		border-radius: var(--radius-full);
+		background-color: color-mix(in oklch, var(--color-primary) 12%, transparent);
+		border: 1px solid color-mix(in oklch, var(--color-primary) 24%, transparent);
+		color: var(--color-primary);
+		font-size: var(--font-size-xs);
+		font-weight: var(--font-weight-medium);
+	}
+
+	.override-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--space-3);
+	}
+
+	.field-group {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.field-label {
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
+		color: var(--color-text-secondary);
+	}
+
+	.field-input {
+		background-color: var(--color-surface-elevated);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		color: var(--color-text-primary);
+		font-family: var(--font-sans);
+		font-size: var(--font-size-md);
+		padding: var(--space-2) var(--space-3);
+		width: 100%;
+		outline: none;
+		transition: border-color var(--transition-fast);
+	}
+
+	.field-input:focus {
+		border-color: var(--color-primary);
+	}
+
+	.field-error {
+		font-size: var(--font-size-sm);
+		color: var(--color-error);
+	}
+
+	.override-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.btn-save-override,
+	.btn-clear-override {
+		border-radius: var(--radius-md);
+		padding: var(--space-2) var(--space-4);
+		font-family: var(--font-sans);
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
+		cursor: pointer;
+		transition:
+			background-color var(--transition-fast),
+			border-color var(--transition-fast),
+			color var(--transition-fast),
+			opacity var(--transition-fast);
+	}
+
+	.btn-save-override {
+		background-color: var(--color-primary);
+		color: var(--color-primary-foreground);
+		border: none;
+	}
+
+	.btn-save-override:hover:not(:disabled) {
+		background-color: var(--color-primary-hover);
+	}
+
+	.btn-clear-override {
+		background: transparent;
+		color: var(--color-text-secondary);
+		border: 1px solid var(--color-border);
+	}
+
+	.btn-clear-override:hover:not(:disabled) {
+		color: var(--color-text-primary);
+		border-color: var(--color-border-strong);
+	}
+
+	.btn-save-override:disabled,
+	.btn-clear-override:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
 	.empty-providers {
 		padding: var(--space-8) var(--space-5);
 		text-align: center;
@@ -444,5 +675,22 @@
 	.btn-action.danger:hover {
 		color: var(--color-error);
 		border-color: var(--color-error);
+	}
+
+	@media (max-width: 640px) {
+		.override-header,
+		.override-actions {
+			align-items: stretch;
+			flex-direction: column;
+		}
+
+		.override-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.btn-save-override,
+		.btn-clear-override {
+			min-height: 44px;
+		}
 	}
 </style>
