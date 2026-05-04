@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import { DAEMON_URL } from '$lib/daemon/client.js';
+	import { PtyBridge } from '../terminal/pty-bridge.js';
 	import { createRenderer } from '../terminal/renderer.js';
 	import type { TerminalRenderer } from '../terminal/renderer.js';
 	import { terminalResize } from '../terminal/terminal-action.js';
@@ -53,6 +55,64 @@
 	// (e.g. user closes the panel mid-spawn).
 	let unsubscribeData: (() => void) | null = null;
 	let cancelled = false;
+	let bridge: PtyBridge | null = null;
+	let resizeObserver: ResizeObserver | null = null;
+	let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const FALLBACK_CHAR_WIDTH_PX = 8.5;
+	const FALLBACK_LINE_HEIGHT_PX = 20;
+
+	function clearResizeDebounce(): void {
+		if (!resizeDebounceTimer) return;
+		clearTimeout(resizeDebounceTimer);
+		resizeDebounceTimer = null;
+	}
+
+	function estimateGridFromContainer(node: HTMLElement): { cols: number; rows: number } {
+		const cols = Math.max(2, Math.floor(node.clientWidth / FALLBACK_CHAR_WIDTH_PX));
+		const rows = Math.max(2, Math.floor(node.clientHeight / FALLBACK_LINE_HEIGHT_PX));
+		return { cols, rows };
+	}
+
+	function resolveRendererGrid(currentRenderer: TerminalRenderer): { cols: number; rows: number } {
+		const withGrid = currentRenderer as unknown as {
+			cols?: number;
+			rows?: number;
+			terminal?: { cols?: number; rows?: number };
+		};
+
+		const cols = withGrid.cols ?? withGrid.terminal?.cols;
+		const rows = withGrid.rows ?? withGrid.terminal?.rows;
+
+		if (typeof cols === 'number' && typeof rows === 'number') {
+			return {
+				cols: Math.max(2, Math.floor(cols)),
+				rows: Math.max(2, Math.floor(rows)),
+			};
+		}
+
+		if (containerEl) {
+			return estimateGridFromContainer(containerEl);
+		}
+
+		return { cols: 80, rows: 24 };
+	}
+
+	function syncResizeToBridge(): void {
+		if (!renderer || !bridge) return;
+		renderer.fit();
+		const { cols, rows } = resolveRendererGrid(renderer);
+		bridge.sendResize(cols, rows);
+	}
+
+	function scheduleResizeSync(): void {
+		if (!renderer || !bridge) return;
+		clearResizeDebounce();
+		resizeDebounceTimer = setTimeout(() => {
+			resizeDebounceTimer = null;
+			syncResizeToBridge();
+		}, 100);
+	}
 
 	onMount(() => {
 		// Defensive: $state is initialised after the first render, so by
@@ -89,6 +149,15 @@
 				// instance on its first `update` tick.
 				renderer = created;
 
+				bridge = new PtyBridge(projectId, sessionId, String(DAEMON_URL));
+				bridge.connect(created);
+
+				resizeObserver = new ResizeObserver(() => {
+					scheduleResizeSync();
+				});
+				resizeObserver.observe(container);
+				scheduleResizeSync();
+
 				// Focus the terminal so the user can type immediately
 				// after activating the tab. Skipped on initial idle mount
 				// when the tab itself is not yet user-visible — the focus
@@ -105,8 +174,13 @@
 
 	onDestroy(() => {
 		cancelled = true;
+		clearResizeDebounce();
+		resizeObserver?.disconnect();
+		resizeObserver = null;
 		unsubscribeData?.();
 		unsubscribeData = null;
+		bridge?.disconnect();
+		bridge = null;
 		renderer?.dispose();
 		renderer = null;
 	});
