@@ -166,6 +166,27 @@ export class LspService implements LspServiceFacade {
     return this.diagnosticStore.get(filePath) ?? [];
   }
 
+  /**
+   * Returns the active LspClient for a file path, lazily spawning a server
+   * if one matches but hasn't been started yet. Returns undefined if no
+   * server matches the file extension or all matching servers fail to spawn.
+   */
+  async getClientForFile(filePath: string): Promise<LspClient | undefined> {
+    const serverIds = extensionToServerIds(filePath);
+    const matchingServers = this.servers.filter((s) => serverIds.includes(s.id));
+    for (const server of matchingServers) {
+      const root = await server.root(filePath);
+      if (!root) continue;
+      const key = `${server.id}::${root}`;
+      const entry = this.clients.get(key);
+      if (entry) return entry.client;
+      // Lazy-spawn if not yet started
+      const client = await this.getOrSpawnClient(server, filePath);
+      if (client) return client;
+    }
+    return undefined;
+  }
+
   async dispose(): Promise<void> {
     for (const entry of this.clients.values()) {
       entry.client.dispose();

@@ -18,6 +18,7 @@ import { editTool } from './edit.js';
 import { globTool } from './glob.js';
 import { grepTool } from './grep.js';
 import { lspTool } from './lsp/index.js';
+import { lspDiagnosticsTool } from './lsp_diagnostics/index.js';
 import { createInteractiveTools } from './interactive/index.js';
 import { readTool } from './read.js';
 import { bashTool } from './shell/index.js';
@@ -424,6 +425,7 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 	registry.register(skillTool);
 	registry.register(referenceTool);
 	registry.register(lspTool);
+	registry.register(lspDiagnosticsTool);
 	const visualizeTool = createVisualizeTool();
 	registry.register(visualizeTool);
 	// Research Base tools — read-only tools available to all agents.
@@ -480,6 +482,7 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	registry.register(skillTool)
 	registry.register(referenceTool)
 	registry.register(lspTool)
+	registry.register(lspDiagnosticsTool)
 	const visualizeTool = createVisualizeTool({
 		getConfig: async () => {
 			const config = await deps.configManager.getConfig()

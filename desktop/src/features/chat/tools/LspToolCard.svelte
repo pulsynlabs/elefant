@@ -102,7 +102,6 @@
 					<pre class="lsp-raw">{content}</pre>
 				{/if}
 
-				<span class="lsp-experimental">Experimental \u2014 ELEFANT_EXPERIMENTAL_LSP=true required</span>
 			</div>
 		{/if}
 	{/snippet}
@@ -205,9 +204,4 @@
 		margin: 0;
 	}
 
-	.lsp-experimental {
-		font-size: var(--font-size-xs);
-		color: var(--color-text-muted);
-		font-style: italic;
-	}
 </style>
