@@ -8,6 +8,7 @@
  */
 
 export { default as RightPanel } from './RightPanel.svelte';
+export { default as RightPanelMobile } from './RightPanelMobile.svelte';
 export { default as PanelTabs } from './PanelTabs.svelte';
 export { default as TokenBar } from './TokenBar.svelte';
 export { default as TerminalTab } from './tabs/TerminalTab.svelte';
