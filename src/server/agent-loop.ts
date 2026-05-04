@@ -67,6 +67,20 @@ interface EffectiveMcpTools {
 	selective: boolean
 }
 
+function createEffectiveToolSet(tools: ToolDefinition[], runContext: RunContext): ToolDefinition[] {
+	return tools.filter((tool) => {
+		if (tool.alwaysLoad === true) {
+			return true
+		}
+
+		if (tool.deferred !== true) {
+			return true
+		}
+
+		return runContext.discoveredTools.has(tool.name)
+	})
+}
+
 function createToolResult(toolCallId: string, content: string, isError: boolean): ToolResult {
 	return {
 		toolCallId,
@@ -441,6 +455,7 @@ export async function* runAgentLoop(
 		}
 
 		const effectiveMcpTools = createEffectiveMcpTools(options)
+		const effectiveToolSet = createEffectiveToolSet(effectiveMcpTools.tools, options.runContext)
 
 		const pendingToolCalls: ToolCall[] = []
 		let finishReason: 'stop' | 'tool_calls' | 'length' | 'error' = 'stop'
@@ -486,7 +501,7 @@ export async function* runAgentLoop(
 			? appendManifestToMessages(transformedMessages, effectiveMcpTools.manifest)
 			: transformedMessages
 
-		for await (const event of adapterResult.data.sendMessage(outgoingMessages, effectiveMcpTools.tools, {
+		for await (const event of adapterResult.data.sendMessage(outgoingMessages, effectiveToolSet, {
 			signal: options.runContext.signal,
 			provider: options.provider,
 			maxTokens: options.maxTokens,

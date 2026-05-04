@@ -1005,6 +1005,106 @@ describe('runAgentLoop', () => {
 		expect(capturedTools).toEqual([['native']])
 	})
 
+	it('withholds deferred built-in tools from API tool array before discovery', async () => {
+		const capturedTools: string[][] = []
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: [
+					baseTool('native'),
+					{ ...baseTool('deferred-tool'), deferred: true },
+				],
+				hookRegistry: new HookRegistry(),
+				runContext: createRunContext('conv-deferred-builtin-hidden'),
+			}),
+		)
+
+		expect(capturedTools).toEqual([['native']])
+	})
+
+	it('promotes discovered deferred built-in tools on the next iteration', async () => {
+		const capturedTools: string[][] = []
+		let turn = 0
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				turn += 1
+				if (turn === 1) {
+					yield {
+						type: 'tool_call_complete',
+						toolCall: { id: 'discover-1', name: 'tool_search', arguments: { names: ['deferred-tool'] } },
+					}
+					yield { type: 'done', finishReason: 'tool_calls' }
+					return
+				}
+
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+		const runContext = createRunContext('conv-deferred-builtin-promote')
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async (_name, args) => {
+					const payload = typeof args === 'object' && args !== null ? args as Record<string, unknown> : {}
+					const names = Array.isArray(payload.names) ? payload.names : []
+					if (names.includes('deferred-tool')) {
+						runContext.discoveredTools.add('deferred-tool')
+					}
+					return { ok: true, data: '{"tools":[{"name":"deferred-tool"}]}' }
+				},
+			}, {
+				messages: [{ role: 'user', content: 'discover' }],
+				tools: [
+					{ ...baseTool('tool_search'), alwaysLoad: true },
+					{ ...baseTool('deferred-tool'), deferred: true },
+				],
+				hookRegistry: new HookRegistry(),
+				runContext,
+			}),
+		)
+
+		expect(capturedTools[0]).toEqual(['tool_search'])
+		expect(capturedTools[1]).toEqual(['tool_search', 'deferred-tool'])
+	})
+
+	it('always includes alwaysLoad tools even when deferred is true', async () => {
+		const capturedTools: string[][] = []
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: [
+					{ ...baseTool('always-tool'), deferred: true, alwaysLoad: true },
+				],
+				hookRegistry: new HookRegistry(),
+				runContext: createRunContext('conv-deferred-always-load'),
+			}),
+		)
+
+		expect(capturedTools).toEqual([['always-tool']])
+	})
+
 	it('leaves tools unchanged when mcpManager has no tools', async () => {
 		const capturedTools: string[][] = []
 		const adapter: ProviderAdapter = {
