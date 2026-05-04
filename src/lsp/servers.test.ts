@@ -45,29 +45,45 @@ afterEach(async () => {
 });
 
 describe('LSP server registry', () => {
-  it('exports one server definition per supported server id', () => {
-    expect(ALL_SERVERS.map((server) => server.id)).toEqual([
-      'typescript',
-      'pyright',
-      'pylsp',
-      'gopls',
-      'rust-analyzer',
-      'css',
-      'html',
-      'json',
-      'yaml',
-      'marksman',
-    ]);
+  it('exports server definitions for all supported languages', () => {
+    const ids = ALL_SERVERS.map((s) => s.id);
+    // Spot-check key entries rather than asserting the full list, so adding
+    // more servers doesn't require updating this test.
+    expect(ids).toContain('typescript');
+    expect(ids).toContain('svelte');
+    expect(ids).toContain('vue');
+    expect(ids).toContain('pyright');
+    expect(ids).toContain('pylsp');
+    expect(ids).toContain('ruff');
+    expect(ids).toContain('gopls');
+    expect(ids).toContain('rust-analyzer');
+    expect(ids).toContain('clangd');
+    expect(ids).toContain('css');
+    expect(ids).toContain('html');
+    expect(ids).toContain('json');
+    expect(ids).toContain('yaml');
+    expect(ids).toContain('marksman');
+    expect(ids).toContain('kotlin');
+    expect(ids).toContain('gleam');
+    expect(ids).toContain('zig');
+    expect(ids).toContain('solidity');
+    // No duplicates
+    expect(ids.length).toBe(new Set(ids).size);
+    // At least 40 servers registered
+    expect(ids.length).toBeGreaterThanOrEqual(40);
   });
 
   it('routes common extensions to server ids', () => {
     expect(extensionToServerIds('example.ts')).toEqual(['typescript']);
-    expect(extensionToServerIds('example.py')).toEqual(['pyright', 'pylsp']);
+    expect(extensionToServerIds('example.py')).toEqual(['pyright', 'pylsp', 'ruff']);
     expect(extensionToServerIds('example.go')).toEqual(['gopls']);
     expect(extensionToServerIds('example.rs')).toEqual(['rust-analyzer']);
     expect(extensionToServerIds('example.css')).toEqual(['css']);
     expect(extensionToServerIds('example.json')).toEqual(['json']);
     expect(extensionToServerIds('example.md')).toEqual(['marksman']);
+    expect(extensionToServerIds('example.svelte')).toEqual(['svelte']);
+    expect(extensionToServerIds('example.gleam')).toEqual(['gleam']);
+    expect(extensionToServerIds('example.sol')).toEqual(['solidity']);
     expect(extensionToServerIds('example.unknown')).toEqual([]);
   });
 

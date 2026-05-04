@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 
 import { LspClient } from '../tools/lsp/client.js';
+import { triggerInstall, hasFailed, isInstalling } from './installer.js';
 import { ALL_SERVERS } from './servers.js';
 import type { LspDiagnostic, ServerInfo } from './types.js';
 import { extensionToServerIds } from './language.js';
@@ -99,6 +100,10 @@ export class LspService implements LspServiceFacade {
       try {
         const handle = await server.spawn(root);
         if (!handle) {
+          // Binary not found — trigger background install if available and not already attempted
+          if (server.install && !hasFailed(server.id) && !isInstalling(server.id)) {
+            triggerInstall(server.id, server.install);
+          }
           return undefined;
         }
 

@@ -1,3 +1,5 @@
+import type { InstallMethod } from './installer.js';
+
 export interface LspPosition {
   line: number;
   character: number;
@@ -32,4 +34,6 @@ export interface ServerInfo {
   extensions: string[];
   root(filePath: string): Promise<string | undefined>;
   spawn(root: string): Promise<Handle | undefined>;
+  /** How to auto-install this server if the binary is not found. */
+  install?: InstallMethod;
 }
