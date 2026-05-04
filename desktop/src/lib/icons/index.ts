@@ -66,6 +66,10 @@ export { default as SpecModeIcon } from '@hugeicons/core-free-icons/CheckListIco
 export { default as ResearchIcon } from '@hugeicons/core-free-icons/Book02Icon';
 export { default as ExternalLinkIcon } from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
 
+// Layout / Panels
+export { default as PanelRightIcon } from '@hugeicons/core-free-icons/PanelRightIcon';
+export { default as PanelRightCloseIcon } from '@hugeicons/core-free-icons/PanelRightCloseIcon';
+
 // MCP (Model Context Protocol)
 export { default as McpServerIcon } from '@hugeicons/core-free-icons/McpServerIcon';
 export { default as PlugIcon } from '@hugeicons/core-free-icons/Plug01Icon';

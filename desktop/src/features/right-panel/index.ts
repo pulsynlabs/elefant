@@ -9,5 +9,6 @@
 
 export { default as RightPanel } from './RightPanel.svelte';
 export { default as PanelTabs } from './PanelTabs.svelte';
-export { default as TokenBar, formatTokens } from './TokenBar.svelte';
+export { default as TokenBar } from './TokenBar.svelte';
+export { rightPanelStore } from './right-panel.svelte.js';
 export type { TabId, PanelTabDescriptor } from './PanelTabs.svelte';
