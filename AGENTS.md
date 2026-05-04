@@ -249,3 +249,7 @@ The chat input supports client-side slash commands intercepted before reaching t
 - `/redo` — Redo a previously undone response.
 - `/btw [question]` — Ask a tangential question in ephemeral side context without polluting main conversation history.
 - `/back` — Return to the main conversation from side context.
+
+### Agent Visualization
+
+The `visualize` tool enables rich inline rendering (mermaid diagrams, stat grids, research cards, etc.) directly in the chat transcript. The main orchestrator agent can call `visualize` with structured data; subagents can suggest viz via `<suggest-viz type="..." data="..." />` in their closing XML, which the orchestrator may choose to render. See the full guide at [`docs/agent-rich-viz.md`](docs/agent-rich-viz.md).
