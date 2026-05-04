@@ -37,6 +37,7 @@ export { default as InfoIcon } from '@hugeicons/core-free-icons/InformationCircl
 export { default as CrossIcon } from '@hugeicons/core-free-icons/Cancel01Icon';
 export { default as CheckSquareIcon } from '@hugeicons/core-free-icons/CheckmarkSquare02Icon';
 export { default as UncheckSquareIcon } from '@hugeicons/core-free-icons/Square01Icon';
+export { default as InProgressIcon } from '@hugeicons/core-free-icons/Loading03Icon';
 
 // Utility
 export { default as TerminalIcon } from '@hugeicons/core-free-icons/TerminalIcon';

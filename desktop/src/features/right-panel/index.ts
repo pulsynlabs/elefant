@@ -10,5 +10,8 @@
 export { default as RightPanel } from './RightPanel.svelte';
 export { default as PanelTabs } from './PanelTabs.svelte';
 export { default as TokenBar } from './TokenBar.svelte';
+export { default as TodosTab } from './tabs/TodosTab.svelte';
 export { rightPanelStore } from './right-panel.svelte.js';
+export { sessionTodosStore } from '$lib/stores/session-todos.svelte.js';
 export type { TabId, PanelTabDescriptor } from './PanelTabs.svelte';
+export type { TodoItem, TodoStatus } from '$lib/stores/session-todos.svelte.js';

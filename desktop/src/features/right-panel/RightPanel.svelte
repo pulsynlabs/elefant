@@ -8,6 +8,8 @@
 		CheckSquareIcon,
 	} from '$lib/icons/index.js';
 	import PanelTabs, { type PanelTabDescriptor, type TabId } from './PanelTabs.svelte';
+	import FileChangesTab from './tabs/FileChangesTab.svelte';
+	import TodosTab from './tabs/TodosTab.svelte';
 
 	type Props = {
 		/** Currently active tab — owned externally by the persistence store. */
@@ -90,15 +92,9 @@
 							<p>Terminal</p>
 						</div>
 					{:else if tab.id === 'files'}
-						<div class="tab-placeholder">
-							<HugeiconsIcon icon={EditIcon} size={28} strokeWidth={1.4} />
-							<p>File Changes</p>
-						</div>
+						<FileChangesTab />
 					{:else}
-						<div class="tab-placeholder">
-							<HugeiconsIcon icon={CheckSquareIcon} size={28} strokeWidth={1.4} />
-							<p>Todos</p>
-						</div>
+						<TodosTab />
 					{/if}
 				</div>
 			{/if}
