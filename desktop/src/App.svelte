@@ -266,7 +266,7 @@
 		{/snippet}
 
 		{#snippet topbar()}
-			<TopBar onToggleSidebar={toggleSidebar}>
+			<TopBar onToggleSidebar={toggleSidebar} {layoutMode}>
 				<ConnectionStatus />
 				<ThemeToggle />
 			</TopBar>
