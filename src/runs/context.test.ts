@@ -55,7 +55,7 @@ describe('buildInitialMessages', () => {
 })
 
 describe('createRunContext', () => {
-	it('initialises discoveredMcpTools as an empty Set', () => {
+	it('initialises discoveredTools as an empty Set', () => {
 		const context = createRunContext({
 			runId: 'run-1',
 			depth: 0,
@@ -66,11 +66,11 @@ describe('createRunContext', () => {
 			signal: new AbortController().signal,
 		})
 
-		expect(context.discoveredMcpTools).toBeInstanceOf(Set)
-		expect(context.discoveredMcpTools.size).toBe(0)
+		expect(context.discoveredTools).toBeInstanceOf(Set)
+		expect(context.discoveredTools.size).toBe(0)
 	})
 
-	it('keeps discoveredMcpTools mutable on the same context reference', () => {
+	it('keeps discoveredTools mutable on the same context reference', () => {
 		const context = createRunContext({
 			runId: 'run-1',
 			depth: 0,
@@ -82,8 +82,8 @@ describe('createRunContext', () => {
 		})
 
 		const sameReference = context
-		sameReference.discoveredMcpTools.add('read_file')
+		sameReference.discoveredTools.add('read_file')
 
-		expect(context.discoveredMcpTools.has('read_file')).toBe(true)
+		expect(context.discoveredTools.has('read_file')).toBe(true)
 	})
 })

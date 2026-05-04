@@ -16,14 +16,14 @@ export interface InitialMessagesSource {
 	getMessages: () => Message[]
 }
 
-export type CreateRunContextInput = Omit<RunContext, 'discoveredMcpTools'> & {
-	discoveredMcpTools?: Set<string>
+export type CreateRunContextInput = Omit<RunContext, 'discoveredTools'> & {
+	discoveredTools?: Set<string>
 }
 
 export function createRunContext(input: CreateRunContextInput): RunContext {
 	return {
 		...input,
-		discoveredMcpTools: input.discoveredMcpTools ?? new Set<string>(),
+		discoveredTools: input.discoveredTools ?? new Set<string>(),
 	}
 }
 

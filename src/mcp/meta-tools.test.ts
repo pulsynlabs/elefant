@@ -28,7 +28,7 @@ function entry(serverName: string, mcpTool: Tool): ToolWithMeta {
 	return { serverId: `${serverName}-id`, serverName, tool: mcpTool };
 }
 
-function runContext(discoveredMcpTools = new Set<string>()): RunContext {
+function runContext(discoveredTools = new Set<string>()): RunContext {
 	return {
 		runId: 'run-1',
 		depth: 0,
@@ -37,7 +37,7 @@ function runContext(discoveredMcpTools = new Set<string>()): RunContext {
 		sessionId: 'session-1',
 		projectId: 'project-1',
 		signal: new AbortController().signal,
-		discoveredMcpTools,
+		discoveredTools,
 	};
 }
 
@@ -94,7 +94,7 @@ describe('createMcpSearchToolsTool', () => {
 		}
 	});
 
-	it('mutates runContext.discoveredMcpTools and strips schema noise', async () => {
+	it('mutates runContext.discoveredTools and strips schema noise', async () => {
 		const ctx = runContext();
 		const searchTool = createMcpSearchToolsTool({
 			manager: managerReturning([entry('filesystem', tool('read_file', 'Read local files'))]),
@@ -103,7 +103,7 @@ describe('createMcpSearchToolsTool', () => {
 
 		const result = await searchTool.execute({ query: 'read' });
 
-		expect(ctx.discoveredMcpTools.has('read_file')).toBe(true);
+		expect(ctx.discoveredTools.has('read_file')).toBe(true);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			const schema = parseToolResult(result.data).tools[0]?.input_schema;
@@ -124,7 +124,7 @@ describe('createMcpSearchToolsTool', () => {
 		const result = await searchTool.execute({ query: 'select:read_file' });
 
 		expect(result.ok).toBe(true);
-		expect(ctx.discoveredMcpTools.size).toBe(1);
+		expect(ctx.discoveredTools.size).toBe(1);
 		if (result.ok) {
 			expect(parseToolResult(result.data).tools.map((match) => match.name)).toEqual(['read_file']);
 		}

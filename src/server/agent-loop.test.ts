@@ -88,7 +88,7 @@ function createRunContext(runId: string) {
 		sessionId: `session-${runId}`,
 		projectId: 'project-test',
 		signal: new AbortController().signal,
-		discoveredMcpTools: new Set<string>(),
+		discoveredTools: new Set<string>(),
 	}
 }
 
@@ -1124,7 +1124,7 @@ describe('runAgentLoop', () => {
 				execute: async (_name, args) => {
 					const payload = typeof args === 'object' && args !== null ? args as Record<string, unknown> : {}
 					if (payload.query === 'select:read_file') {
-						runContext.discoveredMcpTools.add('read_file')
+						runContext.discoveredTools.add('read_file')
 					}
 					return { ok: true, data: '{"tools":[{"name":"read_file"}]}' }
 				},

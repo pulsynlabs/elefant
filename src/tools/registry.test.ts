@@ -471,7 +471,7 @@ describe('ToolRegistry', () => {
 				sessionId: 'session-1',
 				projectId: 'project-1',
 				signal: new AbortController().signal,
-				discoveredMcpTools: new Set<string>(),
+				discoveredTools: new Set<string>(),
 			},
 		})
 

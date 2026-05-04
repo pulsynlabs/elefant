@@ -105,7 +105,7 @@ export function createMcpSearchToolsTool(deps: {
 
 			const runContext = deps.getRunContext();
 			for (const match of matches) {
-				runContext.discoveredMcpTools.add(match.tool.name);
+				runContext.discoveredTools.add(match.tool.name);
 			}
 
 			const result: McpSearchToolResult = {

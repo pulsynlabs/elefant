@@ -249,7 +249,7 @@ function createEffectiveMcpTools(options: AgentLoopOptions): EffectiveMcpTools {
 		return { tools: [...baseTools, ...allSessionMcpDefinitions], manifest: '', selective: false }
 	}
 
-	const selectedRawNames = new Set<string>(options.runContext.discoveredMcpTools)
+	const selectedRawNames = new Set<string>(options.runContext.discoveredTools)
 	for (const entry of sessionScopedMcpTools) {
 		if (isAlwaysLoadTool(entry.tool) || options.mcpManager.getPinnedTools(entry.serverId).includes(entry.tool.name)) {
 			selectedRawNames.add(entry.tool.name)
