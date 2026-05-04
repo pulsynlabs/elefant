@@ -2,6 +2,8 @@
 	import type { ToolCardProps } from './types.js';
 	import ToolCardShell from './ToolCardShell.svelte';
 	import { parseUnifiedDiff, extractFilePath } from '$lib/daemon/diff-parser.js';
+	import { parseLspDiagnostics } from '$lib/daemon/lsp-diagnostic-parser.js';
+	import type { DiagnosticInput } from '$lib/types/diagnostics.js';
 
 	let { toolCall }: ToolCardProps = $props();
 
@@ -24,6 +26,12 @@
 		return parseUnifiedDiff(toolCall.result.content);
 	});
 
+	const lspDiagnostics = $derived<DiagnosticInput[]>(
+		!toolCall.result?.content || toolCall.result.isError
+			? []
+			: parseLspDiagnostics(toolCall.result.content)
+	);
+
 	const subtitle = $derived(filePath ?? undefined);
 </script>
 
@@ -43,6 +51,7 @@
 							original={parsed.original}
 							modified={parsed.modified}
 							mode="unified"
+							diagnostics={lspDiagnostics}
 						/>
 					{/if}
 				{/await}
