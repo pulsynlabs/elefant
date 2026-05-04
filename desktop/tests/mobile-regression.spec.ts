@@ -61,6 +61,12 @@ async function loadApp(page: Page): Promise<void> {
  * Open the mobile drawer, click a nav item, then close the drawer.
  * On mobile (≤640px) the drawer is a fixed overlay — we cycle it open/closed
  * to reach nav items. Matches the audit spec's navigateViaDrawer pattern.
+ *
+ * Note (W3.T2 / MH3): The drawer Sidebar and MobileBottomNav both expose
+ * navigation buttons with overlapping labels (e.g. "Settings", "Models").
+ * To avoid strict-mode violations, click queries are scoped to the drawer
+ * dialog. The bottom-nav path is exercised by the dedicated test in Test
+ * Group 6.
  */
 async function navigateTo(page: Page, navLabel: string): Promise<void> {
   // Open drawer via hamburger
@@ -73,8 +79,12 @@ async function navigateTo(page: Page, navLabel: string): Promise<void> {
     .locator(".mobile-drawer.drawer-open")
     .waitFor({ state: "visible", timeout: 5000 });
 
-  // Click the nav item
-  await page.getByRole("button", { name: navLabel, exact: true }).click();
+  // Click the nav item — scope to the drawer dialog so we don't collide
+  // with the same label exposed by the bottom-nav primary tabs.
+  await page
+    .getByRole("dialog", { name: "Navigation" })
+    .getByRole("button", { name: navLabel, exact: true })
+    .click();
   await page.waitForTimeout(400);
 
   // Close drawer via backdrop. Click at a position outside the drawer
@@ -396,7 +406,83 @@ test.describe("Right Panel — Mobile Surface", () => {
   });
 });
 
-// ── Test Group 5: Chat Input Bottom Edge ──────────────────────────────────────
+// ── Test Group 5: Mobile Bottom Nav (W3.T2 / MH3) ────────────────────────────
+//
+// Bottom nav is the primary navigation surface on ≤640px viewports.
+// It must be present at mobile widths, absent at desktop widths, and expose
+// 5 tabs (Chat, Projects, Models, Settings, More) with ≥44×44px hit areas.
+
+test.describe("Mobile Bottom Nav", () => {
+  test.use({ viewport: MOBILE });
+  test.setTimeout(30000);
+
+  test("bottom nav renders at 390×844 with 5 tabs and 44px hit areas", async ({
+    page,
+  }) => {
+    await loadApp(page);
+
+    const nav = page.getByRole("navigation", { name: "Primary navigation" });
+    await expect(nav).toBeVisible();
+
+    const tabs = nav.locator(".nav-tab");
+    await expect(tabs).toHaveCount(5);
+
+    // Each tab must hit the 44×44px floor — covers MH3 + MH6 acceptance.
+    for (const label of ["Chat", "Projects", "Models", "Settings", "More"]) {
+      const btn = nav.getByRole("button", { name: label, exact: true });
+      await expect(btn).toBeVisible();
+      const box = await btn.boundingBox();
+      expect(box).not.toBeNull();
+      if (box) {
+        expect(box.height).toBeGreaterThanOrEqual(44);
+        expect(box.width).toBeGreaterThanOrEqual(44);
+      }
+    }
+  });
+
+  test('"More" tab opens the secondary-nav sheet', async ({ page }) => {
+    await loadApp(page);
+
+    const nav = page.getByRole("navigation", { name: "Primary navigation" });
+    const moreBtn = nav.getByRole("button", { name: "More", exact: true });
+
+    // Sheet absent before tap
+    await expect(
+      page.getByRole("dialog", { name: "More navigation" })
+    ).toHaveCount(0);
+
+    await moreBtn.click();
+    await page.waitForTimeout(400); // slide-up animation
+
+    // Sheet visible after tap
+    const sheet = page.getByRole("dialog", { name: "More navigation" });
+    await expect(sheet).toBeVisible();
+
+    // Sheet exposes the secondary destinations
+    for (const label of [
+      "Agents",
+      "Runs",
+      "Worktrees",
+      "Spec Mode",
+      "Research",
+      "About",
+    ]) {
+      await expect(
+        sheet.getByRole("button", { name: label, exact: true })
+      ).toBeVisible();
+    }
+  });
+
+  test("bottom nav is absent at desktop widths", async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await loadApp(page);
+
+    const nav = page.getByRole("navigation", { name: "Primary navigation" });
+    await expect(nav).toHaveCount(0);
+  });
+});
+
+// ── Test Group 6: Chat Input Bottom Edge ──────────────────────────────────────
 
 test.describe("Chat Input Visibility", () => {
   test.use({ viewport: MOBILE });

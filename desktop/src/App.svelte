@@ -32,6 +32,8 @@
 	import { SpecModeView } from "./features/spec-mode/index.js";
 	import { ResearchView } from "./features/research/index.js";
 	import { RightPanel, RightPanelMobile, TokenBar, rightPanelStore } from "./features/right-panel/index.js";
+	import MobileBottomNav from "$lib/components/layout/MobileBottomNav.svelte";
+	import MoreNavSheet from "$lib/components/layout/MoreNavSheet.svelte";
 
 	type NavigationRuntime = typeof navigationStore & {
 		initNavigation: (opts: { getActiveProjectId: () => string | null }) => void;
@@ -44,6 +46,10 @@
 	let layoutMode = $state<LayoutMode>('expanded');
 	let drawerOpen = $state(false);
 	let isDesignSystemRoute = $state(false);
+	// "More" secondary-nav sheet open state (W3.T4). Lives at the App
+	// level alongside drawerOpen so the bottom nav (a sibling of AppShell)
+	// can drive it without prop-drilling through the shell.
+	let moreSheetOpen = $state(false);
 
 	// Right session panel (SPEC MH1, MH9, MH2). Driven by the persistence
 	// store; the in-chat topbar toggle (ChatView.svelte) flips
@@ -405,6 +411,20 @@
 			aria-label="Close session panel"
 			tabindex="-1"
 		></button>
+	{/if}
+
+	<!-- Mobile bottom navigation bar (W3.T2 / MH3). Sibling of AppShell so
+	     the shell's overflow:hidden doesn't clip its fixed positioning, and
+	     so its z-index is independent of the grid. Only mounted in
+	     mobileOverlay mode — desktop and tablet views (>640px) use the
+	     existing inline sidebar and never see this nav. The "More" tap
+	     opens MoreNavSheet for secondary destinations. -->
+	{#if layoutMode === 'mobileOverlay'}
+		<MobileBottomNav onMoreTap={() => { moreSheetOpen = true; }} />
+		<MoreNavSheet
+			open={moreSheetOpen}
+			onClose={() => { moreSheetOpen = false; }}
+		/>
 	{/if}
 
 	<!-- Floating tool-call approval overlay (shown when daemon requests user decision) -->

@@ -241,6 +241,15 @@
 		background: transparent;
 	}
 
+	/* Mobile mode: leave room at the bottom of the content well for the
+	   fixed-position MobileBottomNav (rendered as a sibling outside this
+	   shell in App.svelte). Without this padding, the bottom 56px + safe
+	   area of any scrollable content would sit underneath the nav bar.
+	   --bottom-nav-height already includes env(safe-area-inset-bottom). */
+	.app-shell.mode-mobile .content {
+		padding-bottom: var(--bottom-nav-height);
+	}
+
 	/* Right panel column — sits at column 3 / 4. Has its own internal
 	   header/footer (rendered by the consumer via the `rightPanel` snippet);
 	   AppShell is purely the layout slot. The leading hairline border
