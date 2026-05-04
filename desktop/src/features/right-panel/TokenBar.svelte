@@ -12,8 +12,8 @@
 	 * data is briefly inconsistent during streaming).
 	 *
 	 * Exported from a `<script module>` block so unit tests and other
-	 * components in Wave 5 (when real wiring lands) can reuse the same
-	 * helper without duplicating the rounding rules.
+	 * components in Wave 5 (T5.3 treemap, T5.4 visualizer) can reuse the
+	 * same helper without duplicating the rounding rules.
 	 */
 	export function formatTokens(value: number): string {
 		if (!Number.isFinite(value) || value <= 0) return '0';
@@ -37,25 +37,34 @@
 </script>
 
 <script lang="ts">
+	// W5.T2: TokenBar now consumes the live `tokenCounterStore` directly
+	// instead of receiving placeholder numeric props. The store is bound
+	// to the active session by RightPanel.svelte (its parent), and pushes
+	// 4 Hz throttled updates from the daemon's per-session SSE feed.
+	//
+	// SPEC MH7: live updates ≤ 500 ms; window resets on compaction;
+	// session total monotonic across compactions.
+	import { tokenCounterStore } from '$lib/stores/token-counter.svelte.js';
+	import { chatStore } from '../chat/chat.svelte.js';
+
 	type Props = {
-		/** Tokens currently consumed in the active context window. */
-		windowTokens: number;
-		/** Maximum context window size for the active model. */
-		windowMax: number;
-		/** Cumulative tokens used across the whole session (across compactions). */
-		sessionTokens: number;
 		/**
-		 * Optional click handler — fires when the user clicks anywhere on
-		 * the bar. In Wave 5 this opens the Context Window Visualizer; in
-		 * Wave 1 the parent doesn't pass anything and the bar renders as
-		 * a non-interactive readout.
+		 * Optional click handler — fires when the user clicks the bar.
+		 * In W5.T4 this opens the Context Window Visualizer; if omitted,
+		 * the bar renders as a non-interactive readout.
 		 */
 		onVisualizerOpen?: () => void;
 	};
 
-	let { windowTokens, windowMax, sessionTokens, onVisualizerOpen }: Props = $props();
+	let { onVisualizerOpen }: Props = $props();
 
 	const isInteractive = $derived(typeof onVisualizerOpen === 'function');
+
+	// Read live counts from the store. These re-evaluate whenever the
+	// store's $state fields change (every flush from the SSE pipeline).
+	const windowTokens = $derived(tokenCounterStore.windowTokens);
+	const windowMax = $derived(tokenCounterStore.windowMax);
+	const sessionTokens = $derived(tokenCounterStore.sessionTokens);
 
 	// Clamp the percentage to [0, 100] so an over-budget window (which
 	// can briefly happen at the edges of streaming) never paints a bar
@@ -75,6 +84,13 @@
 	const ariaLabel = $derived(
 		`Context window: ${windowLabel}${hasBudget ? `, ${percentLabel}` : ''}. ${sessionLabel}.`,
 	);
+
+	// Subtle pulse on the window-token readout while the assistant is
+	// streaming. We tie the cue to `chatStore.isStreaming` rather than
+	// debouncing token deltas locally so the animation reliably starts
+	// at stream-open and stops at stream-close even when the SSE flush
+	// debounce silences brief value plateaus mid-stream.
+	const isStreaming = $derived(chatStore.isStreaming);
 
 	function handleClick() {
 		onVisualizerOpen?.();
@@ -104,7 +120,7 @@
 		onkeydown={handleKeydown}
 	>
 		<div class="token-bar-row">
-			<span class="window-label">
+			<span class="window-label" class:is-streaming={isStreaming}>
 				<span class="arrow" aria-hidden="true">↕</span>
 				{windowLabel}
 			</span>
@@ -122,7 +138,7 @@
 {:else}
 	<div class="token-bar" role="group" aria-label={ariaLabel}>
 		<div class="token-bar-row">
-			<span class="window-label">
+			<span class="window-label" class:is-streaming={isStreaming}>
 				<span class="arrow" aria-hidden="true">↕</span>
 				{windowLabel}
 			</span>
@@ -203,6 +219,31 @@
 		font-weight: 500;
 	}
 
+	/* Streaming pulse: the window-token readout breathes opacity while
+	   the assistant is mid-stream. 0.9s loop, ease-in-out, infinite —
+	   slow enough to read as "live" without being distracting. The
+	   global @media (prefers-reduced-motion) guard in tokens.css
+	   neutralises this for users who opt out. */
+	.window-label.is-streaming {
+		animation: token-pulse 0.9s ease-in-out infinite;
+	}
+
+	@keyframes token-pulse {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.6;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.window-label.is-streaming {
+			animation: none;
+		}
+	}
+
 	.arrow {
 		font-size: 11px;
 		line-height: 1;
@@ -229,9 +270,8 @@
 		height: 100%;
 		background-color: var(--color-primary);
 		border-radius: var(--radius-full);
-		/* No animation in Wave 1 per task constraints, but a tiny
-		   transition keeps the bar from snapping when props are
-		   replaced — the global reduced-motion guard in tokens.css
+		/* Smooth width transitions so streaming updates ease in rather
+		   than snap. The global reduced-motion guard in tokens.css
 		   neutralises this for users who opt out. */
 		transition: width var(--transition-fast);
 	}

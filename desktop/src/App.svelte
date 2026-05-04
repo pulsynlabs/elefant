@@ -277,15 +277,17 @@
 			     (rightPanelOpen above already gates this), so `activeSessionId`
 			     is guaranteed non-null here — the `?? ''` is a defensive
 			     fallback for the type checker, never reached at runtime.
-			     TokenBar shows placeholder zeros until W5 wires the live
-			     token-counter store + SSE feed. -->
+			     TokenBar reads the live token-counter store directly (W5.T2);
+			     RightPanel binds the store to the active session via $effect.
+			     `onVisualizerOpen` is a no-op stub here — T5.4 will swap in
+			     the visualizer-open handler. -->
 			<RightPanel
 				activeTab={rightPanelStore.activeTab(activeSessionId ?? '')}
 				onTabChange={(tab) => rightPanelStore.setActiveTab(activeSessionId ?? '', tab)}
 				onClose={() => rightPanelStore.closePanel()}
 			>
 				{#snippet footer()}
-					<TokenBar windowTokens={0} windowMax={200000} sessionTokens={0} />
+					<TokenBar onVisualizerOpen={() => { /* TODO: T5.4 wires visualizer */ }} />
 				{/snippet}
 			</RightPanel>
 		{/snippet}

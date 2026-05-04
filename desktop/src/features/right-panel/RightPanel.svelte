@@ -8,6 +8,7 @@
 		CheckSquareIcon,
 	} from '$lib/icons/index.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
+	import { tokenCounterStore } from '$lib/stores/token-counter.svelte.js';
 	import PanelTabs, { type PanelTabDescriptor, type TabId } from './PanelTabs.svelte';
 	import FileChangesTab from './tabs/FileChangesTab.svelte';
 	import TerminalTab from './tabs/TerminalTab.svelte';
@@ -25,6 +26,19 @@
 	};
 
 	let { activeTab = 'mcp', onTabChange, onClose, footer }: Props = $props();
+
+	// W5.T2 (MH7): bind the singleton token-counter store to the currently
+	// active (project, session) pair.  `setSession` is idempotent — if both
+	// IDs match the previously bound session it's a no-op, so this $effect
+	// can re-fire freely without churning the SSE EventSource.  Switching
+	// sessions tears down the prior subscription and resets all counters
+	// to zero so we never flash stale numbers from the previous session.
+	$effect(() => {
+		tokenCounterStore.setSession(
+			projectsStore.activeProjectId,
+			projectsStore.activeSessionId,
+		);
+	});
 
 	// Tab descriptor list. Order here defines the visible order in the strip
 	// AND the keyboard cycle order. Spec MH2 default order: MCP → Terminal
