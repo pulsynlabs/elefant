@@ -2,7 +2,21 @@
 <html lang="en" data-theme="dark">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+	<!--
+	  Content Security Policy — tuned for Capacitor Android WebView.
+	  - script-src 'unsafe-eval': required for Mermaid (diagram renderer) and Shiki (syntax
+	    highlighter), both of which use eval()/new Function() at runtime.
+	  - connect-src: includes ws:// and wss:// so the daemon WebSocket connection works.
+	    Add your remote daemon hostname to connect-src before production release.
+	  - worker-src blob:: Shiki may instantiate highlight workers as blob: URLs.
+	  - style-src 'unsafe-inline': required by Mermaid's injected inline styles.
+	  - capacitor:: Capacitor bridge scheme (required for native plugin calls on iOS).
+	-->
+	<meta
+		http-equiv="Content-Security-Policy"
+		content="default-src 'self' capacitor: https:; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob: https:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'; worker-src 'self' blob:; connect-src 'self' ws: wss: https: http://localhost:* ws://localhost:* http://10.0.2.2:* ws://10.0.2.2:*;"
+	/>
 		<meta name="theme-color" content="#0a0a0e" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
