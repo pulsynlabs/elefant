@@ -16,7 +16,10 @@
     "typecheck": "tsc --noEmit",
     "validate:prompts": "bun run scripts/validate-agent-prompts.ts",
     "bench:spec-mode": "bash bench/run-spec-mode-bench.sh",
-    "test:spec": "bun test src/tools/spec/ src/db/repo/spec/ src/hooks/spec* src/permissions/orchestrator*"
+    "test:spec": "bun test src/tools/spec/ src/db/repo/spec/ src/hooks/spec* src/permissions/orchestrator*",
+    "mobile:build": "./scripts/mobile-build.sh",
+    "mobile:deploy": "./scripts/mobile-deploy.sh",
+    "mobile:release": "./scripts/mobile-release.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
