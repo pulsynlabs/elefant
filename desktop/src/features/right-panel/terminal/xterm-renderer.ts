@@ -50,6 +50,19 @@ class XtermRenderer implements TerminalRenderer {
 		this.terminal.resize(cols, rows);
 	}
 
+	fit(): void {
+		// FitAddon throws if the terminal is not yet attached to the DOM
+		// (no parent element, zero dimensions). Guard so that ResizeObserver
+		// callbacks fired before mount() — or after dispose() — are no-ops.
+		if (!this.mounted) return;
+		try {
+			this.fitAddon.fit();
+		} catch {
+			// Container has zero size (display:none, detached). Will refit
+			// the next time the observer fires with a real size.
+		}
+	}
+
 	focus(): void {
 		this.terminal.focus();
 	}

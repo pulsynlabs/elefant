@@ -31,6 +31,14 @@ export interface TerminalRenderer {
 	write(data: string): void;
 	onData(handler: TerminalDataHandler): () => void;
 	resize(cols: number, rows: number): void;
+	/**
+	 * Recompute the terminal grid against its container's current pixel size.
+	 * Called by the ResizeObserver-backed Svelte action whenever the host
+	 * element changes size (panel resize, window resize, layout reflow).
+	 * Implementations should be cheap to call repeatedly and a no-op when
+	 * the renderer is not yet mounted.
+	 */
+	fit(): void;
 	focus(): void;
 	clear(): void;
 	dispose(): void;

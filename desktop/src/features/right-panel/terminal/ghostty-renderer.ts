@@ -53,6 +53,18 @@ class GhosttyRenderer implements TerminalRenderer {
 		this.terminal.resize(cols, rows);
 	}
 
+	fit(): void {
+		// Mirror the xterm renderer: skip when not mounted, swallow zero-size
+		// errors from the addon. The next ResizeObserver tick with a non-zero
+		// box will succeed.
+		if (!this.mounted) return;
+		try {
+			this.fitAddon.fit();
+		} catch {
+			// no-op
+		}
+	}
+
 	focus(): void {
 		this.terminal.focus();
 	}

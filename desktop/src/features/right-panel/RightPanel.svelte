@@ -7,8 +7,10 @@
 		EditIcon,
 		CheckSquareIcon,
 	} from '$lib/icons/index.js';
+	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import PanelTabs, { type PanelTabDescriptor, type TabId } from './PanelTabs.svelte';
 	import FileChangesTab from './tabs/FileChangesTab.svelte';
+	import TerminalTab from './tabs/TerminalTab.svelte';
 	import TodosTab from './tabs/TodosTab.svelte';
 
 	type Props = {
@@ -87,10 +89,17 @@
 							<p>MCP</p>
 						</div>
 					{:else if tab.id === 'terminal'}
-						<div class="tab-placeholder">
-							<HugeiconsIcon icon={TerminalIcon} size={28} strokeWidth={1.4} />
-							<p>Terminal</p>
-						</div>
+						{#if projectsStore.activeProjectId && projectsStore.activeSessionId}
+							<TerminalTab
+								projectId={projectsStore.activeProjectId}
+								sessionId={projectsStore.activeSessionId}
+							/>
+						{:else}
+							<div class="tab-placeholder">
+								<HugeiconsIcon icon={TerminalIcon} size={28} strokeWidth={1.4} />
+								<p>No active session</p>
+							</div>
+						{/if}
 					{:else if tab.id === 'files'}
 						<FileChangesTab />
 					{:else}
