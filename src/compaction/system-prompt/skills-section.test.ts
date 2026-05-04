@@ -14,10 +14,11 @@ function skill(overrides: Partial<SkillInfo> & Pick<SkillInfo, 'name'>): SkillIn
 	};
 }
 
-describe('formatSkills', () => {
+	describe('formatSkills', () => {
 	test('returns an empty string for an empty skill list', () => {
 		expect(formatSkills([], { verbose: true })).toBe('');
 		expect(formatSkills([], { verbose: false })).toBe('');
+		expect(formatSkills([])).toBe(''); // default is compact
 	});
 
 	test('formats a single skill as verbose XML', () => {
@@ -34,16 +35,25 @@ describe('formatSkills', () => {
 		expect(output).toContain('</available_skills>');
 	});
 
-	test('formats a single skill as compact markdown', () => {
+	test('formats a single skill as compact markdown by default', () => {
+		const output = formatSkills([skill({ name: 'p5js' })]);
+
+		expect(output).toContain('## Available Skills');
+		expect(output).toContain('- **p5js**:');
+		expect(output).toContain('Creative coding in p5.js — generative art and interactive visuals');
+		expect(output).toContain("call skill('p5js') to load full content");
+	});
+
+	test('formats a single skill as compact markdown when explicitly requested', () => {
 		const output = formatSkills([skill({ name: 'p5js' })], { verbose: false });
 
 		expect(output).toContain('## Available Skills');
-		expect(output).toContain(
-			'- **p5js**: Creative coding in p5.js — generative art and interactive visuals',
-		);
+		expect(output).toContain('- **p5js**:');
+		expect(output).toContain('Creative coding in p5.js — generative art and interactive visuals');
+		expect(output).toContain("call skill('p5js') to load full content");
 	});
 
-	test('includes all skills under maxChars without a truncation note', () => {
+	test('includes all skills under maxChars without a truncation note (verbose)', () => {
 		const output = formatSkills(
 			[
 				skill({ name: 'p5js', description: 'Creative coding' }),
@@ -56,6 +66,22 @@ describe('formatSkills', () => {
 		expect(output).toContain('<name>comfyui</name>');
 		expect(output).toContain('<name>minimalist-ui</name>');
 		expect(output).toContain('<name>p5js</name>');
+		expect(output).not.toContain('more skills truncated');
+	});
+
+	test('includes all skills under maxChars without a truncation note (compact default)', () => {
+		const output = formatSkills(
+			[
+				skill({ name: 'p5js', description: 'Creative coding' }),
+				skill({ name: 'comfyui', description: 'Generate media' }),
+				skill({ name: 'minimalist-ui', description: 'Clean interfaces' }),
+			],
+			{ maxChars: 4000 },
+		);
+
+		expect(output).toContain('**p5js**');
+		expect(output).toContain('**comfyui**');
+		expect(output).toContain('**minimalist-ui**');
 		expect(output).not.toContain('more skills truncated');
 	});
 
@@ -104,7 +130,6 @@ describe('formatSkills', () => {
 				skill({ name: 'comfyui', description: 'Generate media' }),
 				skill({ name: 'minimalist-ui', description: 'Clean interfaces' }),
 			],
-			{ verbose: false },
 		);
 
 		expect(output.indexOf('**comfyui**')).toBeLessThan(
@@ -113,5 +138,34 @@ describe('formatSkills', () => {
 		expect(output.indexOf('**minimalist-ui**')).toBeLessThan(
 			output.indexOf('**p5js**'),
 		);
+	});
+
+	test('5 skills in compact mode stays under 4 KB', () => {
+		const skills = [
+			skill({ name: 'p5js', description: 'Creative coding in p5.js — generative art and interactive visuals' }),
+			skill({ name: 'comfyui', description: 'Generate images, video, and audio with ComfyUI' }),
+			skill({ name: 'minimalist-ui', description: 'Clean editorial-style interfaces with warm monochrome palette' }),
+			skill({ name: 'social-writer', description: 'Create engaging content for social media platforms' }),
+			skill({ name: 'video-marketing', description: 'Plan video marketing and create video scripts' }),
+		];
+
+		const output = formatSkills(skills);
+		const sizeInBytes = Buffer.byteLength(output, 'utf8');
+		const sizeInKB = sizeInBytes / 1024;
+
+		expect(sizeInKB).toBeLessThan(4);
+		expect(output).toContain('## Available Skills');
+		expect(output).toContain('**p5js**');
+		expect(output).toContain('**video-marketing**');
+	});
+
+	test('compact mode includes invocation hint for each skill', () => {
+		const output = formatSkills([
+			skill({ name: 'p5js', description: 'Creative coding' }),
+			skill({ name: 'comfyui', description: 'Generate media' }),
+		]);
+
+		expect(output).toContain("call skill('p5js') to load full content");
+		expect(output).toContain("call skill('comfyui') to load full content");
 	});
 });
