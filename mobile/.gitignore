@@ -1,0 +1,12 @@
+# Capacitor build artifacts
+android/app/build/
+android/.gradle/
+android/.idea/
+android/local.properties
+android/captures/
+android/.externalNativeBuild/
+ios/App/Pods/
+ios/App/build/
+ios/DerivedData/
+node_modules/
+dist/

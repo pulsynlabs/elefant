@@ -1,0 +1,30 @@
+{
+  "name": "elefant-mobile",
+  "version": "0.1.0",
+  "description": "Elefant native mobile app (Capacitor 7)",
+  "private": true,
+  "scripts": {
+    "sync": "npx cap sync",
+    "sync:android": "npx cap sync android",
+    "sync:ios": "npx cap sync ios",
+    "run:android": "npx cap run android",
+    "run:ios": "npx cap run ios",
+    "open:android": "npx cap open android",
+    "open:ios": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "7.6.2",
+    "@capacitor/app": "7.1.2",
+    "@capacitor/core": "7.6.2",
+    "@capacitor/haptics": "7.0.5",
+    "@capacitor/ios": "7.6.2",
+    "@capacitor/keyboard": "7.0.6",
+    "@capacitor/network": "7.0.4",
+    "@capacitor/preferences": "7.0.4",
+    "@capacitor/status-bar": "7.0.6"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "7.6.2",
+    "typescript": "^6.0.3"
+  }
+}
