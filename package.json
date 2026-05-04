@@ -23,6 +23,8 @@
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@vscode/ripgrep": "^1.17.1",
     "elysia": "^1.4.28",
+    "gpt-tokenizer": "^3.4.0",
+    "node-pty": "^1.1.0",
     "sqlite-vec": "^0.1.9",
     "vscode-jsonrpc": "8.2.1",
     "vscode-languageserver-types": "^3.17.5",

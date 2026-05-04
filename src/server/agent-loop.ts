@@ -24,9 +24,13 @@ import { type Message } from '../types/providers.ts'
 import type { Result } from '../types/result.ts'
 import type { ToolCall, ToolDefinition, ToolResult } from '../types/tools.ts'
 import type { SseManager } from '../transport/sse-manager.ts'
+import { fileChangeTracker, normalizePath, type FileChange } from './file-changes.ts'
 import { estimateMessageTokens } from '../utils/tokens.ts'
 import commandsRegistry from '../commands/workflow/COMMANDS_REGISTRY.json'
 import { parseSlashCommand } from './slash-commands.ts'
+import { filterToolsForSessionOverlay, mcpSessionOverlay } from './mcp-session-overlay.ts'
+import { sessionTodoTracker, type TodoItem, type TodoStatus } from './session-todos.ts'
+import { tokenCounter } from './token-counter.ts'
 
 export interface ToolExecutor {
 	execute(name: string, args: unknown): Promise<Result<string, ElefantError>>
@@ -51,6 +55,7 @@ export interface AgentLoopOptions {
 	sliderEmitter?: SliderEmitter
 	metadataEmitter?: MetadataEmitter
 	sseManager?: SseManager
+	projectRoot?: string
 	commandsDir?: string
 	mcpManager?: MCPManager
 	mcpTokenBudgetPercent?: number
@@ -136,6 +141,17 @@ function readNumberField(value: unknown, field: string): number | undefined {
 	return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : undefined
 }
 
+const VALID_TODO_STATUSES = new Set<string>(['pending', 'in_progress', 'completed', 'cancelled'])
+const VALID_TODO_PRIORITIES = new Set<string>(['high', 'medium', 'low'])
+
+function isValidTodoStatus(value: string): value is TodoStatus {
+	return VALID_TODO_STATUSES.has(value)
+}
+
+function isValidTodoPriority(value: string): boolean {
+	return VALID_TODO_PRIORITIES.has(value)
+}
+
 function inferSessionMode(state: unknown): 'spec' | 'quick' {
 	const directMode = readStringField(state, 'mode')
 	if (directMode === 'spec' || directMode === 'quick') {
@@ -200,37 +216,50 @@ function createEffectiveMcpTools(options: AgentLoopOptions): EffectiveMcpTools {
 	}
 
 	const mcpToolsWithMeta = options.mcpManager.listAllTools()
+	const sessionScopedMcpTools = filterToolsForSessionOverlay(
+		mcpToolsWithMeta,
+		options.runContext.sessionId,
+		mcpSessionOverlay,
+	)
 	if (mcpToolsWithMeta.length === 0) {
+		return { tools: baseTools, manifest: '', selective: false }
+	}
+	if (sessionScopedMcpTools.length === 0) {
 		return { tools: baseTools, manifest: '', selective: false }
 	}
 
 	const mcpDefinitions = createMcpToolDefinitions(options.mcpManager, options.runContext)
-	const definitionByRawName = new Map<string, ToolDefinition>()
+	const definitionByServerAndTool = new Map<string, ToolDefinition>()
 	mcpToolsWithMeta.forEach((entry, index) => {
 		const definition = mcpDefinitions[index]
 		if (definition) {
-			definitionByRawName.set(entry.tool.name, definition)
+			definitionByServerAndTool.set(`${entry.serverId}::${entry.tool.name}`, definition)
 		}
 	})
 
-	const selective = shouldUseSelectiveLoading(mcpToolsWithMeta, {
+	const selective = shouldUseSelectiveLoading(sessionScopedMcpTools, {
 		contextWindow: options.contextWindowTokens ?? 200_000,
 		tokenBudgetPercent: options.mcpTokenBudgetPercent,
 	})
 
 	if (!selective) {
-		return { tools: [...baseTools, ...mcpDefinitions], manifest: '', selective: false }
+		const allSessionMcpDefinitions = sessionScopedMcpTools
+			.map((entry) => definitionByServerAndTool.get(`${entry.serverId}::${entry.tool.name}`))
+			.filter((tool): tool is ToolDefinition => tool !== undefined)
+		return { tools: [...baseTools, ...allSessionMcpDefinitions], manifest: '', selective: false }
 	}
 
 	const selectedRawNames = new Set<string>(options.runContext.discoveredMcpTools)
-	for (const entry of mcpToolsWithMeta) {
+	for (const entry of sessionScopedMcpTools) {
 		if (isAlwaysLoadTool(entry.tool) || options.mcpManager.getPinnedTools(entry.serverId).includes(entry.tool.name)) {
 			selectedRawNames.add(entry.tool.name)
 		}
 	}
 
 	const selectedMcpTools = Array.from(selectedRawNames)
-		.map((name) => definitionByRawName.get(name))
+		.flatMap((name) => sessionScopedMcpTools
+			.filter((entry) => entry.tool.name === name)
+			.map((entry) => definitionByServerAndTool.get(`${entry.serverId}::${entry.tool.name}`)))
 		.filter((tool): tool is ToolDefinition => tool !== undefined)
 
 	return {
@@ -242,7 +271,7 @@ function createEffectiveMcpTools(options: AgentLoopOptions): EffectiveMcpTools {
 			}) as ToolDefinition<unknown, string>,
 			...selectedMcpTools,
 		],
-		manifest: buildMcpManifest(buildMcpManifestServers(options.mcpManager, mcpToolsWithMeta)),
+		manifest: buildMcpManifest(buildMcpManifestServers(options.mcpManager, sessionScopedMcpTools)),
 		selective: true,
 	}
 }
@@ -286,6 +315,42 @@ export async function* runAgentLoop(
 		}
 
 		publishRunEvent(options.runContext, options.sseManager, type, data)
+	}
+	const emitTokenSnapshot = (
+		reason: string,
+		deltaTokens = 0,
+	): void => {
+		if (!options.sseManager) {
+			return
+		}
+
+		const snapshot = tokenCounter.getSnapshot(sessionId, contextWindow)
+		options.sseManager.publish(options.runContext.projectId, sessionId, 'tokens.window', {
+			sessionId,
+			windowTokens: snapshot.windowTokens,
+			windowMax: snapshot.windowMax,
+			sessionTokens: snapshot.sessionTokens,
+			deltaTokens,
+			reason,
+			ts: new Date(snapshot.updatedAt).toISOString(),
+		})
+		options.sseManager.publish(options.runContext.projectId, sessionId, 'tokens.session', {
+			sessionId,
+			windowTokens: snapshot.windowTokens,
+			windowMax: snapshot.windowMax,
+			sessionTokens: snapshot.sessionTokens,
+			deltaTokens,
+			reason,
+			ts: new Date(snapshot.updatedAt).toISOString(),
+		})
+		options.sseManager.publish(options.runContext.projectId, sessionId, 'tokens.breakdown', {
+			sessionId,
+			windowTokens: snapshot.windowTokens,
+			windowMax: snapshot.windowMax,
+			sessionTokens: snapshot.sessionTokens,
+			breakdown: snapshot.breakdown,
+			ts: new Date(snapshot.updatedAt).toISOString(),
+		})
 	}
 	const baseQuestionEmitter = options.questionEmitter ?? (() => undefined)
 	const questionEmitter: QuestionEmitter = (payload) => {
@@ -356,6 +421,8 @@ export async function* runAgentLoop(
 			})
 			messages = compacted.messages
 			tokenCount = compacted.tokenCountAfter
+			tokenCounter.recordCompaction(sessionId, tokenCount, contextWindow)
+			emitTokenSnapshot('compaction', 0)
 		}
 
 		await emit(options.hookRegistry, 'message:before', {
@@ -444,9 +511,13 @@ export async function* runAgentLoop(
 			}
 
 			if (event.type === 'text_delta') {
+				const before = tokenCounter.getSnapshot(sessionId, contextWindow)
+				tokenCounter.recordTextDelta(sessionId, event.text, contextWindow)
+				const after = tokenCounter.getSnapshot(sessionId, contextWindow)
 				emitRunEvent('agent_run.token', {
 					text: event.text,
 				})
+				emitTokenSnapshot('stream_delta', Math.max(0, after.windowTokens - before.windowTokens))
 				assistantText += event.text
 				yield event
 				continue
@@ -454,6 +525,8 @@ export async function* runAgentLoop(
 
 			if (event.type === 'usage') {
 				lastUsage = event
+				tokenCounter.recordUsageSnapshot(sessionId, event.inputTokens, event.outputTokens, contextWindow)
+				emitTokenSnapshot('usage_snapshot', 0)
 				yield event
 				continue
 			}
@@ -587,6 +660,22 @@ export async function* runAgentLoop(
 					}
 				}
 
+				// Capture before-snapshot for file-mutating tools (best-effort).
+				// Must happen before execution because the tool modifies the file.
+				let beforeSnapshot: string | undefined
+				const toolArgs = toolCall.arguments as Record<string, unknown> | undefined
+				const toolFilePath = typeof toolArgs?.filePath === 'string' ? toolArgs.filePath : undefined
+				if (toolFilePath && (toolCall.name === 'write' || toolCall.name === 'edit' || toolCall.name === 'apply_patch')) {
+					try {
+						const existingFile = Bun.file(toolFilePath)
+						if (await existingFile.exists()) {
+							beforeSnapshot = await existingFile.text()
+						}
+					} catch {
+						// best-effort — snapshot not critical
+					}
+				}
+
 				const executeResult = await registry.execute(
 					toolCall.name,
 					toToolArguments(toolCall.arguments, options.runContext.runId, toolCall.id, runQuestionEmitter, runSliderEmitter),
@@ -623,6 +712,72 @@ export async function* runAgentLoop(
 					toolResult,
 				})
 				taskEvents.push({ type: 'tool_result', toolResult })
+
+				if (toolCall.name === 'todowrite' && executeResult.ok && options.sseManager) {
+					try {
+						const args = toolCall.arguments as Record<string, unknown> | undefined
+						const rawTodos = args?.todos
+						if (Array.isArray(rawTodos)) {
+							const todoItems: TodoItem[] = rawTodos
+								.map((item: unknown, index: number): TodoItem | null => {
+									if (typeof item !== 'object' || item === null) return null
+									const obj = item as Record<string, unknown>
+									const status = typeof obj.status === 'string' && isValidTodoStatus(obj.status) ? obj.status : 'pending'
+									const priority = typeof obj.priority === 'string' && isValidTodoPriority(obj.priority) ? obj.priority as TodoItem['priority'] : undefined
+									return {
+										id: typeof obj.id === 'string' ? obj.id : crypto.randomUUID(),
+										content: typeof obj.content === 'string' ? obj.content : '',
+										status,
+										priority,
+										position: typeof obj.position === 'number' ? obj.position : index,
+									}
+								})
+								.filter((item): item is TodoItem => item !== null)
+
+							sessionTodoTracker.updateTodos(options.runContext.sessionId, todoItems)
+							options.sseManager.publish(
+								options.runContext.projectId,
+								options.runContext.sessionId,
+								'todos.updated',
+								{ sessionId: options.runContext.sessionId, todos: todoItems },
+							)
+						}
+					} catch (err) {
+						console.warn('[elefant] Failed to track session todos:', err)
+					}
+				}
+
+				// Record file changes from write/edit/apply_patch tool executions.
+				if (executeResult.ok && toolFilePath && options.projectRoot) {
+					const fileChangeTools = new Set(['write', 'edit', 'apply_patch'])
+					if (fileChangeTools.has(toolCall.name)) {
+						let changeType: FileChange['changeType']
+						if (toolCall.name === 'write') {
+							changeType = beforeSnapshot !== undefined ? 'modified' : 'created'
+						} else {
+							changeType = 'modified'
+						}
+
+						const fileChange: FileChange = {
+							path: normalizePath(toolFilePath, options.projectRoot),
+							changeType,
+							absolutePath: toolFilePath,
+							lastTouchedAt: Date.now(),
+							snapshot: beforeSnapshot,
+						}
+
+						fileChangeTracker.recordChange(options.runContext.sessionId, fileChange)
+
+						if (options.sseManager) {
+							options.sseManager.publish(
+								options.runContext.projectId,
+								options.runContext.sessionId,
+								'file.changed',
+								{ sessionId: options.runContext.sessionId, change: fileChange },
+							)
+						}
+					}
+				}
 
 				return {
 					events: taskEvents,
