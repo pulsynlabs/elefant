@@ -7,6 +7,7 @@ import type { ToolDefinition } from '../types/tools.js';
 import type { ElefantError } from '../types/errors.js';
 import type { Result } from '../types/result.js';
 import { ok, err } from '../types/result.js';
+import { getLspService, buildDiagnosticSuffix } from '../lsp/index.js';
 
 export interface EditParams {
   filePath: string;
@@ -95,7 +96,16 @@ export const editTool: ToolDefinition<EditParams, string> = {
       await Bun.write(filePath, newContent);
 
       const replacedCount = replaceAll ? count : 1;
-      return ok(`Replaced ${replacedCount} occurrence(s) in ${filePath}`);
+      let editOutput = `Replaced ${replacedCount} occurrence(s) in ${filePath}`;
+      try {
+        const lsp = getLspService();
+        await lsp.touchFile(filePath, true);
+        const diags = await lsp.diagnostics();
+        editOutput += buildDiagnosticSuffix(filePath, diags);
+      } catch {
+        // LSP must never break the edit tool
+      }
+      return ok(editOutput);
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes('ENOENT')) {

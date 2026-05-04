@@ -9,6 +9,7 @@ import type { Result } from '../types/result.js';
 import { ok, err } from '../types/result.js';
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { getLspService, buildDiagnosticSuffix } from '../lsp/index.js';
 
 export interface WriteParams {
   filePath: string;
@@ -45,7 +46,16 @@ export const writeTool: ToolDefinition<WriteParams, string> = {
       await Bun.write(filePath, content);
 
       const bytesWritten = Buffer.byteLength(content, 'utf-8');
-      return ok(`Wrote ${bytesWritten} bytes to ${filePath}`);
+      let output = `Wrote ${bytesWritten} bytes to ${filePath}`;
+      try {
+        const lsp = getLspService();
+        await lsp.touchFile(filePath, true);
+        const diags = await lsp.diagnostics();
+        output += buildDiagnosticSuffix(filePath, diags);
+      } catch {
+        // LSP must never break the write tool
+      }
+      return ok(output);
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes('EACCES') || error.message.includes('EPERM')) {
