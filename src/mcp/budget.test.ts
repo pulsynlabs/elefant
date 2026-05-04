@@ -3,6 +3,7 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import { estimateToolTokens, isAlwaysLoadTool, shouldDeferTools, shouldUseSelectiveLoading } from './budget.ts';
 import type { ToolType } from './budget.ts';
+import { buildMcpManifest } from './manifest.ts';
 import type { ToolWithMeta } from './types.ts';
 import type { ToolDefinition } from '../types/tools.ts';
 
@@ -247,5 +248,109 @@ describe('isAlwaysLoadTool', () => {
 	it('returns false when alwaysLoad is undefined (missing field)', () => {
 		const config = {} as { alwaysLoad?: string[] };
 		expect(isAlwaysLoadTool('filesystem', 'any_tool', config)).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Token-savings measurement: synthetic 50-tool MCP catalog
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a realistic synthetic MCP tool with a ~200-char description and
+ * a moderately-sized inputSchema, similar to real tools like filesystem
+ * operations or search endpoints.
+ */
+function syntheticMCPTool(index: number): { mcpTool: Tool; meta: ToolWithMeta } {
+	const suffixes = [
+		'handler',
+		'service',
+		'resolver',
+		'controller',
+		'provider',
+		'fetcher',
+		'parser',
+		'validator',
+		'formatter',
+		'dispatcher',
+	];
+
+	const name = `tool_${String(index).padStart(3, '0')}_${suffixes[index % suffixes.length]}`;
+	const description = `Tool number ${index} (${
+		suffixes[index % suffixes.length]
+	}) — performs a specialized operation with configurable parameters for integration workflows. Used in data pipelines. ${String(index).padStart(3, '0')}`;
+
+	const mcpTool: Tool = {
+		name,
+		description,
+		inputSchema: {
+			type: 'object',
+			properties: {
+				input: { type: 'string', description: `Primary input for ${name}` },
+				options: {
+					type: 'object',
+					properties: {
+						verbose: { type: 'boolean', default: false },
+						timeout: { type: 'number', default: 30_000 },
+					},
+				},
+			},
+			required: ['input'],
+		},
+	};
+
+	const meta: ToolWithMeta = {
+		serverId: 'synthetic-server',
+		serverName: 'synthetic',
+		tool: mcpTool,
+	};
+
+	return { mcpTool, meta };
+}
+
+describe('token-savings measurement (budget regression)', () => {
+	it('achieves ≥50% token reduction with 50-tool synthetic MCP catalog in deferred mode', () => {
+		// Build a 50-tool synthetic catalog
+		const catalog = Array.from({ length: 50 }, (_, i) => syntheticMCPTool(i));
+		const metaTools: ToolWithMeta[] = catalog.map((c) => c.meta);
+		const mcpTools: Tool[] = catalog.map((c) => c.mcpTool);
+
+		// --- Baseline: full tool schemas ---
+		const baselineTokens = estimateToolTokens(metaTools);
+
+		// --- Verify deferred mode activates ---
+		// Use a small context window (40K) so the threshold is 4K tokens.
+		// 50 tools × ~200-char descriptions + schemas cost ~8.5K tokens, well
+		// above the 4K threshold.
+		const shouldDefer = shouldDeferTools('mcp', metaTools, { contextWindow: 40_000 });
+		expect(shouldDefer).toBe(true);
+
+		// --- Deferred-mode tokens: manifest block ---
+		const manifestText = buildMcpManifest([
+			{ name: 'synthetic', tools: mcpTools, alwaysLoad: [] },
+		]);
+		const CHARS_PER_TOKEN = 2.5;
+		const deferredTokens = Math.ceil(manifestText.length / CHARS_PER_TOKEN);
+
+		// --- Reduction assertion ---
+		const reductionRatio = 1 - deferredTokens / baselineTokens;
+		const reductionPct = Math.round(reductionRatio * 100);
+
+		console.log('\n[budget] Token-savings measurement:', {
+			baselineTokens,
+			deferredTokens,
+			manifestChars: manifestText.length,
+			reductionPct: `${reductionPct}%`,
+		});
+
+		// Must-haves: ≥50% reduction when deferred mode is active
+		expect(reductionRatio).toBeGreaterThanOrEqual(0.5);
+		expect(deferredTokens).toBeLessThan(baselineTokens);
+
+		// A 50-tool catalog with full schemas should cost at least 5000 tokens
+		// (sanity check — catches absurdly small baselines)
+		expect(baselineTokens).toBeGreaterThan(5_000);
+
+		// Deferred manifest should be ≤20 tokens (compact <mcp_available_tools> block)
+		expect(deferredTokens).toBeLessThanOrEqual(200);
 	});
 });
