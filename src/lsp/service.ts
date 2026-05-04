@@ -1,5 +1,5 @@
-import { extname } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { EventEmitter } from 'node:events';
+import { fileURLToPath } from 'node:url';
 
 import { LspClient } from '../tools/lsp/client.js';
 import { ALL_SERVERS } from './servers.js';
@@ -13,6 +13,11 @@ interface ClientEntry {
   root: string;
 }
 
+interface PublishDiagnosticsParams {
+  uri: string;
+  diagnostics: LspDiagnostic[];
+}
+
 export interface LspServiceFacade {
   touchFile(filePath: string, waitForDiagnostics?: boolean): Promise<void>;
   diagnostics(): Promise<Record<string, LspDiagnostic[]>>;
@@ -23,6 +28,7 @@ export class LspService implements LspServiceFacade {
   private readonly clients = new Map<string, ClientEntry>();
   private readonly spawning = new Map<string, Promise<LspClient | undefined>>();
   private readonly diagnosticStore = new Map<string, LspDiagnostic[]>();
+  private readonly diagnosticsEmitter = new EventEmitter();
   private servers: ServerInfo[];
 
   constructor(servers: ServerInfo[] = ALL_SERVERS) {
@@ -31,22 +37,133 @@ export class LspService implements LspServiceFacade {
 
   /** Called by write/edit tools after a successful file write */
   async touchFile(filePath: string, waitForDiagnostics = false): Promise<void> {
-    // STUB — Wave 2 implements the real logic.
-    const extension = extname(filePath);
-    const uri = pathToFileURL(filePath).toString();
     const serverIds = extensionToServerIds(filePath);
-    const matchingServers = this.servers.filter((server) => serverIds.includes(server.id));
+    if (serverIds.length === 0) {
+      return;
+    }
 
-    void extension;
-    void uri;
-    void matchingServers;
-    void waitForDiagnostics;
+    const matchingServers = this.servers.filter((server) => serverIds.includes(server.id));
+    if (matchingServers.length === 0) {
+      return;
+    }
+
+    const waitPromises: Promise<void>[] = [];
+
+    for (const server of matchingServers) {
+      const client = await this.getOrSpawnClient(server, filePath);
+      if (!client) {
+        continue;
+      }
+
+      let text = '';
+      try {
+        text = await Bun.file(filePath).text();
+      } catch {
+        text = '';
+      }
+
+      await client.didChange(filePath, text);
+      await client.didSave(filePath);
+
+      if (waitForDiagnostics) {
+        waitPromises.push(this.waitForDiagnostics(filePath));
+      }
+    }
+
+    if (waitPromises.length > 0) {
+      await Promise.race([
+        Promise.all(waitPromises),
+        new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    }
+  }
+
+  private async getOrSpawnClient(server: ServerInfo, filePath: string): Promise<LspClient | undefined> {
+    const root = await server.root(filePath);
+    if (!root) {
+      return undefined;
+    }
+
+    const key = `${server.id}::${root}`;
+    const existing = this.clients.get(key);
+    if (existing) {
+      return existing.client;
+    }
+
+    const inFlight = this.spawning.get(key);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const spawnPromise = (async (): Promise<LspClient | undefined> => {
+      try {
+        const handle = await server.spawn(root);
+        if (!handle) {
+          return undefined;
+        }
+
+        const client = new LspClient(handle.process);
+        await client.initialize(`file://${root}`);
+
+        this.registerNotificationHandlers(client, server.id);
+        this.clients.set(key, { client, serverId: server.id, root });
+        return client;
+      } catch {
+        return undefined;
+      } finally {
+        this.spawning.delete(key);
+      }
+    })();
+
+    this.spawning.set(key, spawnPromise);
+    return spawnPromise;
+  }
+
+  private waitForDiagnostics(filePath: string): Promise<void> {
+    return new Promise<void>((resolve) => {
+      let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+      let hardCapTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const cleanup = () => {
+        this.diagnosticsEmitter.off('diagnostics', handler);
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+        if (hardCapTimer) {
+          clearTimeout(hardCapTimer);
+        }
+      };
+
+      const handler = (path: string) => {
+        if (path !== filePath) {
+          return;
+        }
+
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+        debounceTimer = setTimeout(() => {
+          cleanup();
+          resolve();
+        }, 150);
+      };
+
+      hardCapTimer = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, 3000);
+
+      this.diagnosticsEmitter.on('diagnostics', handler);
+    });
   }
 
   /** Returns a snapshot of all current diagnostics keyed by absolute file path */
   async diagnostics(): Promise<Record<string, LspDiagnostic[]>> {
-    // STUB — Wave 2 fills this in from the diagnostic store.
     return Object.fromEntries(this.diagnosticStore);
+  }
+
+  getDiagnosticsFor(filePath: string): LspDiagnostic[] {
+    return this.diagnosticStore.get(filePath) ?? [];
   }
 
   async dispose(): Promise<void> {
@@ -56,6 +173,31 @@ export class LspService implements LspServiceFacade {
     this.clients.clear();
     this.spawning.clear();
     this.diagnosticStore.clear();
+    this.diagnosticsEmitter.removeAllListeners();
+  }
+
+  registerNotificationHandlers(client: LspClient, _serverId: string): void {
+    client.onNotification('textDocument/publishDiagnostics', (params) => {
+      const p = params as PublishDiagnosticsParams;
+      if (!p?.uri) {
+        return;
+      }
+
+      let absPath: string;
+      try {
+        absPath = fileURLToPath(p.uri);
+      } catch {
+        return;
+      }
+
+      if (!p.diagnostics || p.diagnostics.length === 0) {
+        this.diagnosticStore.delete(absPath);
+      } else {
+        this.diagnosticStore.set(absPath, p.diagnostics);
+      }
+
+      this.diagnosticsEmitter.emit('diagnostics', absPath);
+    });
   }
 }
 
