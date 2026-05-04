@@ -245,6 +245,7 @@ export const referenceTool: ToolDefinition<ReferenceParams, string> = {
 	name: 'reference',
 	description:
 		'Load a bundled reference document by name, or list all available references.',
+	deferred: true,
 	parameters: referenceParamsSchema,
 	execute: executeReference,
 };

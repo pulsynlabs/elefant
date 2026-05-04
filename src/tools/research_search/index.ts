@@ -318,6 +318,7 @@ export function createResearchSearchTool(deps: ResearchSearchDeps): ToolDefiniti
   return {
     name: 'research_search',
     description: 'Search the per-project Research Base with keyword, semantic, or hybrid retrieval. Falls back to keyword when vectors are disabled.',
+    deferred: true,
     parameters: {
       query: { type: 'string', required: true, description: 'Search query text.' },
       k: { type: 'number', required: false, default: DEFAULT_K, description: 'Max results (1–25).' },

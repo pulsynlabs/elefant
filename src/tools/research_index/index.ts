@@ -213,6 +213,7 @@ export function createResearchIndexTool(
 		description:
 			'List and browse the Research Base by section, tag, or recency. ' +
 			'Supports tree (grouped by section) and flat (sorted by last updated) output formats.',
+		deferred: true,
 		parameters: {
 			output: {
 				type: 'string',

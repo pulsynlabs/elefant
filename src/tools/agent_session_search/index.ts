@@ -27,6 +27,7 @@ export function createAgentSessionSearchTool(
 Returns messages matching the optional role and content filters.
 Only works for child runs that belong to the same session as the current run.
 Use after task tool completes to inspect what the child agent said and did.`,
+		deferred: true,
 		parameters: {
 			run_id: {
 				type: 'string',

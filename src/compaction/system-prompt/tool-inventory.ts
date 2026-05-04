@@ -49,14 +49,34 @@ function categoryLabel(cat: string): string {
 }
 
 /**
+ * Generate a marker suffix for a tool based on its loading status.
+ * - [deferred] — Tool requires tool_search to load full schema
+ * - [always] — Tool is explicitly always-loaded
+ * - No marker — Standard tool (always-loaded by default)
+ */
+function getToolMarker(tool: ToolDefinition): string {
+	if (tool.deferred === true) {
+		return ' [deferred]';
+	}
+	if (tool.alwaysLoad === true) {
+		return ' [always]';
+	}
+	return '';
+}
+
+/**
  * Generate a categorized tool inventory section for the system prompt.
  * Uses bold name + em-dash format, grouped by category with stable ordering.
+ * Deferred tools are marked with [deferred] and include a hint to use tool_search.
  */
 export function buildToolInventorySection(source: ToolInventorySource): string {
 	const tools = source.getAll();
 	if (tools.length === 0) {
 		return ['## Available Tools', '- No tools are currently registered.'].join('\n');
 	}
+
+	// Check if any tools are deferred (for instructional preamble)
+	const hasDeferredTools = tools.some((t) => t.deferred === true);
 
 	// Group by category
 	const groups = new Map<string, ToolDefinition[]>();
@@ -77,6 +97,12 @@ export function buildToolInventorySection(source: ToolInventorySource): string {
 
 	const lines: string[] = ['## Available Tools'];
 
+	// Add instructional preamble if deferred tools are present
+	if (hasDeferredTools) {
+		lines.push('');
+		lines.push('💡 Use `tool_search` to load full schemas for `[deferred]` tools before using them.');
+	}
+
 	for (const cat of sortedCats) {
 		const items = groups.get(cat)!;
 		// Sort alphabetically within category
@@ -85,12 +111,13 @@ export function buildToolInventorySection(source: ToolInventorySource): string {
 		lines.push('');
 		lines.push(`### ${categoryLabel(cat)}`);
 		for (const tool of items) {
-			lines.push(`- **${tool.name}** — ${tool.description}`);
+			const marker = getToolMarker(tool);
+			lines.push(`- **${tool.name}**${marker} — ${tool.description}`);
 		}
 	}
 
-	// Trim leading blank line after header
-	if (lines[1] === '') lines.splice(1, 1);
+	// Trim leading blank line after header (but keep preamble blank line)
+	if (lines[1] === '' && !hasDeferredTools) lines.splice(1, 1);
 
 	return lines.join('\n');
 }
