@@ -67,7 +67,7 @@
 
 {#if pending.length > 0}
 	<aside
-		class="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
+		class="approval-panel fixed z-50 rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
 		role="region"
 		aria-label="Tool approval requests"
 	>
@@ -86,7 +86,7 @@
 			</span>
 		</header>
 
-		<ul class="max-h-[60vh] space-y-2 overflow-y-auto p-3">
+		<ul class="approval-list space-y-2 overflow-y-auto p-3">
 			{#each pending as req (req.requestId)}
 				{@const isExpanded = expandedIds.has(req.requestId)}
 				{@const hasArgs = Object.keys(req.args).length > 0}
@@ -106,7 +106,7 @@
 					{#if hasArgs}
 						<button
 							type="button"
-							class="mb-2 text-xs text-gray-600 hover:text-gray-900 focus:outline-none focus-visible:underline dark:text-gray-400 dark:hover:text-gray-200"
+							class="approval-args-toggle mb-2 text-xs text-gray-600 hover:text-gray-900 focus:outline-none focus-visible:underline dark:text-gray-400 dark:hover:text-gray-200"
 							onclick={() => toggleExpanded(req.requestId)}
 							aria-expanded={isExpanded}
 							aria-controls={`args-${req.requestId}`}
@@ -116,15 +116,15 @@
 						{#if isExpanded}
 							<pre
 								id={`args-${req.requestId}`}
-								class="mb-2 max-h-32 overflow-auto rounded bg-white p-2 font-mono text-xs text-gray-800 dark:bg-gray-950 dark:text-gray-200"
+								class="approval-args-pre mb-2 overflow-auto rounded bg-white p-2 font-mono text-xs text-gray-800 dark:bg-gray-950 dark:text-gray-200"
 							>{formatArgs(req.args)}</pre>
 						{/if}
 					{/if}
 
-					<div class="flex gap-2">
+					<div class="approval-actions flex gap-2">
 						<button
 							type="button"
-							class="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+							class="approval-btn approval-btn-approve flex flex-1 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
 							onclick={() => handleApprove(req.requestId)}
 						>
 							<span class="inline-flex items-center" aria-hidden="true">
@@ -134,7 +134,7 @@
 						</button>
 						<button
 							type="button"
-							class="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+							class="approval-btn approval-btn-deny flex flex-1 items-center justify-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
 							onclick={() => handleDeny(req.requestId)}
 						>
 							<span class="inline-flex items-center" aria-hidden="true">
@@ -148,3 +148,85 @@
 		</ul>
 	</aside>
 {/if}
+
+<style>
+	/*
+	 * Desktop / wide-viewport: floating card pinned to the bottom-right
+	 * corner. 24rem (384px) wide, capped to viewport on narrow desktops.
+	 * Identical to the previous Tailwind classes (`bottom-4 right-4 w-96
+	 * max-w-[calc(100vw-2rem)]`) — moving to global CSS so the mobile
+	 * variant below can be exercised by integration tests that probe the
+	 * rule via a synthetic node. `:global` is safe here because the
+	 * `.approval-panel` class only appears on this single component.
+	 */
+	:global(.approval-panel) {
+		bottom: 1rem;
+		right: 1rem;
+		left: auto;
+		width: 24rem;
+		max-width: calc(100vw - 2rem);
+	}
+
+	:global(.approval-list) {
+		max-height: 60vh;
+	}
+
+	:global(.approval-args-pre) {
+		max-height: 8rem;
+	}
+
+	/*
+	 * Mobile (≤640px): the floating card collides with the fixed bottom
+	 * navigation (--bottom-nav-height) and the iOS home indicator inset.
+	 * Convert to a full-width bottom sheet anchored above the bottom nav,
+	 * with rounded top corners and a generous max-height that uses the
+	 * dynamic viewport (dvh) so iOS URL-bar collapse doesn't cause
+	 * clipping. Buttons get a 48px hit area; the args preview scrolls
+	 * vertically and never horizontally.
+	 *
+	 * Spec MH8 acceptance: the approval panel must work as a mobile-
+	 * friendly modal/sheet that doesn't get hidden behind the bottom nav.
+	 */
+	@media (max-width: 640px) {
+		:global(.approval-panel) {
+			bottom: var(--bottom-nav-height, 0px);
+			right: 0;
+			left: 0;
+			width: 100%;
+			max-width: 100vw;
+			border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
+			border-left: none;
+			border-right: none;
+			border-bottom: none;
+			max-height: 70dvh;
+			display: flex;
+			flex-direction: column;
+		}
+
+		:global(.approval-list) {
+			max-height: none;
+			flex: 1 1 auto;
+			min-height: 0;
+		}
+
+		:global(.approval-args-pre) {
+			/* Allow more vertical room for arg previews on mobile (the
+			   sheet itself caps overall height) and keep horizontal
+			   overflow scrollable so wrapped JSON paths don't push the
+			   sheet sideways. */
+			max-height: 12rem;
+			overflow-y: auto;
+			overflow-x: auto;
+			word-break: break-all;
+		}
+
+		/* Bigger, thumb-reachable Approve / Deny buttons. The Tailwind
+		   utility `py-1.5` resolves to ~32px tall — well below the 48px
+		   recommended floor for primary destructive/confirm actions on
+		   touch. */
+		:global(.approval-btn) {
+			min-height: 48px;
+			font-size: var(--font-size-sm, 0.875rem);
+		}
+	}
+</style>

@@ -31,7 +31,6 @@
 	import {
 		HugeiconsIcon,
 		McpServerIcon,
-		TerminalIcon,
 		EditIcon,
 		CheckSquareIcon,
 	} from '$lib/icons/index.js';
@@ -39,7 +38,6 @@
 	import { tokenCounterStore } from '$lib/stores/token-counter.svelte.js';
 	import PanelTabs, { type PanelTabDescriptor, type TabId } from './PanelTabs.svelte';
 	import FileChangesTab from './tabs/FileChangesTab.svelte';
-	import TerminalTab from './tabs/TerminalTab.svelte';
 	import TodosTab from './tabs/TodosTab.svelte';
 	import TokenBar from './TokenBar.svelte';
 	import ContextVisualizer from './visualizer/ContextVisualizer.svelte';
@@ -74,12 +72,14 @@
 	});
 
 	// ── Tab descriptors ─────────────────────────────────────────────────────
-	// Identical order to RightPanel.svelte so MH2 ("active tab persisted
-	// per session") behaves the same regardless of which surface the user
-	// last interacted with.
+	// The mobile sheet intentionally OMITS the Terminal tab (SPEC MH8: terminal
+	// is desktop-only). Order otherwise matches RightPanel.svelte so the
+	// per-session active-tab persistence remains coherent across surfaces.
+	// xterm.js and ghostty-web are dynamic-imported only by TerminalTab, so
+	// not rendering the tab is sufficient to keep them out of the mobile
+	// execution path.
 	const tabs: ReadonlyArray<PanelTabDescriptor> = [
 		{ id: 'mcp', label: 'MCP', icon: McpServerIcon },
-		{ id: 'terminal', label: 'Terminal', icon: TerminalIcon },
 		{ id: 'files', label: 'Files', icon: EditIcon },
 		{ id: 'todos', label: 'Todos', icon: CheckSquareIcon },
 	];
@@ -87,8 +87,10 @@
 	// ── Lazy mount ledger ───────────────────────────────────────────────────
 	// Same contract as RightPanel.svelte: each tab's content is mounted on
 	// first activation and kept alive for the lifetime of the sheet so
-	// terminal sessions, scroll positions and diff cursors survive tab
-	// switches inside the sheet.
+	// scroll positions and diff cursors survive tab switches inside the
+	// sheet. Terminal entry kept in the ledger as `false` so the shared
+	// TabId type stays exhaustive — it never flips because the tab strip
+	// can't activate it on mobile.
 	const mounted: Record<TabId, boolean> = $state({
 		mcp: false,
 		terminal: false,
@@ -248,23 +250,12 @@
 							<HugeiconsIcon icon={McpServerIcon} size={28} strokeWidth={1.4} />
 							<p>MCP</p>
 						</div>
-					{:else if tab.id === 'terminal'}
-						{#if projectsStore.activeProjectId && projectsStore.activeSessionId}
-							<TerminalTab
-								projectId={projectsStore.activeProjectId}
-								sessionId={projectsStore.activeSessionId}
-							/>
-						{:else}
-							<div class="tab-placeholder">
-								<HugeiconsIcon icon={TerminalIcon} size={28} strokeWidth={1.4} />
-								<p>No active session</p>
-							</div>
-						{/if}
 					{:else if tab.id === 'files'}
 						<FileChangesTab />
-					{:else}
+					{:else if tab.id === 'todos'}
 						<TodosTab />
 					{/if}
+					<!-- Terminal tab is intentionally excluded on mobile (SPEC MH8). -->
 				</div>
 			{/if}
 		{/each}

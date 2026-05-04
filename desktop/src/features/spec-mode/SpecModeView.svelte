@@ -392,6 +392,17 @@ Accessibility:
 		gap: var(--space-3);
 		background-color: var(--surface-substrate);
 		padding: var(--space-4);
+		/* Mobile safety net — long workflow names or wide tab labels could
+		   otherwise push the chrome past the 390px viewport. The min-width
+		   on .spec-workflow-switcher-wrapper is fluid (flex:1 + max:28rem)
+		   so this only kicks in for unusual content. */
+		overflow-x: hidden;
+	}
+
+	@media (max-width: 640px) {
+		.spec-mode-view {
+			padding: var(--space-3);
+		}
 	}
 
 	/* ----- Empty / legacy states --------------------------------------- */
@@ -510,12 +521,22 @@ Accessibility:
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-3);
+		/* Wrap on narrow viewports so the workflow switcher and tab toggle
+		   never collide horizontally. Desktop layout is preserved because
+		   the row's natural width fits comfortably above ~640px. */
+		flex-wrap: wrap;
 	}
 
 	.spec-workflow-switcher-wrapper {
-		min-width: 16rem;
-		flex: 1;
+		min-width: 0;
+		flex: 1 1 16rem;
 		max-width: 28rem;
+	}
+
+	@media (max-width: 640px) {
+		.spec-tab-list {
+			flex: 0 0 auto;
+		}
 	}
 
 	/* ----- Tab toggle --------------------------------------------------- */

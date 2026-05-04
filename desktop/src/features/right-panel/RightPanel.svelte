@@ -9,6 +9,7 @@
 	} from '$lib/icons/index.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import { tokenCounterStore } from '$lib/stores/token-counter.svelte.js';
+	import { isCapacitorRuntime } from '$lib/runtime.js';
 	import PanelTabs, { type PanelTabDescriptor, type TabId } from './PanelTabs.svelte';
 	import FileChangesTab from './tabs/FileChangesTab.svelte';
 	import TerminalTab from './tabs/TerminalTab.svelte';
@@ -68,12 +69,23 @@
 	// Tab descriptor list. Order here defines the visible order in the strip
 	// AND the keyboard cycle order. Spec MH2 default order: MCP → Terminal
 	// → File Changes → Todos.
-	const tabs: ReadonlyArray<PanelTabDescriptor> = [
-		{ id: 'mcp', label: 'MCP', icon: McpServerIcon },
-		{ id: 'terminal', label: 'Terminal', icon: TerminalIcon },
-		{ id: 'files', label: 'Files', icon: EditIcon },
-		{ id: 'todos', label: 'Todos', icon: CheckSquareIcon },
-	];
+	//
+	// Terminal tab is excluded on Capacitor (mobile) per SPEC MH8 — xterm.js
+	// / ghostty-web are not part of the mobile experience. Renderer modules
+	// are dynamic-imported in TerminalTab, so omitting the tab entry is
+	// sufficient to keep them out of the mobile execution path.
+	const tabs: ReadonlyArray<PanelTabDescriptor> = isCapacitorRuntime
+		? [
+			{ id: 'mcp', label: 'MCP', icon: McpServerIcon },
+			{ id: 'files', label: 'Files', icon: EditIcon },
+			{ id: 'todos', label: 'Todos', icon: CheckSquareIcon },
+		]
+		: [
+			{ id: 'mcp', label: 'MCP', icon: McpServerIcon },
+			{ id: 'terminal', label: 'Terminal', icon: TerminalIcon },
+			{ id: 'files', label: 'Files', icon: EditIcon },
+			{ id: 'todos', label: 'Todos', icon: CheckSquareIcon },
+		];
 
 	// Lazy mount ledger. A tab's content is rendered only after the user
 	// first activates it; once mounted it's kept alive in DOM for the
