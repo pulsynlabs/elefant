@@ -18,6 +18,7 @@
 	import StreamingMessage from '../chat/StreamingMessage.svelte';
 	import ToolCallCard from '../chat/ToolCallCard.svelte';
 	import MarkdownRenderer from '../chat/MarkdownRenderer.svelte';
+	import VizRenderer from '../chat/viz/VizRenderer.svelte';
 	import AgentTaskCard from './AgentTaskCard.svelte';
 	import { computeRenderBlocks } from './agent-run-transcript-blocks.js';
 	import {
@@ -147,8 +148,14 @@
 		effectiveRunId ? agentRunsStore.childRunsForRun(effectiveRunId) : [],
 	);
 
+	// Top-level runs (`parentRunId === null`) are orchestrator runs and
+	// may render `visualize` tool calls inline via VizRenderer (MH3).
+	// Child runs are subagents — viz is suppressed so subagent
+	// transcripts never initiate or display rich viz cards (MH9).
+	const isOrchestrator = $derived(run !== null && run.parentRunId === null);
+
 	const renderBlocks = $derived(
-		computeRenderBlocks(entries, { childRuns }),
+		computeRenderBlocks(entries, { childRuns, isOrchestrator }),
 	);
 
 	/**
@@ -220,6 +227,8 @@
 							<StreamingMessage message={block.message} />
 						{:else if block.kind === 'tool'}
 							<ToolCallCard toolCall={block.toolCall} />
+						{:else if block.kind === 'viz'}
+							<VizRenderer envelope={block.envelope} />
 						{:else if block.kind === 'task'}
 							<AgentTaskCard
 								title={block.title}
