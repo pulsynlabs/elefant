@@ -98,6 +98,7 @@ export const researchGrepTool: ToolDefinition<ResearchGrepParams, string> = {
 	name: 'research_grep',
 	description:
 		'Search the Research Base (.elefant/markdown-db/) using ripgrep. Returns matches grouped by file with frontmatter titles and research:// links.',
+	deferred: true,
 	parameters: {
 		pattern: {
 			type: 'string',

@@ -95,7 +95,7 @@ describe('agent_session_search tool', () => {
 			title: 'Parent run',
 			depth: 0,
 			signal: new AbortController().signal,
-			discoveredMcpTools: new Set<string>(),
+			discoveredTools: new Set<string>(),
 		}
 
 		const deps: AgentSessionSearchDeps = { database, currentRun }
@@ -151,7 +151,7 @@ describe('agent_session_search tool', () => {
 			title: 'Parent run',
 			depth: 0,
 			signal: new AbortController().signal,
-			discoveredMcpTools: new Set<string>(),
+			discoveredTools: new Set<string>(),
 		}
 
 		const deps: AgentSessionSearchDeps = { database, currentRun }
@@ -197,7 +197,7 @@ describe('agent_session_search tool', () => {
 			title: 'Parent run',
 			depth: 0,
 			signal: new AbortController().signal,
-			discoveredMcpTools: new Set<string>(),
+			discoveredTools: new Set<string>(),
 		}
 
 		const deps: AgentSessionSearchDeps = { database, currentRun }
@@ -242,7 +242,7 @@ describe('agent_session_search tool', () => {
 			title: 'Parent run',
 			depth: 0,
 			signal: new AbortController().signal,
-			discoveredMcpTools: new Set<string>(),
+			discoveredTools: new Set<string>(),
 		}
 
 		const deps: AgentSessionSearchDeps = { database, currentRun }
@@ -291,7 +291,7 @@ describe('agent_session_search tool', () => {
 			title: 'Parent run',
 			depth: 0,
 			signal: new AbortController().signal,
-			discoveredMcpTools: new Set<string>(),
+			discoveredTools: new Set<string>(),
 		}
 
 		const deps: AgentSessionSearchDeps = { database, currentRun }
@@ -330,7 +330,7 @@ describe('agent_session_search tool', () => {
 			title: 'Parent run',
 			depth: 0,
 			signal: new AbortController().signal,
-			discoveredMcpTools: new Set<string>(),
+			discoveredTools: new Set<string>(),
 		}
 
 		const deps: AgentSessionSearchDeps = { database, currentRun }
@@ -387,7 +387,7 @@ describe('agent_session_search tool', () => {
 			title: 'Parent run',
 			depth: 0,
 			signal: new AbortController().signal,
-			discoveredMcpTools: new Set<string>(),
+			discoveredTools: new Set<string>(),
 		}
 
 		const deps: AgentSessionSearchDeps = { database, currentRun }
@@ -433,7 +433,7 @@ describe('agent_session_search tool', () => {
 			title: 'Parent run',
 			depth: 0,
 			signal: new AbortController().signal,
-			discoveredMcpTools: new Set<string>(),
+			discoveredTools: new Set<string>(),
 		}
 
 		const deps: AgentSessionSearchDeps = { database, currentRun }

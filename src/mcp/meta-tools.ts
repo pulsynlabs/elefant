@@ -4,6 +4,7 @@ import type { MCPManager } from './manager.ts';
 import type { RunContext } from '../runs/types.ts';
 import { ok } from '../types/result.ts';
 import type { ToolDefinition } from '../types/tools.ts';
+import { buildToolIndex, searchIndex, type IndexEntry } from '../tools/tool_search/index-builder.js';
 
 type JsonObject = { [key: string]: JsonValue };
 type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
@@ -98,22 +99,72 @@ export function createMcpSearchToolsTool(deps: {
 		},
 		execute: async (params) => {
 			const maxResults = params.max_results ?? 5;
-			const matches = deps.manager.searchTools(params.query, {
-				server: params.server,
-				maxResults,
-			});
 
-			const runContext = deps.getRunContext();
-			for (const match of matches) {
-				runContext.discoveredMcpTools.add(match.tool.name);
+			// Fetch all MCP tools, optionally scoped to a single server.
+			let allTools = deps.manager.listAllTools();
+			if (params.server) {
+				allTools = allTools.filter(
+					(entry) => entry.serverName === params.server || entry.serverId === params.server,
+				);
 			}
 
+			// Build a lightweight search index from the MCP tool catalog.
+			const entries: IndexEntry[] = allTools.map((entry) => ({
+				name: entry.tool.name,
+				description: entry.tool.description ?? '',
+				category: 'mcp',
+			}));
+
+			const index = buildToolIndex(entries);
+
+			// Parse the query string.  `select:a,b` maps to exact-name lookup;
+			// everything else is keyword search via the index.
+			const query = params.query.trim();
+			let searchResults: IndexEntry[];
+
+			if (query.length === 0) {
+				searchResults = [];
+			} else if (query.toLowerCase().startsWith('select:')) {
+				const names = query
+					.slice('select:'.length)
+					.split(',')
+					.map((n) => n.trim())
+					.filter(Boolean);
+
+				searchResults = searchIndex(index, {
+					names,
+					category: 'mcp',
+					limit: maxResults,
+				});
+			} else {
+				searchResults = searchIndex(index, {
+					query,
+					category: 'mcp',
+					limit: maxResults,
+				});
+			}
+
+			// Track discovered tool names so the agent loop can promote their
+			// schemas on the next turn.
+			const runContext = deps.getRunContext();
+			for (const entry of searchResults) {
+				runContext.discoveredTools.add(entry.name);
+			}
+
+			// Map index results back to the full MCP Tool objects (for schema info).
+			const allToolsByName = new Map(
+				allTools.map((t) => [t.tool.name, t]),
+			);
+
 			const result: McpSearchToolResult = {
-				tools: matches.map((match) => ({
-					name: match.tool.name,
-					description: match.tool.description ?? '',
-					input_schema: cleanInputSchema(match.tool),
-				})),
+				tools: searchResults.map((entry) => {
+					const match = allToolsByName.get(entry.name);
+					return {
+						name: entry.name,
+						description: entry.description,
+						input_schema: match ? cleanInputSchema(match.tool) : {},
+					};
+				}),
 			};
 
 			return ok(JSON.stringify(result));

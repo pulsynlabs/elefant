@@ -67,6 +67,20 @@ interface EffectiveMcpTools {
 	selective: boolean
 }
 
+function createEffectiveToolSet(tools: ToolDefinition[], runContext: RunContext): ToolDefinition[] {
+	return tools.filter((tool) => {
+		if (tool.alwaysLoad === true) {
+			return true
+		}
+
+		if (tool.deferred !== true) {
+			return true
+		}
+
+		return runContext.discoveredTools.has(tool.name)
+	})
+}
+
 function createToolResult(toolCallId: string, content: string, isError: boolean): ToolResult {
 	return {
 		toolCallId,
@@ -193,7 +207,10 @@ function buildMcpManifestServers(manager: MCPManager, tools: ToolWithMeta[]): Ar
 		const server = grouped.get(entry.serverId) ?? {
 			name: entry.serverName,
 			tools: [],
-			alwaysLoad: new Set<string>(manager.getPinnedTools(entry.serverId)),
+			alwaysLoad: new Set<string>([
+				...manager.getPinnedTools(entry.serverId),
+				...manager.getAlwaysLoadTools(entry.serverId),
+			]),
 		}
 		server.tools.push(entry.tool)
 		if (isAlwaysLoadTool(entry.tool)) {
@@ -249,9 +266,9 @@ function createEffectiveMcpTools(options: AgentLoopOptions): EffectiveMcpTools {
 		return { tools: [...baseTools, ...allSessionMcpDefinitions], manifest: '', selective: false }
 	}
 
-	const selectedRawNames = new Set<string>(options.runContext.discoveredMcpTools)
+	const selectedRawNames = new Set<string>(options.runContext.discoveredTools)
 	for (const entry of sessionScopedMcpTools) {
-		if (isAlwaysLoadTool(entry.tool) || options.mcpManager.getPinnedTools(entry.serverId).includes(entry.tool.name)) {
+		if (isAlwaysLoadTool(entry.tool) || options.mcpManager.getPinnedTools(entry.serverId).includes(entry.tool.name) || options.mcpManager.getAlwaysLoadTools(entry.serverId).includes(entry.tool.name)) {
 			selectedRawNames.add(entry.tool.name)
 		}
 	}
@@ -418,7 +435,14 @@ export async function* runAgentLoop(
 				contextWindow,
 				sessionId,
 				conversationId: options.runContext.runId,
+				discoveredTools: Array.from(options.runContext.discoveredTools),
 			})
+			if (Array.isArray(compacted.discoveredTools)) {
+				options.runContext.discoveredTools.clear()
+				for (const toolName of compacted.discoveredTools) {
+					options.runContext.discoveredTools.add(toolName)
+				}
+			}
 			messages = compacted.messages
 			tokenCount = compacted.tokenCountAfter
 			tokenCounter.recordCompaction(sessionId, tokenCount, contextWindow)
@@ -441,6 +465,7 @@ export async function* runAgentLoop(
 		}
 
 		const effectiveMcpTools = createEffectiveMcpTools(options)
+		const effectiveToolSet = createEffectiveToolSet(effectiveMcpTools.tools, options.runContext)
 
 		const pendingToolCalls: ToolCall[] = []
 		let finishReason: 'stop' | 'tool_calls' | 'length' | 'error' = 'stop'
@@ -486,7 +511,7 @@ export async function* runAgentLoop(
 			? appendManifestToMessages(transformedMessages, effectiveMcpTools.manifest)
 			: transformedMessages
 
-		for await (const event of adapterResult.data.sendMessage(outgoingMessages, effectiveMcpTools.tools, {
+		for await (const event of adapterResult.data.sendMessage(outgoingMessages, effectiveToolSet, {
 			signal: options.runContext.signal,
 			provider: options.provider,
 			maxTokens: options.maxTokens,

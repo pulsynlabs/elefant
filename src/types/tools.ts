@@ -23,6 +23,19 @@ export interface ToolDefinition<TParams = unknown, TResult = string> {
    * guard at the registry boundary.
    */
   allowedAgents?: string[];
+  /**
+   * When true, this tool's full schema is always included in the initial API
+   * tool array, even if deferred mode is active. Use to ensure critical tools
+   * are never withheld.
+   */
+  alwaysLoad?: boolean;
+  /**
+   * When true, this tool's full schema is withheld from the initial API tool
+   * array. It appears only as a compact marker in the tool inventory. Use
+   * `tool_search` to discover and promote the full schema. Overridden by
+   * alwaysLoad: true.
+   */
+  deferred?: boolean;
   execute: (params: TParams) => Promise<Result<TResult, ElefantError>>;
 }
 

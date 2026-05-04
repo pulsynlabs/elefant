@@ -26,7 +26,7 @@ describe('workflow tool registry integration', () => {
 			sseManager: {} as never,
 			providerRouter: {} as never,
 			configManager: {} as never,
-			currentRun: { runId: 'run-1', depth: 0, agentType: 'orchestrator', title: 'Run', sessionId: 'session-1', projectId: 'project-1', signal: new AbortController().signal, discoveredMcpTools: new Set<string>() },
+			currentRun: { runId: 'run-1', depth: 0, agentType: 'orchestrator', title: 'Run', sessionId: 'session-1', projectId: 'project-1', signal: new AbortController().signal, discoveredTools: new Set<string>() },
 			mode: 'spec',
 		});
 		const names = registry.getAll().map((tool) => tool.name).filter((name) => name.startsWith('wf_')).sort();
@@ -57,7 +57,7 @@ describe('workflow tool registry integration', () => {
 			sseManager: {} as never,
 			providerRouter: {} as never,
 			configManager: {} as never,
-			currentRun: { runId: 'run-1', depth: 0, agentType: 'primary', title: 'Run', sessionId: 'session-1', projectId: 'project-1', signal: new AbortController().signal, discoveredMcpTools: new Set<string>() },
+			currentRun: { runId: 'run-1', depth: 0, agentType: 'primary', title: 'Run', sessionId: 'session-1', projectId: 'project-1', signal: new AbortController().signal, discoveredTools: new Set<string>() },
 			mode: 'quick',
 		});
 

@@ -19,6 +19,26 @@ import type { CompactionInput, CompactionOutput } from './types.ts';
 
 const RETAINED_MESSAGE_RATIO = 0.3;
 
+function serializeDiscoveredToolsBlock(discoveredTools: string[]): string {
+  if (discoveredTools.length === 0) {
+    return '';
+  }
+
+  return `<discovered_tools>${discoveredTools.join(',')}</discovered_tools>`;
+}
+
+function parseDiscoveredToolsBlock(content: string): string[] {
+  const match = content.match(/<discovered_tools>([\s\S]*?)<\/discovered_tools>/i);
+  if (!match) {
+    return [];
+  }
+
+  return match[1]!
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+}
+
 export class CompactionManager {
   private static readonly DEFAULT_COMPACTION_THRESHOLD = 0.8;
 
@@ -39,6 +59,7 @@ export class CompactionManager {
       contextWindow,
       sessionId,
       conversationId,
+      discoveredTools,
     } = input;
 
     const preCompact = await this.emitPreCompactHooks({
@@ -74,6 +95,7 @@ export class CompactionManager {
         blocks: [],
         tokenCountBefore: tokenCount,
         tokenCountAfter: tokenCount,
+        discoveredTools,
         didCompact: false,
         skipReason,
       };
@@ -112,6 +134,7 @@ export class CompactionManager {
       activeSpec ? buildSpecModeBlock(this.ctx.db, activeSpec.projectId, activeSpec.workflowId) : '',
       buildSpecBlock(specPath),
       buildAdlBlock(this.ctx.db),
+      serializeDiscoveredToolsBlock(discoveredTools ?? []),
       buildToolInstructionsBlock(toolNames),
     ].filter((block) => block.length > 0);
 
@@ -137,6 +160,9 @@ export class CompactionManager {
       content: block,
     }));
     const compactedMessages = [summaryMessage, ...blockMessages, ...keptMessages];
+    const rehydratedDiscoveredTools = blockMessages
+      .filter((message) => message.role === 'system')
+      .flatMap((message) => parseDiscoveredToolsBlock(message.content));
     const tokenCountAfter = estimateMessageTokens(compactedMessages);
 
     try {
@@ -173,6 +199,7 @@ export class CompactionManager {
       blocks,
       tokenCountBefore: tokenCount,
       tokenCountAfter,
+      discoveredTools: rehydratedDiscoveredTools,
       didCompact: true,
     };
   }

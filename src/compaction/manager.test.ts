@@ -167,7 +167,25 @@ describe('CompactionManager', () => {
     expect(result.blocks.length).toBeGreaterThan(0);
     expect(result.blocks.some((block) => block.includes('Workflow State'))).toBe(true);
     expect(result.blocks.some((block) => block.includes('Available Tools'))).toBe(true);
+    expect(result.blocks.some((block) => block.includes('<discovered_tools>'))).toBe(false);
     expect(result.didCompact).toBe(true);
+  });
+
+  it('round-trips discoveredTools through compaction metadata', async () => {
+    const fixture = createFixture();
+    fixtures.push(fixture);
+
+    const result = await fixture.manager.compact({
+      messages: createMessages(12),
+      tokenCount: 180_000,
+      contextWindow: 200_000,
+      sessionId: fixture.sessionId,
+      conversationId: 'conv-discovered-tools',
+      discoveredTools: ['mcp__filesystem__read_file', 'visualize'],
+    });
+
+    expect(result.blocks.some((block) => block.includes('<discovered_tools>mcp__filesystem__read_file,visualize</discovered_tools>'))).toBe(true);
+    expect(result.discoveredTools).toEqual(['mcp__filesystem__read_file', 'visualize']);
   });
 
   it('compact uses checkpoint handoff format when no hook provides a summary', async () => {

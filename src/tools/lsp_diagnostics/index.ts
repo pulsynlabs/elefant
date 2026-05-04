@@ -47,6 +47,7 @@ export const lspDiagnosticsTool: ToolDefinition<LspDiagnosticsParams, string> = 
     'List current LSP diagnostics (type errors, warnings) across the workspace or for a specific file. ' +
     'Optionally filter by severity level.',
   category: 'inspect',
+  deferred: true,
   parameters: {
     filePath: {
       type: 'string',

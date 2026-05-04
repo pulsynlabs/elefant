@@ -30,11 +30,15 @@ function tool(
 	name: string,
 	description: string,
 	category?: string,
+	deferred?: boolean,
+	alwaysLoad?: boolean,
 ): ToolDefinition {
 	return {
 		name,
 		description,
 		category,
+		deferred,
+		alwaysLoad,
 		parameters: {},
 		execute: async () => ({ ok: true, data: 'ok' }),
 	}
@@ -327,5 +331,90 @@ describe('buildToolInventorySection', () => {
 		const after = buildToolInventorySection(src)
 		expect(after).toContain('### Workflow')
 		expect(after).toContain('- **wf_status** — Show workflow status')
+	})
+
+	// -----------------------------------------------------------------------
+	// Deferred and always-load markers
+	// -----------------------------------------------------------------------
+
+	it('renders standard tools without any marker', () => {
+		const result = buildToolInventorySection(registry(
+			tool('read', 'Read a file'),
+			tool('write', 'Write a file'),
+		))
+
+		expect(result).toContain('- **read** — Read a file')
+		expect(result).toContain('- **write** — Write a file')
+		expect(result).not.toContain('[deferred]')
+		expect(result).not.toContain('[always]')
+	})
+
+	it('renders deferred tools with [deferred] marker', () => {
+		const result = buildToolInventorySection(registry(
+			tool('read', 'Read a file'),
+			tool('complex_analysis', 'Run deep code analysis', undefined, true),
+			tool('legacy_migrate', 'Migration utilities', undefined, true),
+		))
+
+		expect(result).toContain('- **read** — Read a file')
+		expect(result).toContain('- **complex_analysis** [deferred] — Run deep code analysis')
+		expect(result).toContain('- **legacy_migrate** [deferred] — Migration utilities')
+	})
+
+	it('renders always-load tools with [always] marker', () => {
+		const result = buildToolInventorySection(registry(
+			tool('read', 'Read a file', undefined, undefined, true),
+			tool('write', 'Write a file', undefined, undefined, true),
+		))
+
+		expect(result).toContain('- **read** [always] — Read a file')
+		expect(result).toContain('- **write** [always] — Write a file')
+	})
+
+	it('renders all three marker states correctly', () => {
+		const result = buildToolInventorySection(registry(
+			tool('read', 'Read a file'),
+			tool('complex_analysis', 'Run deep code analysis', undefined, true),
+			tool('tool_list', 'List all available tools', undefined, undefined, true),
+		))
+
+		expect(result).toContain('- **read** — Read a file')
+		expect(result).toContain('- **complex_analysis** [deferred] — Run deep code analysis')
+		expect(result).toContain('- **tool_list** [always] — List all available tools')
+	})
+
+	it('includes instructional preamble when deferred tools are present', () => {
+		const result = buildToolInventorySection(registry(
+			tool('read', 'Read a file'),
+			tool('complex_analysis', 'Run deep code analysis', undefined, true),
+		))
+
+		expect(result).toContain('💡 Use `tool_search` to load full schemas for `[deferred]` tools before using them.')
+	})
+
+	it('does not include instructional preamble when no deferred tools are present', () => {
+		const result = buildToolInventorySection(registry(
+			tool('read', 'Read a file'),
+			tool('write', 'Write a file'),
+			tool('tool_list', 'List all available tools', undefined, undefined, true),
+		))
+
+		expect(result).not.toContain('💡 Use `tool_search`')
+		expect(result).not.toContain('[deferred]')
+	})
+
+	it('places instructional preamble after header and before categories', () => {
+		const result = buildToolInventorySection(registry(
+			tool('complex_analysis', 'Run deep code analysis', undefined, true),
+		))
+
+		const lines = result.split('\n')
+		const headerIdx = lines.findIndex((l) => l === '## Available Tools')
+		const preambleIdx = lines.findIndex((l) => l.includes('💡 Use `tool_search`'))
+		const categoryIdx = lines.findIndex((l) => l.startsWith('### '))
+
+		expect(headerIdx).toBeGreaterThanOrEqual(0)
+		expect(preambleIdx).toBeGreaterThan(headerIdx)
+		expect(categoryIdx).toBeGreaterThan(preambleIdx)
 	})
 })

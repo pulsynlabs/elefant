@@ -162,6 +162,7 @@ export function createResearchReadTool(
     name: 'research_read',
     description:
       'Read a Research Base file by id, path, or research:// URI, with optional #anchor section extraction.',
+    deferred: true,
     parameters: {
       id: {
         type: 'string',

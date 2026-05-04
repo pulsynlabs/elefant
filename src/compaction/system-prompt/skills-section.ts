@@ -16,20 +16,22 @@ const VERBOSE_HEADER = [
 const COMPACT_HEADER = '## Available Skills';
 
 export interface SkillSectionOptions {
-	verbose: boolean;
+	/** @default false - compact mode is default for deferred loading */
+	verbose?: boolean;
 	maxChars?: number;
 }
 
 export function formatSkills(
 	skills: SkillInfo[],
-	opts: SkillSectionOptions,
+	opts: SkillSectionOptions = {},
 ): string {
 	if (skills.length === 0) return '';
 
 	const sortedSkills = [...skills].sort((a, b) => a.name.localeCompare(b.name));
 	const maxChars = opts.maxChars ?? DEFAULT_MAX_CHARS;
+	const isVerbose = opts.verbose ?? false;
 
-	return opts.verbose
+	return isVerbose
 		? formatVerboseSkills(sortedSkills, maxChars)
 		: formatCompactSkills(sortedSkills, maxChars);
 }
@@ -93,7 +95,8 @@ function formatVerboseSkill(skill: SkillInfo): string {
 }
 
 function formatCompactSkill(skill: SkillInfo): string {
-	return `- **${skill.name}**: ${oneLine(skill.description)}`;
+	const description = oneLine(skill.description);
+	return `- **${skill.name}**: ${description} (call skill('${skill.name}') to load full content)`;
 }
 
 function verboseTruncationFooter(truncatedCount: number): string {

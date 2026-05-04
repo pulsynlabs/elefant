@@ -35,6 +35,7 @@ export function createVisualizeTool(deps?: VisualizeToolDeps): ToolDefinition<Vi
 		name: 'visualize',
 		description: VISUALIZE_DESCRIPTION,
 		allowedAgents: ['orchestrator'],
+		deferred: true,
 		parameters: {
 			type: {
 				type: 'string',

@@ -8,6 +8,7 @@ import {
 	buildSpecBlock,
 	createCompactionBlockTransform,
 } from '../compaction/blocks.ts'
+import type { CompactionInput } from '../compaction/types.ts'
 import { emit, HookRegistry } from '../hooks/index.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { ProviderAdapter, StreamEvent } from '../providers/types.ts'
@@ -48,6 +49,7 @@ function mcpManagerWithTools(tools: ToolWithMeta[]): MCPManager {
 	return {
 		listAllTools: () => tools,
 		getPinnedTools: () => [],
+		getAlwaysLoadTools: () => [],
 		getTimeout: () => 30_000,
 		callTool: async () => ({ content: [{ type: 'text', text: 'mcp ok' }] }),
 		searchTools: (query: string) => {
@@ -88,7 +90,7 @@ function createRunContext(runId: string) {
 		sessionId: `session-${runId}`,
 		projectId: 'project-test',
 		signal: new AbortController().signal,
-		discoveredMcpTools: new Set<string>(),
+		discoveredTools: new Set<string>(),
 	}
 }
 
@@ -1005,6 +1007,152 @@ describe('runAgentLoop', () => {
 		expect(capturedTools).toEqual([['native']])
 	})
 
+	it('withholds deferred built-in tools from API tool array before discovery', async () => {
+		const capturedTools: string[][] = []
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: [
+					baseTool('native'),
+					{ ...baseTool('deferred-tool'), deferred: true },
+				],
+				hookRegistry: new HookRegistry(),
+				runContext: createRunContext('conv-deferred-builtin-hidden'),
+			}),
+		)
+
+		expect(capturedTools).toEqual([['native']])
+	})
+
+	it('promotes discovered deferred built-in tools on the next iteration', async () => {
+		const capturedTools: string[][] = []
+		let turn = 0
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				turn += 1
+				if (turn === 1) {
+					yield {
+						type: 'tool_call_complete',
+						toolCall: { id: 'discover-1', name: 'tool_search', arguments: { names: ['deferred-tool'] } },
+					}
+					yield { type: 'done', finishReason: 'tool_calls' }
+					return
+				}
+
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+		const runContext = createRunContext('conv-deferred-builtin-promote')
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async (_name, args) => {
+					const payload = typeof args === 'object' && args !== null ? args as Record<string, unknown> : {}
+					const names = Array.isArray(payload.names) ? payload.names : []
+					if (names.includes('deferred-tool')) {
+						runContext.discoveredTools.add('deferred-tool')
+					}
+					return { ok: true, data: '{"tools":[{"name":"deferred-tool"}]}' }
+				},
+			}, {
+				messages: [{ role: 'user', content: 'discover' }],
+				tools: [
+					{ ...baseTool('tool_search'), alwaysLoad: true },
+					{ ...baseTool('deferred-tool'), deferred: true },
+				],
+				hookRegistry: new HookRegistry(),
+				runContext,
+			}),
+		)
+
+		expect(capturedTools[0]).toEqual(['tool_search'])
+		expect(capturedTools[1]).toEqual(['tool_search', 'deferred-tool'])
+	})
+
+	it('always includes alwaysLoad tools even when deferred is true', async () => {
+		const capturedTools: string[][] = []
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: [
+					{ ...baseTool('always-tool'), deferred: true, alwaysLoad: true },
+				],
+				hookRegistry: new HookRegistry(),
+				runContext: createRunContext('conv-deferred-always-load'),
+			}),
+		)
+
+		expect(capturedTools).toEqual([['always-tool']])
+	})
+
+	it('rehydrates discoveredTools after compaction before effective tool filtering', async () => {
+		const capturedTools: string[][] = []
+		let compacted = false
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		const runContext = createRunContext('conv-compaction-discovered-tools')
+		runContext.discoveredTools.add('visualize')
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: [
+					{ ...baseTool('tool_search'), alwaysLoad: true },
+					{ ...baseTool('visualize'), deferred: true },
+				],
+				hookRegistry: new HookRegistry(),
+				runContext,
+				compaction: {
+					shouldCompact: () => !compacted,
+					compact: async (input: CompactionInput) => {
+						compacted = true
+						return {
+							messages: input.messages,
+							summary: 'compacted',
+							blocks: ['<discovered_tools>visualize</discovered_tools>'],
+							tokenCountBefore: input.tokenCount,
+							tokenCountAfter: input.tokenCount,
+							discoveredTools: ['visualize'],
+							didCompact: true,
+						}
+					},
+				} as any,
+			}),
+		)
+
+		expect(capturedTools[0]).toEqual(['tool_search', 'visualize'])
+	})
+
 	it('leaves tools unchanged when mcpManager has no tools', async () => {
 		const capturedTools: string[][] = []
 		const adapter: ProviderAdapter = {
@@ -1124,7 +1272,7 @@ describe('runAgentLoop', () => {
 				execute: async (_name, args) => {
 					const payload = typeof args === 'object' && args !== null ? args as Record<string, unknown> : {}
 					if (payload.query === 'select:read_file') {
-						runContext.discoveredMcpTools.add('read_file')
+						runContext.discoveredTools.add('read_file')
 					}
 					return { ok: true, data: '{"tools":[{"name":"read_file"}]}' }
 				},

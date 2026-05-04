@@ -184,6 +184,50 @@ function withMockPreconnect(mockFetch: MockFetchFunction, originalFetch: typeof 
 		expect(capturedBody!.stream_options).toEqual({ include_usage: true })
 	})
 
+	it('serializes exactly the tools provided without deferred filtering logic', async () => {
+		let capturedBody: { tools?: Array<{ function?: { name?: string } }> } | null = null
+
+		globalThis.fetch = withMockPreconnect(
+			async (_url, init) => {
+				if (init?.body) {
+					capturedBody = JSON.parse(init.body as string) as { tools?: Array<{ function?: { name?: string } }> }
+				}
+				return createSseResponse([
+					'data: {"choices":[{"delta":{"content":"Hi"},"finish_reason":null}]}\n\n',
+					'data: [DONE]\n\n',
+				])
+			},
+			originalFetch,
+		)
+
+		const adapter = new OpenAIAdapter(OPENAI_CONFIG)
+		const tools: ToolDefinition[] = [
+			{
+				name: 'always_tool',
+				description: 'Always tool',
+				parameters: {},
+				alwaysLoad: true,
+				execute: async () => ok('ok'),
+			},
+			{
+				name: 'deferred_tool',
+				description: 'Deferred tool',
+				parameters: {},
+				deferred: true,
+				execute: async () => ok('ok'),
+			},
+		]
+
+		const events: StreamEvent[] = []
+		for await (const event of adapter.sendMessage([{ role: 'user', content: 'hello' }], tools)) {
+			events.push(event)
+		}
+
+		expect(events.some((event) => event.type === 'done')).toBe(true)
+		expect(capturedBody).not.toBeNull()
+		expect((capturedBody!.tools ?? []).map((entry) => entry.function?.name)).toEqual(['always_tool', 'deferred_tool'])
+	})
+
 	it('yields UsageEvent when final chunk includes usage data', async () => {
 		globalThis.fetch = withMockPreconnect(
 			async () =>

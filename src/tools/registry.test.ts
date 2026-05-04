@@ -5,11 +5,11 @@ import type { ToolDefinition } from '../types/tools.ts'
 import { createToolRegistry, createToolRegistryForRun, filterToolsForAgent, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all 24 tools including research_* and visualize tools', () => {
+	it('registers all 25 tools including research_* and tool_search', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
-		expect(names).toEqual([
+			expect(names).toEqual([
 			'apply_patch',
 			'bash',
 			'edit',
@@ -30,12 +30,13 @@ describe('ToolRegistry', () => {
 			'todoread',
 			'todowrite',
 			'tool_list',
+			'tool_search',
 			'visualize',
 			'webfetch',
 			'websearch',
 			'write',
 		])
-		expect(names.length).toBe(24)
+		expect(names.length).toBe(25)
 	})
 
 	it('execute() calls the matching tool', async () => {
@@ -471,7 +472,7 @@ describe('ToolRegistry', () => {
 				sessionId: 'session-1',
 				projectId: 'project-1',
 				signal: new AbortController().signal,
-				discoveredMcpTools: new Set<string>(),
+				discoveredTools: new Set<string>(),
 			},
 		})
 
