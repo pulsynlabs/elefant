@@ -13,6 +13,7 @@
 	import { HugeiconsIcon, WarningIcon } from '$lib/icons/index.js';
 	import ServerList from '$lib/components/servers/ServerList.svelte';
 	import AddEditServerModal from '$lib/components/servers/AddEditServerModal.svelte';
+	import { isCapacitorRuntime } from '$lib/runtime.js';
 
 	// ─── Server list status state (synced from registry subscription) ────
 	let statuses = $state<Record<string, ServerHealthStatus>>({});
@@ -333,24 +334,31 @@
 				</div>
 			{/if}
 
-			<div class="auto-start-row">
-				<div class="auto-start-info">
-					<span class="auto-start-label">Auto-start on launch</span>
-					<span class="auto-start-desc">
-						Automatically start the local daemon when Elefant opens.
-					</span>
+			<!-- Auto-start toggle is desktop-only. Mobile (Capacitor) is
+			     remote-only per MH7 — there is no embedded daemon to
+			     start — so this control is hidden rather than disabled
+			     to keep the settings surface honest about what the
+			     platform actually supports. -->
+			{#if !isCapacitorRuntime}
+				<div class="auto-start-row">
+					<div class="auto-start-info">
+						<span class="auto-start-label">Auto-start on launch</span>
+						<span class="auto-start-desc">
+							Automatically start the local daemon when Elefant opens.
+						</span>
+					</div>
+					<button
+						class="toggle-switch"
+						class:enabled={autoStart}
+						onclick={handleAutoStartToggle}
+						role="switch"
+						aria-checked={autoStart}
+						aria-label="Auto-start daemon on launch"
+					>
+						<span class="toggle-thumb"></span>
+					</button>
 				</div>
-				<button
-					class="toggle-switch"
-					class:enabled={autoStart}
-					onclick={handleAutoStartToggle}
-					role="switch"
-					aria-checked={autoStart}
-					aria-label="Auto-start daemon on launch"
-				>
-					<span class="toggle-thumb"></span>
-				</button>
-			</div>
+			{/if}
 		</section>
 	{/if}
 

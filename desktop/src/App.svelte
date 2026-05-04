@@ -230,8 +230,14 @@
 				registry.setActive(activeServerId);
 			}
 
-			// Auto-start daemon if configured
-			if (settingsStore.autoStartDaemon) {
+			// Auto-start daemon if configured. Mobile (Capacitor) is
+			// remote-only per MH7 — never spawns a local daemon process —
+			// so skip this entirely on Capacitor builds even if the
+			// persisted setting somehow ended up true (e.g. config
+			// imported from a desktop install). Desktop/Tauri keeps the
+			// existing behavior: silently ignore failures so a missing
+			// daemon binary doesn't break first launch.
+			if (settingsStore.autoStartDaemon && !isCapacitorRuntime) {
 				daemonLifecycle.getDaemonStatus().then((status) => {
 					if (status !== "running") {
 						daemonLifecycle.startDaemon().catch(() => {

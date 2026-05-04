@@ -9,6 +9,7 @@
 	import { rightPanelStore } from "../../../features/right-panel/index.js";
 	import { projectsStore } from "$lib/stores/projects.svelte.js";
 	import { tokenCounterStore } from "$lib/stores/token-counter.svelte.js";
+	import { connectionStore } from "$lib/stores/connection.svelte.js";
 
 	type LayoutMode = 'expanded' | 'collapsed' | 'mobileOverlay';
 
@@ -45,6 +46,28 @@
 	const windowPercentLabel = $derived(
 		`${Math.round(tokenCounterStore.windowPercent * 100)}%`,
 	);
+
+	// W5.T5 (MH7): mobile-only daemon connection indicator. Shows a small
+	// status dot at ≤640px so users can see at a glance whether the remote
+	// daemon is reachable. Three states map to existing semantic tokens:
+	//
+	//   connected     → --color-success (steady)
+	//   reconnecting  → --color-warning (pulsing)
+	//   disconnected  → --color-error (steady)
+	//
+	// Desktop hides the dot via `layoutMode` because the existing
+	// `<ConnectionStatus />` slot already shows a richer connection card
+	// in the topbar — at mobile widths that card is suppressed for space,
+	// and the dot owns the affordance.
+	const showConnectionDot = $derived(layoutMode === 'mobileOverlay');
+	const connectionStatus = $derived(connectionStore.status);
+	const connectionLabel = $derived(
+		connectionStatus === 'connected'
+			? 'Connected'
+			: connectionStatus === 'reconnecting'
+				? 'Reconnecting'
+				: 'Offline',
+	);
 </script>
 
 <div class="topbar-content" data-tauri-drag-region>
@@ -60,6 +83,18 @@
 	<div class="topbar-spacer"></div>
 
 	{@render children?.()}
+
+	{#if showConnectionDot}
+		<span
+			class="connection-dot"
+			class:connected={connectionStatus === 'connected'}
+			class:reconnecting={connectionStatus === 'reconnecting'}
+			role="status"
+			aria-live="polite"
+			aria-label="Daemon {connectionLabel.toLowerCase()}"
+			title="Daemon: {connectionLabel}"
+		></span>
+	{/if}
 
 	{#if showTokenChip}
 		<button
@@ -216,6 +251,46 @@
 		.topbar-panel-toggle,
 		.topbar-token-chip {
 			transition: none;
+		}
+	}
+
+	/* ── Mobile connection indicator (W5.T5 / MH7) ─────────────────────
+	 * Small status dot rendered at ≤640px so the user always has a
+	 * visible read on whether the remote daemon is reachable. The
+	 * dot itself is decorative-sized but exposed to AT via role/aria
+	 * on the element. The wrapper is non-interactive (role="status"),
+	 * so it doesn't count toward the touch-target audit.
+	 */
+	.connection-dot {
+		display: inline-block;
+		flex-shrink: 0;
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background-color: var(--color-error);
+		transition: background-color var(--duration-fast) var(--ease-out-expo);
+	}
+
+	.connection-dot.connected {
+		background-color: var(--color-success);
+	}
+
+	.connection-dot.reconnecting {
+		background-color: var(--color-warning);
+		animation: connection-dot-pulse 1.2s ease-in-out infinite;
+	}
+
+	@keyframes connection-dot-pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.4; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.connection-dot {
+			transition: none;
+		}
+		.connection-dot.reconnecting {
+			animation: none;
 		}
 	}
 
