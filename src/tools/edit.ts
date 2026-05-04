@@ -7,7 +7,12 @@ import type { ToolDefinition } from '../types/tools.js';
 import type { ElefantError } from '../types/errors.js';
 import type { Result } from '../types/result.js';
 import { ok, err } from '../types/result.js';
+import { readFile } from 'node:fs/promises';
+import { resolve, basename } from 'node:path';
 import { getLspService, buildDiagnosticSuffix } from '../lsp/index.js';
+import { applyInstructionGuard } from '../instruction/guard.js';
+import type { InstructionService } from '../instruction/types.js';
+import { LINE_TARGET } from '../instruction/types.js';
 
 export interface EditParams {
   filePath: string;
@@ -129,3 +134,59 @@ export const editTool: ToolDefinition<EditParams, string> = {
     }
   },
 };
+
+export interface EditToolDeps {
+  /** Instruction service for hierarchical AGENTS.md resolution. */
+  service: InstructionService;
+  /** Already-loaded instruction paths for this session (mutated by guard). */
+  alreadyLoaded: Set<string>;
+  /** Absolute project root path. */
+  projectRoot: string;
+}
+
+/**
+ * Create an edit tool that injects the instruction guard.
+ *
+ * After a successful edit, applicable AGENTS.md / CLAUDE.md files
+ * in the target file's directory ancestry are loaded and appended
+ * as a `<system-reminder>` block in the tool output.
+ *
+ * The underlying `editTool` is not modified — the factory returns
+ * a wrapped copy with the guard injected into the `execute` path.
+ */
+export function createEditTool(deps: EditToolDeps): ToolDefinition<EditParams, string> {
+  return {
+    ...editTool,
+    execute: async (params): Promise<Result<string, ElefantError>> => {
+      const base = await editTool.execute(params);
+      if (!base.ok) return base;
+
+      const guarded = await applyInstructionGuard({
+        service: deps.service,
+        filepath: params.filePath,
+        alreadyLoaded: deps.alreadyLoaded,
+        output: base.data,
+      });
+
+      let output = guarded.content;
+
+      // If editing an instruction file, invalidate cache + check line count
+      const resolvedPath = resolve(params.filePath);
+      const name = basename(resolvedPath);
+      if (name === 'AGENTS.md' || name === 'CLAUDE.md') {
+        deps.service.invalidate(resolvedPath);
+        try {
+          const newContent = await readFile(resolvedPath, 'utf-8');
+          const lineCount = newContent.split('\n').length;
+          if (lineCount > LINE_TARGET) {
+            output += `\n\n[WARNING: ${name} has ${lineCount} lines, exceeds target of ${LINE_TARGET}. Consider shortening.]`;
+          }
+        } catch {
+          // read failure must not break the edit tool
+        }
+      }
+
+      return ok(output);
+    },
+  };
+}
