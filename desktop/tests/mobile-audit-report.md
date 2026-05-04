@@ -1,8 +1,8 @@
 # Mobile Audit Report
 
-**Generated:** 2026-05-02T01:46:13.236Z
+**Generated:** 2026-05-04T07:52:00.890Z
 **Viewport:** 390×844 (iPhone 14 Pro)
-**Audited:** 8 views
+**Audited:** 9 views
 
 ---
 
@@ -46,14 +46,21 @@
 ## View: worktrees
 **Status:** SKIPPED — No active project — nav item hidden (open a project first)
 
+## View: right-panel-seeded
+**Status:** PASS
+**Screenshot:** tests/screenshots/mobile/right-panel-seeded.png
+**Horizontal Scroll:** ✓ No
+**Off-Viewport Elements:** ✓ None
+**Touch Targets:** ✓ All measured targets ≥ 44×44px
+
 ---
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total views | 8 |
-| Audited | 4 |
-| Passed | 4 |
+| Total views | 9 |
+| Audited | 5 |
+| Passed | 5 |
 | Failed | 0 |
 | Skipped | 4 |

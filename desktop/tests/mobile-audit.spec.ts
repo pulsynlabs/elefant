@@ -529,6 +529,45 @@ test.describe("Mobile Audit — 390×844", () => {
     });
   }
 
+  // ── Right panel seeded-open view (W6.T4) ────────────────────────────────
+  //
+  // Audits the home view with `elefant.rightPanel.open=true` seeded into
+  // localStorage so the RightPanelMobile bottom sheet hydrates as soon as
+  // a session is in scope. Even when the sheet itself doesn't mount (no
+  // session in fixture), this catches any layout regression introduced by
+  // the persistence-store hydration path on mobile.
+  test("audit: right-panel-seeded view", async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem("elefant.rightPanel.open", "true");
+      } catch {
+        /* sandboxed — skip seeding */
+      }
+    });
+    await loadApp(page);
+
+    const filePath = path.join(SCREENSHOT_DIR, "right-panel-seeded.png");
+    await page.screenshot({ path: filePath, fullPage: false });
+
+    const data = await auditView(page, "right-panel-seeded");
+    results.push({
+      ...data,
+      screenshotPath: path.relative(process.cwd(), filePath),
+      skipped: false,
+    });
+
+    if (data.horizontalScroll)
+      console.warn(
+        "[AUDIT] right-panel-seeded: horizontal scroll detected",
+      );
+    data.offViewportElements.forEach((el) =>
+      console.warn(`[AUDIT] right-panel-seeded: off-viewport: ${el}`),
+    );
+    data.touchTargetViolations.forEach((el) =>
+      console.warn(`[AUDIT] right-panel-seeded: touch-target: ${el}`),
+    );
+  });
+
   // ── Report generation (always runs) ─────────────────────────────────────
 
   test("generate audit report", async () => {
