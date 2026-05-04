@@ -253,3 +253,19 @@ The chat input supports client-side slash commands intercepted before reaching t
 ### Agent Visualization
 
 The `visualize` tool enables rich inline rendering (mermaid diagrams, stat grids, research cards, etc.) directly in the chat transcript. The main orchestrator agent can call `visualize` with structured data; subagents can suggest viz via `<suggest-viz type="..." data="..." />` in their closing XML, which the orchestrator may choose to render. See the full guide at [`docs/agent-rich-viz.md`](docs/agent-rich-viz.md).
+
+### Right Session Panel
+
+The chat view includes a collapsible right session panel (desktop: inline 320px column; mobile: bottom sheet overlay).
+
+**Toggle:** Panel-right icon button in the chat topbar (desktop) or TopBar (mobile).
+
+**Tabs:**
+- **MCP** — Session-scoped server enable/disable without touching global config
+- **Terminal** — Embedded shell in project CWD via ghostty-web (xterm.js fallback)
+- **File Changes** — Live list of files modified by the agent this session, click for diff
+- **Todos** — Read-only view of the agent's active todo list from `todowrite` calls
+
+**Token Bar (footer):** Always-visible context window usage counter (window + session cumulative). Click to open the Context Window Visualizer treemap.
+
+**Persistence:** Panel open/closed is global; active tab is per-session (localStorage / Tauri plugin-store).

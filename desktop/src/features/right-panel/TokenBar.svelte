@@ -115,6 +115,7 @@
 	<button
 		type="button"
 		class="token-bar token-bar-interactive"
+		data-part="token-bar-button"
 		aria-label={ariaLabel}
 		onclick={handleClick}
 		onkeydown={handleKeydown}

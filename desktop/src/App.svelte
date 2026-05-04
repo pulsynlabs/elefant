@@ -279,15 +279,16 @@
 			     fallback for the type checker, never reached at runtime.
 			     TokenBar reads the live token-counter store directly (W5.T2);
 			     RightPanel binds the store to the active session via $effect.
-			     `onVisualizerOpen` is a no-op stub here — T5.4 will swap in
-			     the visualizer-open handler. -->
+			     The Context Window Visualizer (MH8/T5.4) is managed internally
+			     by RightPanel; App.svelte just passes the opener callback
+			     through the footer snippet. -->
 			<RightPanel
 				activeTab={rightPanelStore.activeTab(activeSessionId ?? '')}
 				onTabChange={(tab) => rightPanelStore.setActiveTab(activeSessionId ?? '', tab)}
 				onClose={() => rightPanelStore.closePanel()}
 			>
-				{#snippet footer()}
-					<TokenBar onVisualizerOpen={() => { /* TODO: T5.4 wires visualizer */ }} />
+				{#snippet footer(args)}
+					<TokenBar onVisualizerOpen={args.onVisualizerOpen} />
 				{/snippet}
 			</RightPanel>
 		{/snippet}

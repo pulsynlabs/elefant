@@ -13,6 +13,7 @@
 	import FileChangesTab from './tabs/FileChangesTab.svelte';
 	import TerminalTab from './tabs/TerminalTab.svelte';
 	import TodosTab from './tabs/TodosTab.svelte';
+	import ContextVisualizer from './visualizer/ContextVisualizer.svelte';
 
 	type Props = {
 		/** Currently active tab — owned externally by the persistence store. */
@@ -21,11 +22,35 @@
 		onTabChange?: (tab: TabId) => void;
 		/** Optional close affordance shown at the far right of the tab strip. */
 		onClose?: () => void;
-		/** Optional sticky footer (e.g. TokenBar). Built later in W1.T3. */
-		footer?: Snippet;
+		/**
+		 * Optional sticky footer (e.g. TokenBar).
+		 * Receives a `onVisualizerOpen` callback that the footer component
+		 * should wire to its interactive affordance.
+		 */
+		footer?: Snippet<[{ onVisualizerOpen: () => void }]>;
 	};
 
 	let { activeTab = 'mcp', onTabChange, onClose, footer }: Props = $props();
+
+	// ── Context Window Visualizer (MH8 / T5.4) ──────────────────────────────
+	//
+	// RightPanel owns the open/close state internally so App.svelte stays
+	// declarative. The footer snippet receives the opener callback; TokenBar
+	// calls it on click. When the overlay closes, focus returns to the
+	// TokenBar button so the keyboard user lands where they left off.
+	let visualizerOpen = $state(false);
+
+	function openVisualizer() {
+		visualizerOpen = true;
+	}
+
+	function closeVisualizer() {
+		visualizerOpen = false;
+		// Return focus to the TokenBar button that opened the overlay.
+		requestAnimationFrame(() => {
+			document.querySelector<HTMLElement>('[data-part="token-bar-button"]')?.focus();
+		});
+	}
 
 	// W5.T2 (MH7): bind the singleton token-counter store to the currently
 	// active (project, session) pair.  `setSession` is idempotent — if both
@@ -122,11 +147,19 @@
 				</div>
 			{/if}
 		{/each}
+
+		<!-- Context Window Visualizer overlay (MH8 / T5.4).
+		     Covers the tab content area; the header and footer remain
+		     visible.  `position: absolute; inset: 0` within .panel-content
+		     (which is `position: relative`) so it fills the scrollable zone. -->
+		{#if visualizerOpen}
+			<ContextVisualizer onClose={closeVisualizer} />
+		{/if}
 	</div>
 
 	{#if footer}
 		<footer class="panel-footer">
-			{@render footer()}
+			{@render footer({ onVisualizerOpen: openVisualizer })}
 		</footer>
 	{/if}
 </section>
