@@ -5,8 +5,23 @@ import path from "path";
 
 const host = process.env.TAURI_DEV_HOST;
 
+/** Vite plugin that marks @capacitor/* packages as external so they are
+ *  never resolved at build time. These packages live in mobile/node_modules/
+ *  and are only loaded via dynamic import when isCapacitorRuntime is true. */
+function capacitorExternal() {
+  return {
+    name: 'capacitor-external',
+    resolveId(id: string) {
+      if (id.startsWith('@capacitor/')) {
+        return { id, external: true };
+      }
+      return null;
+    },
+  };
+}
+
 export default defineConfig(async () => ({
-  plugins: [svelte(), tailwindcss()],
+  plugins: [svelte(), tailwindcss(), capacitorExternal()],
   resolve: {
     alias: {
       $lib: path.resolve("./src/lib"),

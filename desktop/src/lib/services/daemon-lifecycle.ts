@@ -1,6 +1,6 @@
-import { Command } from '@tauri-apps/plugin-shell';
 import { getDaemonClient, DAEMON_URL } from '$lib/daemon/client.js';
 import { settingsStore } from '$lib/stores/settings.svelte.js';
+import { isTauriRuntime } from '$lib/runtime.js';
 
 export type DaemonLifecycleStatus = 'running' | 'stopped' | 'unknown' | 'starting' | 'stopping';
 
@@ -27,33 +27,37 @@ async function resolveEntryPath(): Promise<string | null> {
 		// Daemon not responding — fall through
 	}
 
-	// Strategy 2: read /proc/<pid>/cmdline and /proc/<pid>/environ via bun.
+	// Strategy 2: Tauri-only — read /proc/<pid>/cmdline and /proc/<pid>/environ via bun.
 	// The PID file lives at ~/.elefant/daemon.pid (hardcoded in pid.ts).
 	// bun is already in our shell scope so no new capability is needed.
-	try {
-		const script = [
-			`const fs = require('fs');`,
-			`const home = process.env.HOME;`,
-			`const pid = fs.readFileSync(home + '/.elefant/daemon.pid', 'utf8').trim();`,
-			// argv[1] from cmdline (null-separated): index 1 is the script path
-			`const cmdline = fs.readFileSync('/proc/' + pid + '/cmdline', 'utf8').split('\\0');`,
-			`const scriptArg = cmdline[1] ?? '';`,
-			// If it's already absolute we're done; otherwise combine with PWD
-			`if (scriptArg.startsWith('/')) { process.stdout.write(scriptArg); process.exit(0); }`,
-			`const env = fs.readFileSync('/proc/' + pid + '/environ', 'utf8').split('\\0');`,
-			`const pwdEntry = env.find(e => e.startsWith('PWD='));`,
-			`const pwd = pwdEntry ? pwdEntry.slice(4) : '';`,
-			`process.stdout.write(pwd + '/' + scriptArg);`,
-		].join(' ');
+	if (isTauriRuntime) {
+		try {
+			const { Command } = await import('@tauri-apps/plugin-shell');
 
-		const cmd = Command.create('bun', ['-e', script]);
-		const output = await cmd.execute();
-		const path = output.stdout.trim();
-		if (path && path.includes('server-entry')) {
-			return path;
+			const script = [
+				`const fs = require('fs');`,
+				`const home = process.env.HOME;`,
+				`const pid = fs.readFileSync(home + '/.elefant/daemon.pid', 'utf8').trim();`,
+				// argv[1] from cmdline (null-separated): index 1 is the script path
+				`const cmdline = fs.readFileSync('/proc/' + pid + '/cmdline', 'utf8').split('\\0');`,
+				`const scriptArg = cmdline[1] ?? '';`,
+				// If it's already absolute we're done; otherwise combine with PWD
+				`if (scriptArg.startsWith('/')) { process.stdout.write(scriptArg); process.exit(0); }`,
+				`const env = fs.readFileSync('/proc/' + pid + '/environ', 'utf8').split('\\0');`,
+				`const pwdEntry = env.find(e => e.startsWith('PWD='));`,
+				`const pwd = pwdEntry ? pwdEntry.slice(4) : '';`,
+				`process.stdout.write(pwd + '/' + scriptArg);`,
+			].join(' ');
+
+			const cmd = Command.create('bun', ['-e', script]);
+			const output = await cmd.execute();
+			const path = output.stdout.trim();
+			if (path && path.includes('server-entry')) {
+				return path;
+			}
+		} catch {
+			// /proc not available or bun failed
 		}
-	} catch {
-		// /proc not available or bun failed
 	}
 
 	return null;
@@ -85,12 +89,18 @@ export async function stopDaemon(): Promise<void> {
 }
 
 export async function startDaemon(): Promise<void> {
+	if (!isTauriRuntime) {
+		throw new Error('Daemon start is only supported in the Tauri desktop app.');
+	}
+
 	if (!cachedEntryPath) {
 		cachedEntryPath = await resolveEntryPath();
 	}
 	if (!cachedEntryPath) {
 		throw new Error('Cannot locate daemon entry point. Is the daemon process running?');
 	}
+
+	const { Command } = await import('@tauri-apps/plugin-shell');
 
 	// Use spawn() not execute() — the daemon runs forever so execute() would
 	// block until Tauri kills it. spawn() fires-and-forgets the process.
@@ -113,6 +123,10 @@ export async function startDaemon(): Promise<void> {
 }
 
 export async function restartDaemon(): Promise<void> {
+	if (!isTauriRuntime) {
+		throw new Error('Daemon restart is only supported in the Tauri desktop app.');
+	}
+
 	// Resolve entry path while the daemon is still alive.
 	cachedEntryPath = await resolveEntryPath();
 
