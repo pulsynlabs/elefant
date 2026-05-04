@@ -140,6 +140,10 @@ const skillsConfigSchema = z.object({
 	cacheTtlHours: z.number().int().min(1).default(24),
 });
 
+const agentsMdConfigSchema = z.object({
+	autoUpdate: z.boolean().default(true),
+}).strict();
+
 const BUNDLED_REGISTRIES = [
 	{ type: 'clawhub' as const, url: 'https://clawhub.com', enabled: true },
 	{
@@ -169,6 +173,7 @@ const configSchema = z.object({
 		enabled: true,
 		provider: 'bundled-cpu',
 	}),
+	agentsMd: agentsMdConfigSchema.optional().default({ autoUpdate: true }),
 }).strict();
 
 type AgentProfileInput = z.input<typeof agentProfileSchema>;
@@ -225,6 +230,7 @@ export {
 	researchProviderConfigSchema,
 	researchConfigSchema,
 	visualizeModelOverrideSchema,
+	agentsMdConfigSchema,
 	BUNDLED_REGISTRIES,
 };
 export type ElefantConfig = z.infer<typeof configSchema>;
@@ -243,3 +249,4 @@ export type SkillsConfig = z.infer<typeof skillsConfigSchema>;
 export type ResearchProviderConfig = z.infer<typeof researchProviderConfigSchema>;
 export type ResearchConfig = z.infer<typeof researchConfigSchema>;
 export type VisualizeModelOverride = z.infer<typeof visualizeModelOverrideSchema>;
+export type AgentsMdConfig = z.infer<typeof agentsMdConfigSchema>;
