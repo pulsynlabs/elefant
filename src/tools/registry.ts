@@ -29,17 +29,45 @@ import { createTaskTool, type TaskToolDeps } from './task/index.js';
 import type { MetadataEmitter } from './task/metadata-emitter.js';
 import { todoreadTool, todowriteTool } from './todo/index.js';
 import { createToolListTool } from './tool_list/index.js';
+import { createToolSearchTool, type SkillCatalogEntry } from './tool_search/index.js';
 import { webfetchTool } from './webfetch.js';
 import { websearchTool } from './websearch.js';
 import { writeTool } from './write.js';
 import { createResearchSearchTool } from './research_search/index.js';
 import { researchGrepTool } from './research_grep/index.js';
 import { createResearchReadTool } from './research_read/index.js';
-import { researchWriteTool, createResearchWriteTool } from './research_write/index.js';
+import { researchWriteTool } from './research_write/index.js';
 import { createResearchIndexTool } from './research_index/index.js';
 import { createVisualizeTool } from './visualize/index.js';
 
 export const MAX_TOOL_OUTPUT_CHARS = 100_000;
+
+function createStaticRunContext(): RunContext {
+	return {
+		runId: 'static-tool-registry',
+		depth: 0,
+		agentType: 'system',
+		title: 'static-tool-registry',
+		sessionId: 'static-tool-registry',
+		projectId: 'static-tool-registry',
+		signal: new AbortController().signal,
+		discoveredTools: new Set<string>(),
+	};
+}
+
+function extractSkillCatalogFromRegistry(registry: ToolRegistry): SkillCatalogEntry[] {
+	const skillResult = registry.get('skill');
+	if (!skillResult.ok) {
+		return [];
+	}
+
+	const description = skillResult.data.description;
+	const matches = Array.from(description.matchAll(/- \*\*(.+?)\*\*: (.+?) \(call skill\('\1'\) to load full content\)/g));
+	return matches.map((match) => ({
+		name: match[1]!.trim(),
+		summary: match[2]!.trim(),
+	}));
+}
 
 const TRUNCATION_NOTICE_TEMPLATE = (n: number): string =>
 	`\n\n[Output truncated: showing first ${n} chars. Use grep/glob/read to retrieve specific parts.]`;
@@ -423,6 +451,11 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 		registry.register(tool);
 	}
 	registry.register(skillTool);
+	registry.register(createToolSearchTool({
+		registry,
+		runContext: createStaticRunContext(),
+		skillCatalog: extractSkillCatalogFromRegistry(registry),
+	}));
 	registry.register(referenceTool);
 	registry.register(lspTool);
 	registry.register(lspDiagnosticsTool);
@@ -480,6 +513,11 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 		registry.register(tool)
 	}
 	registry.register(skillTool)
+	registry.register(createToolSearchTool({
+		registry,
+		runContext: deps.currentRun,
+		skillCatalog: extractSkillCatalogFromRegistry(registry),
+	}))
 	registry.register(referenceTool)
 	registry.register(lspTool)
 	registry.register(lspDiagnosticsTool)

@@ -8,6 +8,7 @@ import {
 	buildSpecBlock,
 	createCompactionBlockTransform,
 } from '../compaction/blocks.ts'
+import type { CompactionInput } from '../compaction/types.ts'
 import { emit, HookRegistry } from '../hooks/index.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { ProviderAdapter, StreamEvent } from '../providers/types.ts'
@@ -48,6 +49,7 @@ function mcpManagerWithTools(tools: ToolWithMeta[]): MCPManager {
 	return {
 		listAllTools: () => tools,
 		getPinnedTools: () => [],
+		getAlwaysLoadTools: () => [],
 		getTimeout: () => 30_000,
 		callTool: async () => ({ content: [{ type: 'text', text: 'mcp ok' }] }),
 		searchTools: (query: string) => {
@@ -1103,6 +1105,52 @@ describe('runAgentLoop', () => {
 		)
 
 		expect(capturedTools).toEqual([['always-tool']])
+	})
+
+	it('rehydrates discoveredTools after compaction before effective tool filtering', async () => {
+		const capturedTools: string[][] = []
+		let compacted = false
+		const adapter: ProviderAdapter = {
+			name: 'mock',
+			async *sendMessage(_messages, tools): AsyncGenerator<StreamEvent> {
+				capturedTools.push(tools.map((tool) => tool.name))
+				yield { type: 'done', finishReason: 'stop' }
+			},
+		}
+
+		const runContext = createRunContext('conv-compaction-discovered-tools')
+		runContext.discoveredTools.add('visualize')
+
+		await collectEvents(
+			runAgentLoop(createRouter(adapter), {
+				execute: async () => ({ ok: true, data: 'ok' }),
+			}, {
+				messages: [{ role: 'user', content: 'hello' }],
+				tools: [
+					{ ...baseTool('tool_search'), alwaysLoad: true },
+					{ ...baseTool('visualize'), deferred: true },
+				],
+				hookRegistry: new HookRegistry(),
+				runContext,
+				compaction: {
+					shouldCompact: () => !compacted,
+					compact: async (input: CompactionInput) => {
+						compacted = true
+						return {
+							messages: input.messages,
+							summary: 'compacted',
+							blocks: ['<discovered_tools>visualize</discovered_tools>'],
+							tokenCountBefore: input.tokenCount,
+							tokenCountAfter: input.tokenCount,
+							discoveredTools: ['visualize'],
+							didCompact: true,
+						}
+					},
+				} as any,
+			}),
+		)
+
+		expect(capturedTools[0]).toEqual(['tool_search', 'visualize'])
 	})
 
 	it('leaves tools unchanged when mcpManager has no tools', async () => {

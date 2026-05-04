@@ -435,7 +435,14 @@ export async function* runAgentLoop(
 				contextWindow,
 				sessionId,
 				conversationId: options.runContext.runId,
+				discoveredTools: Array.from(options.runContext.discoveredTools),
 			})
+			if (Array.isArray(compacted.discoveredTools)) {
+				options.runContext.discoveredTools.clear()
+				for (const toolName of compacted.discoveredTools) {
+					options.runContext.discoveredTools.add(toolName)
+				}
+			}
 			messages = compacted.messages
 			tokenCount = compacted.tokenCountAfter
 			tokenCounter.recordCompaction(sessionId, tokenCount, contextWindow)
