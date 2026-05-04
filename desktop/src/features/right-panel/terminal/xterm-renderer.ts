@@ -81,12 +81,24 @@ export function createXtermRenderer(options: CreateRendererOptions): TerminalRen
 	const theme = resolveTheme(options.rootEl);
 
 	const terminalOptions: ITerminalOptions = {
-		fontFamily: options.fontFamily ?? 'JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace',
-		fontSize: options.fontSize ?? 13,
-		lineHeight: options.lineHeight ?? 1.35,
+		// Mirror typography.css `--font-mono` literally — xterm draws to
+		// canvas and cannot read CSS custom properties, so the font stack
+		// must be expanded here.
+		fontFamily:
+			options.fontFamily ??
+			'"Geist Mono Variable", "Geist Mono", "JetBrains Mono", "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+		fontSize: options.fontSize ?? 14,
+		lineHeight: options.lineHeight ?? 1.4,
 		allowTransparency: options.allowTransparency ?? true,
 		theme,
 		cursorBlink: true,
+		// UX niceties: double-click selects word, right-click extends a
+		// word selection (rather than opening the browser context menu
+		// over the canvas). Ctrl+C is left to xterm.js's default selection
+		// handling, which forwards the keypress to the PTY when no text
+		// is selected — that's the SIGINT path users expect.
+		rightClickSelectsWord: true,
+		scrollback: 5000,
 	};
 
 	const terminal = new Terminal(terminalOptions);

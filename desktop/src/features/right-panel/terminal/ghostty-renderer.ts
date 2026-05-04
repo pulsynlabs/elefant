@@ -86,9 +86,13 @@ export async function createGhosttyRenderer(
 
 	await initGhostty();
 
+	// ghostty-web does not currently expose `lineHeight` on ITerminalOptions
+	// (W4.T1 finding) — its renderer derives line metrics from the font.
 	const terminalOptions: ITerminalOptions = {
-		fontFamily: options.fontFamily ?? 'JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace',
-		fontSize: options.fontSize ?? 13,
+		fontFamily:
+			options.fontFamily ??
+			'"Geist Mono Variable", "Geist Mono", "JetBrains Mono", "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+		fontSize: options.fontSize ?? 14,
 		allowTransparency: options.allowTransparency ?? true,
 		theme,
 		cursorBlink: true,

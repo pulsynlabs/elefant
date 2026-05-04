@@ -85,17 +85,29 @@ function readCssVar(styles: CSSStyleDeclaration, key: string): string | undefine
 export function resolveTheme(rootEl: HTMLElement): TerminalTheme {
 	const styles = getComputedStyle(rootEl);
 
+	// The terminal canvas paints its own background — we drive it from the
+	// substrate so the renderer surface blends with the page beneath the
+	// panel chrome. `--surface-substrate` is the real Quire token; the
+	// older `--surface-canvas` / `--surface-shell` lookups (kept as a fall-
+	// through for compatibility) never resolved against tokens.css and
+	// always dropped through to FALLBACK_THEME, leaving terminals visibly
+	// off-tone in dark mode.
 	return {
 		background:
+			readCssVar(styles, '--surface-substrate') ??
 			readCssVar(styles, '--surface-canvas') ??
 			readCssVar(styles, '--surface-shell') ??
 			FALLBACK_THEME.background,
 		foreground: readCssVar(styles, '--text-prose') ?? FALLBACK_THEME.foreground,
 		cursor: readCssVar(styles, '--color-primary') ?? FALLBACK_THEME.cursor,
 		cursorAccent:
-			readCssVar(styles, '--text-primary-inverse') ?? FALLBACK_THEME.cursorAccent,
+			readCssVar(styles, '--text-inverse') ??
+			readCssVar(styles, '--text-primary-inverse') ??
+			FALLBACK_THEME.cursorAccent,
 		selectionBackground:
-			readCssVar(styles, '--color-primary-soft') ?? FALLBACK_THEME.selectionBackground,
+			readCssVar(styles, '--color-primary-subtle') ??
+			readCssVar(styles, '--color-primary-soft') ??
+			FALLBACK_THEME.selectionBackground,
 		selectionForeground:
 			readCssVar(styles, '--text-prose') ?? FALLBACK_THEME.selectionForeground,
 		black: readCssVar(styles, '--terminal-black') ?? FALLBACK_THEME.black,
