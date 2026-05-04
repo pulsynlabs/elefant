@@ -71,6 +71,7 @@ const mcpStdioConfigSchema = z.object({
 	enabled: z.boolean().optional().default(true),
 	timeout: z.number().positive().optional().default(30000),
 	pinnedTools: z.array(z.string()).optional().default([]),
+	alwaysLoad: z.array(z.string().min(1)).optional().default([]),
 }).strict();
 
 const mcpRemoteConfigSchema = z.object({
@@ -82,6 +83,7 @@ const mcpRemoteConfigSchema = z.object({
 	enabled: z.boolean().optional().default(true),
 	timeout: z.number().positive().optional().default(30000),
 	pinnedTools: z.array(z.string()).optional().default([]),
+	alwaysLoad: z.array(z.string().min(1)).optional().default([]),
 }).strict();
 
 const mcpServerSchema = z.discriminatedUnion("transport", [

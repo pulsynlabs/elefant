@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
-import { estimateToolTokens, shouldDeferTools, shouldUseSelectiveLoading } from './budget.ts';
+import { estimateToolTokens, isAlwaysLoadTool, shouldDeferTools, shouldUseSelectiveLoading } from './budget.ts';
 import type { ToolType } from './budget.ts';
 import type { ToolWithMeta } from './types.ts';
 import type { ToolDefinition } from '../types/tools.ts';
@@ -214,5 +214,38 @@ describe('shouldUseSelectiveLoading (backward compat)', () => {
 		expect(shouldUseSelectiveLoading(tools, { contextWindow: 50_000, tokenBudgetPercent: 10 })).toBe(
 			shouldDeferTools('mcp', tools, { contextWindow: 50_000, tokenBudgetPercent: 10 }),
 		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// isAlwaysLoadTool — per-tool config check
+// ---------------------------------------------------------------------------
+
+describe('isAlwaysLoadTool', () => {
+	it('returns true when tool is in config.alwaysLoad list', () => {
+		const config = { alwaysLoad: ['read_file', 'write_file'] };
+		expect(isAlwaysLoadTool('filesystem', 'read_file', config)).toBe(true);
+		expect(isAlwaysLoadTool('filesystem', 'write_file', config)).toBe(true);
+	});
+
+	it('returns false for tools NOT in the per-tool alwaysLoad list', () => {
+		const config = { alwaysLoad: ['read_file'] };
+		expect(isAlwaysLoadTool('filesystem', 'search_files', config)).toBe(false);
+		expect(isAlwaysLoadTool('filesystem', 'delete_file', config)).toBe(false);
+	});
+
+	it('returns false when config.alwaysLoad is empty (both off)', () => {
+		const config = { alwaysLoad: [] };
+		expect(isAlwaysLoadTool('filesystem', 'any_tool', config)).toBe(false);
+	});
+
+	it('returns false for unknown tools (not in the list)', () => {
+		const config = { alwaysLoad: ['read_file'] };
+		expect(isAlwaysLoadTool('filesystem', 'nonexistent_tool', config)).toBe(false);
+	});
+
+	it('returns false when alwaysLoad is undefined (missing field)', () => {
+		const config = {} as { alwaysLoad?: string[] };
+		expect(isAlwaysLoadTool('filesystem', 'any_tool', config)).toBe(false);
 	});
 });

@@ -128,3 +128,28 @@ export function shouldUseSelectiveLoading(
 ): boolean {
 	return shouldDeferTools('mcp', tools, options);
 }
+
+/**
+ * Check whether a specific tool on a specific MCP server should always be
+ * loaded (i.e. never deferred) based on the per-server per-tool config.
+ *
+ * When a tool name appears in the server config's `alwaysLoad` array, it
+ * bypasses the deferred-loading budget gate and is always included in the
+ * effective tool set.
+ *
+ * This check is additive: it runs alongside the server-level
+ * `pinnedTools` list and the tool-level `_meta['anthropic/alwaysLoad']`
+ * flag. A tool matching any of those conditions is treated as always-loaded.
+ *
+ * @param serverName  Human-readable server name (for future log/debug use).
+ * @param toolName    Name of the tool as returned by the MCP server.
+ * @param config      The MCP server config record (from daemon config).
+ * @returns true if the tool is listed in `config.alwaysLoad`.
+ */
+export function isAlwaysLoadTool(
+	_serverName: string,
+	toolName: string,
+	config: { alwaysLoad?: string[] },
+): boolean {
+	return config.alwaysLoad?.includes(toolName) ?? false;
+}

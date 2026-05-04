@@ -207,7 +207,10 @@ function buildMcpManifestServers(manager: MCPManager, tools: ToolWithMeta[]): Ar
 		const server = grouped.get(entry.serverId) ?? {
 			name: entry.serverName,
 			tools: [],
-			alwaysLoad: new Set<string>(manager.getPinnedTools(entry.serverId)),
+			alwaysLoad: new Set<string>([
+				...manager.getPinnedTools(entry.serverId),
+				...manager.getAlwaysLoadTools(entry.serverId),
+			]),
 		}
 		server.tools.push(entry.tool)
 		if (isAlwaysLoadTool(entry.tool)) {
@@ -265,7 +268,7 @@ function createEffectiveMcpTools(options: AgentLoopOptions): EffectiveMcpTools {
 
 	const selectedRawNames = new Set<string>(options.runContext.discoveredTools)
 	for (const entry of sessionScopedMcpTools) {
-		if (isAlwaysLoadTool(entry.tool) || options.mcpManager.getPinnedTools(entry.serverId).includes(entry.tool.name)) {
+		if (isAlwaysLoadTool(entry.tool) || options.mcpManager.getPinnedTools(entry.serverId).includes(entry.tool.name) || options.mcpManager.getAlwaysLoadTools(entry.serverId).includes(entry.tool.name)) {
 			selectedRawNames.add(entry.tool.name)
 		}
 	}

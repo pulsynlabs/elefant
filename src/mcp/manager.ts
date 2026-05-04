@@ -177,6 +177,10 @@ export class MCPManager {
 		return this.servers.get(id)?.config.pinnedTools ?? [];
 	}
 
+	public getAlwaysLoadTools(id: string): string[] {
+		return this.servers.get(id)?.config.alwaysLoad ?? [];
+	}
+
 	public async listTools(id: string): Promise<Tool[]> {
 		const state = this.servers.get(id);
 		if (!state) {
