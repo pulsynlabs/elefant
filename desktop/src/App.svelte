@@ -31,6 +31,7 @@
 	import ChildRunView from "./features/agent-runs/ChildRunView.svelte";
 	import { SpecModeView } from "./features/spec-mode/index.js";
 	import { ResearchView } from "./features/research/index.js";
+	import { RightPanel, RightPanelMobile, TokenBar, rightPanelStore } from "./features/right-panel/index.js";
 
 	type NavigationRuntime = typeof navigationStore & {
 		initNavigation: (opts: { getActiveProjectId: () => string | null }) => void;
@@ -43,6 +44,16 @@
 	let layoutMode = $state<LayoutMode>('expanded');
 	let drawerOpen = $state(false);
 	let isDesignSystemRoute = $state(false);
+
+	// Right session panel (SPEC MH1, MH9, MH2). Driven by the persistence
+	// store; the in-chat topbar toggle (ChatView.svelte) flips
+	// `rightPanelStore.panelOpen`. We only expose the panel when a chat
+	// session is actually active — without a session there is nothing
+	// session-scoped to show in the tabs.
+	const activeSessionId = $derived(projectsStore.activeSessionId);
+	const rightPanelOpen = $derived(
+		rightPanelStore.panelOpen && activeSessionId !== null,
+	);
 
 	// Whether the user has a real (non-placeholder) provider configured.
 	// null = still waiting for daemon to respond
@@ -249,16 +260,37 @@
 {#if isDesignSystemRoute}
 	<DesignSystemPage />
 {:else}
-	<AppShell {layoutMode}>
+	<AppShell {layoutMode} {rightPanelOpen}>
 		{#snippet sidebar()}
 			<Sidebar collapsed={layoutMode === 'collapsed'} />
 		{/snippet}
 
 		{#snippet topbar()}
-			<TopBar onToggleSidebar={toggleSidebar}>
+			<TopBar onToggleSidebar={toggleSidebar} {layoutMode}>
 				<ConnectionStatus />
 				<ThemeToggle />
 			</TopBar>
+		{/snippet}
+
+		{#snippet rightPanel()}
+			<!-- Real session panel. Only rendered when a session is active
+			     (rightPanelOpen above already gates this), so `activeSessionId`
+			     is guaranteed non-null here — the `?? ''` is a defensive
+			     fallback for the type checker, never reached at runtime.
+			     TokenBar reads the live token-counter store directly (W5.T2);
+			     RightPanel binds the store to the active session via $effect.
+			     The Context Window Visualizer (MH8/T5.4) is managed internally
+			     by RightPanel; App.svelte just passes the opener callback
+			     through the footer snippet. -->
+			<RightPanel
+				activeTab={rightPanelStore.activeTab(activeSessionId ?? '')}
+				onTabChange={(tab) => rightPanelStore.setActiveTab(activeSessionId ?? '', tab)}
+				onClose={() => rightPanelStore.closePanel()}
+			>
+				{#snippet footer(args)}
+					<TokenBar onVisualizerOpen={args.onVisualizerOpen} />
+				{/snippet}
+			</RightPanel>
 		{/snippet}
 
 		<!-- Onboarding gate: show setup flow until a real provider is configured -->
@@ -353,6 +385,28 @@
 		></button>
 	{/if}
 
+	<!-- Mobile right-panel bottom sheet (W6.T1 / MH10). Sibling of AppShell so
+	     the shell's overflow:hidden doesn't clip the fixed sheet. Only mounted
+	     in mobileOverlay mode AND when a chat session is active — the sheet
+	     itself reads `rightPanelStore.panelOpen` to drive its slide-in
+	     animation, so toggling closed leaves the component mounted (it slides
+	     out, not unmounts) for the duration of the mobile mode. The backdrop
+	     is rendered separately, only while the sheet is visually open, so a
+	     closed sheet doesn't block taps on the chat content above it. -->
+	{#if layoutMode === 'mobileOverlay' && activeSessionId !== null}
+		<RightPanelMobile />
+	{/if}
+
+	{#if layoutMode === 'mobileOverlay' && rightPanelOpen}
+		<button
+			type="button"
+			class="right-panel-mobile-backdrop"
+			onclick={() => rightPanelStore.closePanel()}
+			aria-label="Close session panel"
+			tabindex="-1"
+		></button>
+	{/if}
+
 	<!-- Floating tool-call approval overlay (shown when daemon requests user decision) -->
 	<ApprovalPanel />
 {/if}
@@ -409,6 +463,30 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.drawer-backdrop {
+			animation: none;
+		}
+	}
+
+	/* Right-panel mobile bottom-sheet backdrop. Same recipe as the sidebar
+	   drawer-backdrop above (button-as-scrim for native click + a11y), but
+	   kept under its own class so the two overlays can coexist without
+	   their styles fighting. z-index sits between the page content and the
+	   bottom sheet (--z-modal: 30) so backdrop taps are reachable but
+	   never paint over the sheet itself. */
+	.right-panel-mobile-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: var(--z-sticky);
+		background: rgb(0 0 0 / 0.45);
+		border: none;
+		padding: 0;
+		margin: 0;
+		cursor: pointer;
+		animation: drawer-backdrop-in var(--duration-base) var(--ease-out-expo) forwards;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.right-panel-mobile-backdrop {
 			animation: none;
 		}
 	}

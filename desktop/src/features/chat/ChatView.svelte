@@ -36,6 +36,12 @@
 	import type { MessageRole } from '$lib/daemon/types.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
+	import { rightPanelStore } from '../right-panel/index.js';
+	import {
+		HugeiconsIcon,
+		PanelRightIcon,
+		PanelRightCloseIcon,
+	} from '$lib/icons/index.js';
 
 	let abortController: AbortController | null = null;
 
@@ -332,11 +338,52 @@
 	// `{#if hasMessages}` so layout differences (centred vs bottom-pinned)
 	// don't fight each other inside a single grid.
 	const hasMessages = $derived(chatStore.messages.length > 0);
+
+	// --- Right session panel toggle --------------------------------------
+	//
+	// SPEC MH1: the chat surface owns the toggle button for the right
+	// session panel. It is hidden when no session is active (nothing
+	// session-scoped to inspect) and is suppressed in mobile-overlay
+	// width via CSS — the mobile toggle moves to the global TopBar in
+	// W6.T2 to stay reachable when the chat is full-bleed under a
+	// bottom sheet. Open/close animation is owned by the AppShell grid
+	// transition; we only flip the boolean here.
+	const hasActiveSession = $derived(projectsStore.activeSessionId !== null);
+	const isRightPanelOpen = $derived(rightPanelStore.panelOpen);
+
+	function toggleRightPanel(): void {
+		rightPanelStore.togglePanel();
+	}
 </script>
 
 <div class="chat-view">
 	<!-- Connection status banner (always visible, top-pinned) -->
 	<ConnectionBanner />
+
+	<!--
+		Right session panel toggle (SPEC MH1). Floats over the top-right
+		corner of the chat surface so it's reachable from both zero-state
+		and active-state branches without coupling to either layout. The
+		button is hidden when no session is active (nothing session-scoped
+		to inspect) and at mobile widths (≤640px) where the mobile toggle
+		owns the affordance — see W6.T2.
+	-->
+	{#if hasActiveSession}
+		<button
+			type="button"
+			class="right-panel-toggle"
+			onclick={toggleRightPanel}
+			aria-label="Toggle session panel"
+			aria-expanded={isRightPanelOpen}
+			title={isRightPanelOpen ? 'Hide session panel' : 'Show session panel'}
+		>
+			<HugeiconsIcon
+				icon={isRightPanelOpen ? PanelRightCloseIcon : PanelRightIcon}
+				size={16}
+				strokeWidth={1.5}
+			/>
+		</button>
+	{/if}
 
 	<!--
 		Both layout branches are always in the DOM and stacked via
@@ -542,10 +589,61 @@
 			max(var(--space-4), env(safe-area-inset-bottom));
 	}
 
+	/* ----- Right session panel toggle ---------------------------------
+	 * Floats over the top-right corner of the chat surface. Sized to
+	 * match the global TopBar's sidebar-toggle (32px square, 16px icon)
+	 * for visual rhythm with the topbar already rendered above this
+	 * view in App.svelte. Suppressed at mobile widths — the equivalent
+	 * mobile affordance lives in the global TopBar from W6.T2 onwards.
+	 */
+	.right-panel-toggle {
+		position: absolute;
+		top: var(--space-2);
+		right: var(--space-3);
+		z-index: var(--z-sticky);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		padding: 0;
+		border-radius: var(--radius-md);
+		border: none;
+		background: transparent;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		transition:
+			color var(--duration-fast) var(--ease-out-expo),
+			background-color var(--duration-fast) var(--ease-out-expo),
+			box-shadow var(--duration-fast) var(--ease-out-expo);
+	}
+
+	.right-panel-toggle:hover {
+		color: var(--text-prose);
+		background-color: var(--color-surface-hover);
+	}
+
+	.right-panel-toggle:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-focus);
+	}
+
+	/* Hide the desktop toggle on mobile widths — the mobile equivalent
+	   is added to the global TopBar in W6.T2. Using display:none keeps
+	   the button out of the tab order and the a11y tree at small widths. */
+	@media (max-width: 640px) {
+		.right-panel-toggle {
+			display: none;
+		}
+	}
+
 	/* ----- Reduced motion ---------------------------------------------- */
 	@media (prefers-reduced-motion: reduce) {
 		.chat-zero-state,
 		.chat-active-state {
+			transition: none;
+		}
+		.right-panel-toggle {
 			transition: none;
 		}
 	}

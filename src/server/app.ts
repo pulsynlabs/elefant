@@ -25,6 +25,10 @@ import type { StateManager } from '../state/manager.ts'
 import { mountWorkflowRoutes } from './routes-workflow.ts'
 import { mountServeRoutes } from './routes-serve.ts'
 import { mountFsRoutes } from './routes-fs.ts'
+import { mountFileChangesRoute, mountProjectFileReadRoute } from './routes-file-changes.ts'
+import { mountSessionTodosRoute } from './routes-session-todos.ts'
+import { mountPtyRoute } from './routes-pty.ts'
+import { mountTokenRoutes } from './routes-tokens.ts'
 
 export function createApp(
 	providerRouter: ProviderRouter,
@@ -174,6 +178,22 @@ export function createApp(
 
 	// Mount secure filesystem listing routes for remote project selection
 	mountFsRoutes(baseApp as unknown as Elysia)
+
+	// Mount file changes retrieval route
+	mountFileChangesRoute(baseApp, db)
+
+	// Project-scoped file read endpoint — backs the right-panel diff viewer's
+	// "after" content. Read-only, capped at 2 MB, restricted to project root.
+	mountProjectFileReadRoute(baseApp, db)
+
+	// Mount session todos route (MH6 — W2.T4)
+	mountSessionTodosRoute(baseApp as unknown as Elysia)
+
+	// Mount token stream route (MH7/MH8 — W2.T2)
+	mountTokenRoutes(baseApp as unknown as Elysia)
+
+	// Mount PTY route (MH9 — W2.T3)
+	mountPtyRoute(baseApp as unknown as Elysia)
 
 	return baseApp
 }

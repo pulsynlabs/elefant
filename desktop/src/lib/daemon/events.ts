@@ -14,6 +14,8 @@ export type ProjectEventType =
 	| 'tool:block'
 	| 'compaction'
 	| 'workflow:status'
+	| 'file.changed'
+	| 'todos.updated'
 	| 'message'
 	| string;
 
@@ -34,6 +36,12 @@ const KNOWN_EVENT_NAMES: readonly ProjectEventType[] = [
 	'tool:block',
 	'compaction',
 	'workflow:status',
+	// Per-session derived event streams. These are emitted by the daemon's
+	// agent-loop into the project SSE channel (see src/server/agent-loop.ts);
+	// listing them here so subscribeProjectEvents fans them out to handlers
+	// instead of dropping them on the floor as untyped.
+	'file.changed',
+	'todos.updated',
 ] as const;
 
 /**

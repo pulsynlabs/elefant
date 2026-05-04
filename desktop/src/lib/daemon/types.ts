@@ -407,13 +407,25 @@ export interface McpRegistryResponse {
 
 /**
  * SSE event payload pushed by the daemon when an MCP server's connection
- * status changes (`mcp.status.changed`) or its tool list changes
- * (`mcp.tools.changed`). The desktop UI re-fetches the affected server
- * on receipt rather than mutating local state from the event payload.
+ * status changes (`mcp.status.changed`), its tool list changes
+ * (`mcp.tools.changed`), or a session-scoped overlay toggles a server on
+ * or off for one session only (`mcp.session.toggled`).
+ *
+ * For status / tools events the desktop UI re-fetches the affected server
+ * rather than mutating local state from the event payload — the daemon is
+ * the single source of truth.
+ *
+ * For `mcp.session.toggled` the payload is fully self-describing
+ * (`sessionId`, `serverId`, `disabled`) since it never changes the
+ * server's persisted config — only the per-session overlay map.
  */
 export interface McpStatusEvent {
-	type: 'mcp.status.changed' | 'mcp.tools.changed';
+	type: 'mcp.status.changed' | 'mcp.tools.changed' | 'mcp.session.toggled';
 	serverId: string;
 	status?: McpServerWithStatus['status'];
 	error?: string;
+	/** Present only on `mcp.session.toggled` events. */
+	sessionId?: string;
+	/** Present only on `mcp.session.toggled` events. */
+	disabled?: boolean;
 }

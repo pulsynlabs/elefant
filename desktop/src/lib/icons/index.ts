@@ -37,6 +37,7 @@ export { default as InfoIcon } from '@hugeicons/core-free-icons/InformationCircl
 export { default as CrossIcon } from '@hugeicons/core-free-icons/Cancel01Icon';
 export { default as CheckSquareIcon } from '@hugeicons/core-free-icons/CheckmarkSquare02Icon';
 export { default as UncheckSquareIcon } from '@hugeicons/core-free-icons/Square01Icon';
+export { default as InProgressIcon } from '@hugeicons/core-free-icons/Loading03Icon';
 
 // Utility
 export { default as TerminalIcon } from '@hugeicons/core-free-icons/TerminalIcon';
@@ -65,6 +66,10 @@ export { default as WorktreesIcon } from '@hugeicons/core-free-icons/FolderTreeI
 export { default as SpecModeIcon } from '@hugeicons/core-free-icons/CheckListIcon';
 export { default as ResearchIcon } from '@hugeicons/core-free-icons/Book02Icon';
 export { default as ExternalLinkIcon } from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
+
+// Layout / Panels
+export { default as PanelRightIcon } from '@hugeicons/core-free-icons/PanelRightIcon';
+export { default as PanelRightCloseIcon } from '@hugeicons/core-free-icons/PanelRightCloseIcon';
 
 // MCP (Model Context Protocol)
 export { default as McpServerIcon } from '@hugeicons/core-free-icons/McpServerIcon';

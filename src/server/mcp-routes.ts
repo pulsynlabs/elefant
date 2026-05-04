@@ -10,6 +10,7 @@ import { fetchAnthropicRegistry, invalidateAnthropicCache, prefetchAnthropicRegi
 import { fetchSmitheryRegistry } from '../mcp/registry/smithery.ts';
 import { getBundledRegistry } from '../mcp/registry/bundled.ts';
 import type { SseManager } from '../transport/sse-manager.ts';
+import { mcpSessionOverlay } from './mcp-session-overlay.ts';
 
 const DEFAULT_CONFIG_PATH = join(homedir(), '.config', 'elefant', 'elefant.config.json');
 export const MCP_EVENTS_PROJECT_ID = '__global_mcp__';
@@ -218,6 +219,40 @@ export function createMcpRoutes<TApp extends Elysia>(app: TApp, mcpManager: MCPM
   app.post('/api/mcp/servers/:id/disconnect', async ({ params }) => {
     await mcpManager.disconnect(params.id);
     return { ok: true, data: { id: params.id, status: 'disabled' } };
+  });
+
+  // --- Session-scoped server overlay (in-memory only) ---
+
+  app.post('/api/projects/:projectId/sessions/:sessionId/mcp/:serverId/disable', async ({ params }) => {
+    mcpSessionOverlay.disable(params.sessionId, params.serverId);
+    options.sseManager?.publishVolatile(MCP_EVENTS_PROJECT_ID, 'mcp.session.toggled', {
+      sessionId: params.sessionId,
+      serverId: params.serverId,
+      disabled: true,
+    });
+
+    return {
+      ok: true,
+      serverId: params.serverId,
+      sessionId: params.sessionId,
+      disabled: true,
+    };
+  });
+
+  app.post('/api/projects/:projectId/sessions/:sessionId/mcp/:serverId/enable', async ({ params }) => {
+    mcpSessionOverlay.enable(params.sessionId, params.serverId);
+    options.sseManager?.publishVolatile(MCP_EVENTS_PROJECT_ID, 'mcp.session.toggled', {
+      sessionId: params.sessionId,
+      serverId: params.serverId,
+      disabled: false,
+    });
+
+    return {
+      ok: true,
+      serverId: params.serverId,
+      sessionId: params.sessionId,
+      disabled: false,
+    };
   });
 
   // --- Tools ---

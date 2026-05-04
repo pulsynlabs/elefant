@@ -134,6 +134,34 @@ export async function pinTool(
 	}
 }
 
+/**
+ * Toggle an MCP server on or off **for one session only**, without
+ * mutating the persisted global config. Posts to the W2.T5 routes:
+ *
+ *   POST /api/projects/:projectId/sessions/:sessionId/mcp/:serverId/disable
+ *   POST /api/projects/:projectId/sessions/:sessionId/mcp/:serverId/enable
+ *
+ * The daemon publishes a `mcp.session.toggled` SSE event on success which
+ * subscribers will receive — callers may still apply an optimistic local
+ * update to keep the UI feeling instant.
+ */
+export async function setSessionDisabled(
+	projectId: string,
+	sessionId: string,
+	serverId: string,
+	disabled: boolean,
+): Promise<void> {
+	const action = disabled ? 'disable' : 'enable';
+	const path = `/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(
+		sessionId,
+	)}/mcp/${encodeURIComponent(serverId)}/${action}`;
+	const res = await apiFetch(path, { method: 'POST' });
+	if (!res.ok) {
+		const body = (await res.json().catch(() => ({}))) as { error?: string };
+		throw new Error(body.error ?? `HTTP ${res.status}`);
+	}
+}
+
 export async function fetchRegistry(opts: {
 	source?: 'anthropic' | 'smithery' | 'bundled' | 'all';
 	page?: number;
@@ -175,6 +203,7 @@ export function subscribeToStatus(
 	const KNOWN_EVENTS: ReadonlyArray<McpStatusEvent['type']> = [
 		'mcp.status.changed',
 		'mcp.tools.changed',
+		'mcp.session.toggled',
 	];
 
 	for (const name of KNOWN_EVENTS) {
@@ -204,6 +233,7 @@ export const mcpService = {
 	disconnectServer,
 	listServerTools,
 	pinTool,
+	setSessionDisabled,
 	fetchRegistry,
 	refreshRegistry,
 	subscribeToStatus,
