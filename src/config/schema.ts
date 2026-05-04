@@ -121,6 +121,11 @@ const researchConfigSchema = z.object({
 	providerConfig: researchProviderConfigSchema.optional(),
 }).strict();
 
+const visualizeModelOverrideSchema = z.object({
+	provider: z.string(),
+	model: z.string(),
+}).strict();
+
 const skillsConfigSchema = z.object({
 	registries: z.array(registryConfigSchema).default([
 		{ type: 'clawhub' as const, url: 'https://clawhub.com', enabled: true },
@@ -152,6 +157,7 @@ const configSchema = z.object({
 	mcp: z.array(mcpServerSchema).optional().default([]),
 	tokenBudgetPercent: z.number().min(0).max(100).optional().default(10),
 	compactionThreshold: z.number().min(0.5).max(0.95).optional().default(0.8),
+	visualizeModelOverride: visualizeModelOverrideSchema.nullable().optional().default(null),
 	hardwareAccelerationDisabled: z.boolean().optional().default(false),
 	skills: skillsConfigSchema.optional().default({
 		registries: BUNDLED_REGISTRIES,
@@ -216,6 +222,7 @@ export {
 	skillsConfigSchema,
 	researchProviderConfigSchema,
 	researchConfigSchema,
+	visualizeModelOverrideSchema,
 	BUNDLED_REGISTRIES,
 };
 export type ElefantConfig = z.infer<typeof configSchema>;
@@ -233,3 +240,4 @@ export type RegistryConfig = z.infer<typeof registryConfigSchema>;
 export type SkillsConfig = z.infer<typeof skillsConfigSchema>;
 export type ResearchProviderConfig = z.infer<typeof researchProviderConfigSchema>;
 export type ResearchConfig = z.infer<typeof researchConfigSchema>;
+export type VisualizeModelOverride = z.infer<typeof visualizeModelOverrideSchema>;

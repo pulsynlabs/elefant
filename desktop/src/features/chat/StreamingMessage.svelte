@@ -2,6 +2,8 @@
 	import type { ChatMessage } from './types.js';
 	import ToolCallCard from './ToolCallCard.svelte';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
+	import VizRenderer from './viz/VizRenderer.svelte';
+	import { promoteVizBlock } from './viz/promote-viz-block.js';
 	import { HugeiconsIcon, ErrorIcon } from '$lib/icons/index.js';
 
 	type Props = {
@@ -20,11 +22,18 @@
 			<span class="error-text">{message.errorMessage ?? 'An error occurred'}</span>
 		</div>
 	{:else if message.blocks && message.blocks.length > 0}
-		{#each message.blocks as block, i (block.type === 'tool_call' ? block.toolCall.id : `block-${i}`)}
+		{#each message.blocks as block, i (block.type === 'tool_call' ? block.toolCall.id : block.type === 'viz' ? `viz-${block.envelope.id}` : `block-${i}`)}
 			{#if block.type === 'text'}
 				<MarkdownRenderer source={block.text} streaming={message.isStreaming ?? false} />
 			{:else if block.type === 'tool_call'}
-				<ToolCallCard toolCall={block.toolCall} />
+				{@const promoted = promoteVizBlock(block.toolCall)}
+				{#if promoted.type === 'viz'}
+					<VizRenderer envelope={promoted.envelope} />
+				{:else}
+					<ToolCallCard toolCall={block.toolCall} />
+				{/if}
+			{:else if block.type === 'viz'}
+				<VizRenderer envelope={block.envelope} />
 			{/if}
 		{/each}
 	{:else if message.content}

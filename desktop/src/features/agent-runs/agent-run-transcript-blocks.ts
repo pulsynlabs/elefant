@@ -14,6 +14,19 @@
 //     block (rendered as AgentTaskCard). The child run's `tool_result`
 //     is suppressed — the task card already represents the whole
 //     delegation; a trailing result block would be noise.
+//   • A `tool_call` with `name === 'visualize'` is routed based on
+//     `isOrchestrator`:
+//       – Orchestrator runs (top-level, `parentRunId === null`): the
+//         tool call is promoted to a `viz` block and rendered inline
+//         via VizRenderer (MH3: viz blocks render inline in the chat
+//         stream — including the agent-run transcript surface).
+//       – Subagent runs: silently skipped (MH9: subagent transcripts
+//         don't initiate or render viz). The toolkit allowlist already
+//         prevents subagents from calling `visualize`, so this is a
+//         defensive guard for stray calls.
+//     The paired `tool_result` is always suppressed for visualize
+//     calls — its content is already carried inside the `viz` block
+//     (or dropped entirely for subagents).
 //   • Any other `tool_call` emits a regular `tool` block and its
 //     `tool_result` is merged back onto the paired display.
 //   • `question` and `terminal` events produce their own blocks.
@@ -28,10 +41,13 @@ import type {
 	ContentBlock,
 	ToolCallDisplay,
 } from '../chat/types.js';
+import { promoteVizBlock } from '../chat/viz/promote-viz-block.js';
+import type { VizEnvelope } from '../chat/viz/types.js';
 
 export type RenderBlock =
 	| { kind: 'text'; id: string; message: ChatMessage }
 	| { kind: 'tool'; id: string; toolCall: ToolCallDisplay }
+	| { kind: 'viz'; id: string; envelope: VizEnvelope }
 	| {
 			kind: 'task';
 			id: string;
@@ -50,7 +66,8 @@ export type RenderBlock =
 	| { kind: 'terminal'; id: string; status: AgentRunStatus; message: string };
 
 /**
- * Options controlling runId resolution for `task` tool calls.
+ * Options controlling runId resolution for `task` tool calls and viz
+ * routing.
  *
  * `childRuns` is the current list of direct children of the parent run
  * (i.e. what `agentRunsStore.childRunsForRun(parentRunId)` returns).
@@ -63,9 +80,18 @@ export type RenderBlock =
  *   1. `tool_call.metadata.runId` (carried by `agent_run.tool_call_metadata`)
  *   2. child run whose `title` matches `arguments.description`
  *   3. `null` — spawning (AgentTaskCard renders the disabled state)
+ *
+ * `isOrchestrator` decides whether `visualize` tool calls promote to a
+ * `viz` render block (true) or are silently skipped (false). The
+ * AgentRunTranscript component derives this from
+ * `run.parentRunId === null` — top-level runs are orchestrator runs and
+ * may render viz inline; child runs are subagents and never do (MH9).
+ * Defaults to `false` so callers without a run context (early tests,
+ * pre-hydration) preserve the safe-by-default subagent behaviour.
  */
 export interface ComputeRenderBlocksOptions {
 	childRuns?: AgentRun[];
+	isOrchestrator?: boolean;
 }
 
 /**
@@ -80,10 +106,24 @@ export function computeRenderBlocks(
 	options: ComputeRenderBlocksOptions = {},
 ): RenderBlock[] {
 	const childRuns = options.childRuns ?? [];
+	const isOrchestrator = options.isOrchestrator ?? false;
 	const out: RenderBlock[] = [];
 	const toolCallsById = new Map<string, ToolCallDisplay>();
 	// Track task tool_call_ids so we can suppress their tool_result.
 	const taskToolCallIds = new Set<string>();
+	// Track visualize tool_call_ids: in either branch (orchestrator
+	// promotion or subagent suppression) the paired `tool_result` should
+	// not surface as a generic ToolCallCard. For orchestrator runs we
+	// also map the id to the index of its viz render block so the
+	// trailing tool_result can patch the envelope onto the block once
+	// the result content arrives (mirrors `promoteVizBlock` semantics
+	// in StreamingMessage).
+	const vizToolCallIds = new Set<string>();
+	const vizBlockIndexById = new Map<string, number>();
+	// Cache pending visualize tool calls keyed by id so we can re-run
+	// `promoteVizBlock` once the result lands. Until then we render a
+	// placeholder ToolCallCard via the helper's fallback.
+	const vizPendingToolCalls = new Map<string, ToolCallDisplay>();
 	let currentText: { id: string; text: string } | null = null;
 
 	const flushText = (): void => {
@@ -112,6 +152,41 @@ export function computeRenderBlocks(
 			}
 			case 'tool_call': {
 				flushText();
+				if (entry.name === 'visualize') {
+					vizToolCallIds.add(entry.id);
+					if (!isOrchestrator) {
+						// Subagent transcript — silently skip (MH9).
+						break;
+					}
+					// Orchestrator transcript — emit a viz render block.
+					// Until the matching tool_result arrives the envelope
+					// cannot be parsed; render a fallback ToolCallCard via
+					// the same `promoteVizBlock` helper used by
+					// StreamingMessage so the running state is consistent.
+					const toolCall: ToolCallDisplay = {
+						id: entry.id,
+						name: entry.name,
+						arguments: entry.arguments,
+					};
+					vizPendingToolCalls.set(entry.id, toolCall);
+					const promoted = promoteVizBlock(toolCall);
+					if (promoted.type === 'viz') {
+						vizBlockIndexById.set(entry.id, out.length);
+						out.push({
+							kind: 'viz',
+							id: `viz-${entry.id}`,
+							envelope: promoted.envelope,
+						});
+					} else {
+						vizBlockIndexById.set(entry.id, out.length);
+						out.push({
+							kind: 'tool',
+							id: `tool-${entry.id}`,
+							toolCall,
+						});
+					}
+					break;
+				}
 				if (entry.name === 'task') {
 					// Dedicated task render block — AgentTaskCard consumes this.
 					const title =
@@ -162,6 +237,37 @@ export function computeRenderBlocks(
 				// Suppress the trailing tool_result for task calls — the
 				// AgentTaskCard already represents the full delegation.
 				if (taskToolCallIds.has(entry.toolCallId)) {
+					break;
+				}
+				if (vizToolCallIds.has(entry.toolCallId)) {
+					// Orchestrator: re-run promotion now that the result
+					// content is available and patch the existing block.
+					// Subagent: nothing to patch — the call was skipped.
+					const pending = vizPendingToolCalls.get(entry.toolCallId);
+					const blockIdx = vizBlockIndexById.get(entry.toolCallId);
+					if (pending && blockIdx !== undefined) {
+						pending.result = {
+							toolCallId: entry.toolCallId,
+							content: entry.content,
+							isError: entry.isError,
+						};
+						const promoted = promoteVizBlock(pending);
+						if (promoted.type === 'viz') {
+							out[blockIdx] = {
+								kind: 'viz',
+								id: `viz-${entry.toolCallId}`,
+								envelope: promoted.envelope,
+							};
+						} else {
+							// Malformed envelope — keep the tool block but
+							// merge the result so the user can inspect it.
+							out[blockIdx] = {
+								kind: 'tool',
+								id: `tool-${entry.toolCallId}`,
+								toolCall: pending,
+							};
+						}
+					}
 					break;
 				}
 				const existing = toolCallsById.get(entry.toolCallId);

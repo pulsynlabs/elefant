@@ -5,6 +5,12 @@ import type { Database } from '../../db/database.js'
 import type { HookRegistry } from '../../hooks/index.js'
 import type { ProviderRouter } from '../../providers/router.js'
 import { buildInitialMessages, createRunContext } from '../../runs/context.js'
+import {
+	agentKindToAudience,
+	buildReferenceCatalog,
+	formatTagIndex,
+	loadForAudience,
+} from '../../agents/reference-catalog.js'
 import { createRun, markRunEnded } from '../../runs/dal.js'
 import { publishRunEvent, publishStatusChange, publishToolCallMetadata } from '../../runs/events.js'
 import { insertMessage } from '../../runs/messages.js'
@@ -12,7 +18,7 @@ import type { RunRegistry } from '../../runs/registry.js'
 import type { RunContext } from '../../runs/types.js'
 import { runAgentLoop } from '../../server/agent-loop.js'
 import { createQuestionEmitter } from '../question/emitter.js'
-import type { ToolRegistry } from '../registry.js'
+import { filterToolsForAgent, type ToolRegistry } from '../registry.js'
 import type { MetadataEmitter } from './metadata-emitter.js'
 import type { ElefantError } from '../../types/errors.js'
 import type { Message } from '../../types/providers.js'
@@ -65,7 +71,7 @@ export async function resolveAgentPrompt(
 
 	const profile = configResult.data
 	if (profile.promptOverride?.trim()) {
-		return profile.promptOverride
+		return appendReferenceSection(profile.promptOverride, subagentType)
 	}
 
 	if (!profile.promptFile) {
@@ -80,7 +86,33 @@ export async function resolveAgentPrompt(
 		const path = isAbsolute(profile.promptFile)
 			? profile.promptFile
 			: resolve(process.cwd(), profile.promptFile)
-		return await readFile(path, 'utf-8')
+		const basePrompt = await readFile(path, 'utf-8')
+		return appendReferenceSection(basePrompt, subagentType)
+	} catch {
+		return null
+	}
+}
+
+async function appendReferenceSection(basePrompt: string, agentKind: string): Promise<string> {
+	const referenceSection = await buildReferenceSection(agentKind)
+	if (!referenceSection) return basePrompt
+	return `${basePrompt}\n\n${referenceSection}`
+}
+
+async function buildReferenceSection(agentKind: string): Promise<string | null> {
+	try {
+		const catalog = await buildReferenceCatalog()
+
+		if (agentKind === 'orchestrator' || agentKind === 'goop-orchestrator') {
+			const tagIndex = formatTagIndex(catalog)
+			return tagIndex || null
+		}
+
+		const audience = agentKindToAudience(agentKind)
+		if (!audience || audience === 'orchestrator') return null
+
+		const content = await loadForAudience(catalog, audience)
+		return content || null
 	} catch {
 		return null
 	}
@@ -412,9 +444,10 @@ Use agent_session_search to query the child's full message history by runId.`,
 			}
 
 			try {
+				const filteredTools = filterToolsForAgent(toolRegistry.getAll(), agentType)
 				for await (const event of runAgentLoop(providerRouter, toolRegistry, {
 					messages: initialMessages,
-					tools: toolRegistry.getAll(),
+					tools: filteredTools,
 					hookRegistry,
 					runContext: childCtx,
 					sseManager,

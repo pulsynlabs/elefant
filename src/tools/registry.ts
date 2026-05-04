@@ -22,6 +22,7 @@ import { createInteractiveTools } from './interactive/index.js';
 import { readTool } from './read.js';
 import { bashTool } from './shell/index.js';
 import { skillTool } from './skill/index.js';
+import { referenceTool } from './reference/index.js';
 import { createSpecToolContext, createSpecTools } from './workflow/index.ts';
 import { createTaskTool, type TaskToolDeps } from './task/index.js';
 import type { MetadataEmitter } from './task/metadata-emitter.js';
@@ -35,6 +36,7 @@ import { researchGrepTool } from './research_grep/index.js';
 import { createResearchReadTool } from './research_read/index.js';
 import { researchWriteTool, createResearchWriteTool } from './research_write/index.js';
 import { createResearchIndexTool } from './research_index/index.js';
+import { createVisualizeTool } from './visualize/index.js';
 
 export const MAX_TOOL_OUTPUT_CHARS = 100_000;
 
@@ -368,6 +370,30 @@ export class ToolRegistry {
 }
 
 /**
+ * Filter a tool list to only include tools accessible to a given agent type.
+ *
+ * A tool is accessible when:
+ * - It has no `allowedAgents` restriction (public to all agents), OR
+ * - The agent's type is explicitly listed in `allowedAgents`.
+ *
+ * This mirrors the runtime enforcement in `ToolRegistry.execute()` (line 251–258)
+ * but operates on the static tool definitions so the LLM never sees tools it
+ * cannot call. The execute()-level check remains as a belt-and-suspenders guard.
+ */
+export function filterToolsForAgent(
+	tools: ToolDefinition[],
+	agentType: string,
+): ToolDefinition[] {
+	return tools.filter((tool) => {
+		if (!tool.allowedAgents || tool.allowedAgents.length === 0) {
+			return true
+		}
+
+		return tool.allowedAgents.includes(agentType)
+	})
+}
+
+/**
  * Resolve a project's absolute filesystem path from the daemon database.
  * Used by createToolRegistryForRun to provide projectPath to research tools.
  */
@@ -396,9 +422,12 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 		registry.register(tool);
 	}
 	registry.register(skillTool);
+	registry.register(referenceTool);
 	registry.register(lspTool);
+	const visualizeTool = createVisualizeTool();
+	registry.register(visualizeTool);
 	// Research Base tools — read-only tools available to all agents.
-	// See _shared/research-base-protocol.md for usage guidance.
+	// See reference: research-base-workflow (auto-loaded for researcher/writer agents).
 	registry.register(researchGrepTool);
 	registry.register(researchWriteTool);
 	registry.register(createResearchReadTool({ projectPath: process.cwd() }));
@@ -449,7 +478,15 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 		registry.register(tool)
 	}
 	registry.register(skillTool)
+	registry.register(referenceTool)
 	registry.register(lspTool)
+	const visualizeTool = createVisualizeTool({
+		getConfig: async () => {
+			const config = await deps.configManager.getConfig()
+			return config.ok ? config.data : null
+		},
+	})
+	registry.register(visualizeTool)
 
 	// ── Research Base tools (per-run deps) ────────────────────────────────
 	// All agents get read-only research access; researcher/writer/librarian

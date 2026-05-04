@@ -8,6 +8,7 @@ import {
 	configSchema,
 	providerSchema,
 	researchConfigSchema,
+	visualizeModelOverrideSchema,
 	ConfigManager,
 	type AgentProfile,
 	type ConfigError,
@@ -217,6 +218,7 @@ export function createConfigRoutes<TApp extends Elysia>(
 				defaultProvider: z.string().min(1).optional(),
 				logLevel: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 				compactionThreshold: z.number().min(0.5).max(0.95).optional(),
+				visualizeModelOverride: visualizeModelOverrideSchema.nullable().optional(),
 				research: researchConfigSchema.partial().optional(),
 			})
 			.strict();
@@ -257,6 +259,9 @@ export function createConfigRoutes<TApp extends Elysia>(
 			...(parsed.data.logLevel !== undefined ? { logLevel: parsed.data.logLevel } : {}),
 			...(parsed.data.compactionThreshold !== undefined
 				? { compactionThreshold: parsed.data.compactionThreshold }
+				: {}),
+			...(parsed.data.visualizeModelOverride !== undefined
+				? { visualizeModelOverride: parsed.data.visualizeModelOverride }
 				: {}),
 			...(parsed.data.research !== undefined ? { research: mergedResearch } : {}),
 		};

@@ -9,6 +9,7 @@ import type {
 	ProviderEntry,
 	ProviderFormat,
 	RegistryProvider,
+	VisualizeModelOverride,
 } from '$lib/daemon/types.js';
 import { getDaemonClient } from '$lib/daemon/client.js';
 
@@ -44,7 +45,7 @@ export async function updateConfig(
 	patch: Partial<
 		Pick<
 			ElefantConfig,
-			'port' | 'defaultProvider' | 'logLevel' | 'hardwareAccelerationDisabled' | 'research'
+			'port' | 'defaultProvider' | 'logLevel' | 'hardwareAccelerationDisabled' | 'research' | 'visualizeModelOverride'
 		>
 	>,
 ): Promise<void> {
@@ -114,6 +115,12 @@ export async function fetchProviderModels(
 	return getDaemonClient().fetchProviderModels(baseURL, apiKey, format);
 }
 
+export async function setVisualizeModelOverride(
+	override: VisualizeModelOverride | null,
+): Promise<void> {
+	return getDaemonClient().setVisualizeModelOverride(override);
+}
+
 export const configService = {
 	readConfig,
 	updateConfig,
@@ -122,4 +129,5 @@ export const configService = {
 	deleteProvider,
 	fetchProviderRegistry,
 	fetchProviderModels,
+	setVisualizeModelOverride,
 };

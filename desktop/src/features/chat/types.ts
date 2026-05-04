@@ -1,5 +1,7 @@
 // Chat feature type definitions
 
+import type { VizEnvelope } from './viz/types.js';
+
 export type MessageRole = 'user' | 'assistant' | 'tool' | 'system';
 
 export interface ToolCallDisplay {
@@ -33,7 +35,8 @@ export interface ToolResultDisplay {
 export type ContentBlock =
 	| { type: 'text'; text: string }
 	| { type: 'tool_call'; toolCall: ToolCallDisplay }
-	| { type: 'tool_result'; result: ToolResultDisplay };
+	| { type: 'tool_result'; result: ToolResultDisplay }
+	| { type: 'viz'; envelope: VizEnvelope };
 
 export interface ChatMessage {
 	id: string;

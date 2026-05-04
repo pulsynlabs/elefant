@@ -37,3 +37,6 @@ export { createToolListTool, type ToolListParams } from './tool_list/index.js';
 // Task and agent_session_search tools (per-run registry only)
 export { createTaskTool, type TaskParams, type TaskToolDeps, DEFAULT_MAX_CHILDREN } from './task/index.js';
 export { createAgentSessionSearchTool, type AgentSessionSearchParams, type AgentSessionSearchDeps } from './agent_session_search/index.js';
+
+// Visualization tool (Wave 5 - agent rich viz)
+export { createVisualizeTool, type VisualizeParams, type VisualizeToolDeps } from './visualize/index.js';
