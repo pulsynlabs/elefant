@@ -28,6 +28,7 @@ import { MCPManager } from '../mcp/manager.ts'
 import { MCP_EVENTS_PROJECT_ID } from '../server/mcp-routes.ts'
 import type { ElefantError } from '../types/errors.ts'
 import { err, ok, type Result } from '../types/result.ts'
+import { createLspService } from '../lsp/index.js'
 import type { DaemonContext } from './context.ts'
 import { setGlobalHookRegistry } from './shutdown.ts'
 
@@ -47,6 +48,7 @@ function toConfigError(message: string, details?: unknown): ElefantError {
 export async function createDaemon(config: ElefantConfig): Promise<Result<ElefantDaemon, ElefantError>> {
 	const hookRegistry = new HookRegistry()
 	const toolRegistry = createToolRegistry(hookRegistry)
+	const lspService = createLspService()
 
 	let providerRouter: ProviderRouter
 	try {
@@ -182,6 +184,7 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 			console.error(`[elefant] Daemon listening on port ${config.port}`)
 		},
 		stop: async () => {
+			await lspService.dispose()
 			await mcpManager.shutdown()
 			await pluginLoader.unloadAll()
 			ws.stopHeartbeat()

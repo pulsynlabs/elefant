@@ -348,6 +348,8 @@ export class LspClient {
   private pending = new Map<number, PendingRequest>();
   private writeChain: Promise<void> = Promise.resolve();
   private openDocuments = new Set<string>();
+  private notificationHandlers = new Map<string, Array<(params: unknown) => void>>();
+  private documentVersions = new Map<string, number>();
   private disposed = false;
 
   constructor(private readonly process: ReturnType<typeof Bun.spawn>) {
@@ -465,6 +467,35 @@ export class LspClient {
     return normalizeWorkspaceSymbols(response);
   }
 
+  onNotification(method: string, handler: (params: unknown) => void): void {
+    const existing = this.notificationHandlers.get(method) ?? [];
+    existing.push(handler);
+    this.notificationHandlers.set(method, existing);
+  }
+
+  async didChange(filePath: string, newText: string): Promise<void> {
+    const uri = toFileUri(filePath);
+    if (!this.openDocuments.has(uri)) {
+      await this.ensureDocumentOpened(filePath, uri);
+    }
+
+    const current = this.documentVersions.get(uri) ?? 1;
+    const next = current + 1;
+    this.documentVersions.set(uri, next);
+
+    await this.sendNotification('textDocument/didChange', {
+      textDocument: { uri, version: next },
+      contentChanges: [{ text: newText }],
+    });
+  }
+
+  async didSave(filePath: string): Promise<void> {
+    const uri = toFileUri(filePath);
+    await this.sendNotification('textDocument/didSave', {
+      textDocument: { uri },
+    });
+  }
+
   dispose(): void {
     if (this.disposed) {
       return;
@@ -513,6 +544,7 @@ export class LspClient {
       },
     });
 
+    this.documentVersions.set(uri, 1);
     this.openDocuments.add(uri);
   }
 
@@ -581,25 +613,40 @@ export class LspClient {
       return;
     }
 
-    const response = message as JsonRpcResponse;
-    if (typeof response.id !== 'number') {
+    const msg = message as Record<string, unknown>;
+    if (typeof msg['id'] === 'number') {
+      const response = message as JsonRpcResponse;
+      const pending = this.pending.get(response.id);
+      if (!pending) {
+        return;
+      }
+
+      this.pending.delete(response.id);
+      clearTimeout(pending.timeout);
+
+      if (response.error) {
+        pending.reject(new Error(`LSP error ${response.error.code}: ${response.error.message}`));
+        return;
+      }
+
+      pending.resolve(response.result);
       return;
     }
 
-    const pending = this.pending.get(response.id);
-    if (!pending) {
-      return;
+    if (typeof msg['method'] === 'string') {
+      const handlers = this.notificationHandlers.get(msg['method']);
+      if (!handlers) {
+        return;
+      }
+
+      for (const handler of handlers) {
+        try {
+          handler(msg['params']);
+        } catch {
+          // ignore notification handler failures
+        }
+      }
     }
-
-    this.pending.delete(response.id);
-    clearTimeout(pending.timeout);
-
-    if (response.error) {
-      pending.reject(new Error(`LSP error ${response.error.code}: ${response.error.message}`));
-      return;
-    }
-
-    pending.resolve(response.result);
   }
 
   private async sendNotification(method: string, params?: unknown): Promise<void> {

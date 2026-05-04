@@ -32,7 +32,7 @@ describe('editTool', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data).toBe(`Replaced 1 occurrence(s) in ${filePath}`);
+      expect(result.data).toContain(`Replaced 1 occurrence(s) in ${filePath}`);
     }
 
     const content = await readFile(filePath, 'utf-8');
@@ -87,7 +87,7 @@ describe('editTool', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data).toBe(`Replaced 3 occurrence(s) in ${filePath}`);
+      expect(result.data).toContain(`Replaced 3 occurrence(s) in ${filePath}`);
     }
 
     const content = await readFile(filePath, 'utf-8');

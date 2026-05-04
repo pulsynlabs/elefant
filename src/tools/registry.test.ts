@@ -5,7 +5,7 @@ import type { ToolDefinition } from '../types/tools.ts'
 import { createToolRegistry, createToolRegistryForRun, filterToolsForAgent, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all 23 tools including research_* and visualize tools', () => {
+	it('registers all 24 tools including research_* and visualize tools', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
@@ -16,6 +16,7 @@ describe('ToolRegistry', () => {
 			'glob',
 			'grep',
 			'lsp',
+			'lsp_diagnostics',
 			'question',
 			'read',
 			'reference',
@@ -34,7 +35,7 @@ describe('ToolRegistry', () => {
 			'websearch',
 			'write',
 		])
-		expect(names.length).toBe(23)
+		expect(names.length).toBe(24)
 	})
 
 	it('execute() calls the matching tool', async () => {
@@ -197,6 +198,7 @@ describe('ToolRegistry', () => {
 		expect(registry.get('question').ok).toBe(true)
 		expect(registry.get('skill').ok).toBe(true)
 		expect(registry.get('lsp').ok).toBe(true)
+		expect(registry.get('lsp_diagnostics').ok).toBe(true)
 
 		// Original 6 tools should still be available
 		expect(registry.get('read').ok).toBe(true)

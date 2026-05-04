@@ -1,5 +1,3 @@
-import { extname } from 'node:path';
-
 import type { ToolDefinition } from '../../types/tools.js';
 import type { ElefantError } from '../../types/errors.js';
 import type { Result } from '../../types/result.js';
@@ -7,7 +5,7 @@ import { ok, err } from '../../types/result.js';
 
 import type { Position } from './client.js';
 import { formatHover, formatLocations, formatSymbols } from './format.js';
-import { getClient } from './manager.js';
+import { getLspService } from '../../lsp/index.js';
 
 export type LspOperation =
   | 'goToDefinition'
@@ -23,14 +21,6 @@ export interface LspParams {
   query?: string;
 }
 
-function detectLanguage(filePath: string): string | null {
-  const extension = extname(filePath).toLowerCase();
-  if (extension === '.ts' || extension === '.tsx' || extension === '.js' || extension === '.jsx') {
-    return 'typescript';
-  }
-  return null;
-}
-
 function isPosition(value: LspParams['position']): value is Position {
   if (!value) {
     return false;
@@ -40,7 +30,7 @@ function isPosition(value: LspParams['position']): value is Position {
 
 export const lspTool: ToolDefinition<LspParams, string> = {
   name: 'lsp',
-  description: 'Experimental code intelligence via Language Server Protocol.',
+  description: 'Code intelligence via Language Server Protocol.',
   parameters: {
     operation: {
       type: 'string',
@@ -64,29 +54,14 @@ export const lspTool: ToolDefinition<LspParams, string> = {
     },
   },
   execute: async (params): Promise<Result<string, ElefantError>> => {
-    if (process.env.ELEFANT_EXPERIMENTAL_LSP !== 'true') {
-      return err({
-        code: 'TOOL_EXECUTION_FAILED',
-        message: 'LSP tool is experimental. Set ELEFANT_EXPERIMENTAL_LSP=true to enable.',
-      });
-    }
-
     const { operation, filePath, position, query } = params;
 
     try {
-      const language = filePath ? detectLanguage(filePath) : 'typescript';
-      if (!language) {
-        return err({
-          code: 'BINARY_NOT_FOUND',
-          message: `No LSP server mapping for file extension: ${extname(filePath ?? '')}`,
-        });
-      }
-
-      const client = await getClient(language);
+      const client = await getLspService().getClientForFile(filePath ?? '');
       if (!client) {
         return err({
           code: 'BINARY_NOT_FOUND',
-          message: 'LSP server not found. Install typescript-language-server.',
+          message: 'LSP server not found for this file type. Install the appropriate language server.',
         });
       }
 
