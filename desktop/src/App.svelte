@@ -34,6 +34,8 @@
 	import { RightPanel, RightPanelMobile, TokenBar, rightPanelStore } from "./features/right-panel/index.js";
 	import MobileBottomNav from "$lib/components/layout/MobileBottomNav.svelte";
 	import MoreNavSheet from "$lib/components/layout/MoreNavSheet.svelte";
+	import MobileSetupWizard from "./features/mobile-setup/MobileSetupWizard.svelte";
+	import { isCapacitorRuntime } from "$lib/runtime.js";
 
 	type NavigationRuntime = typeof navigationStore & {
 		initNavigation: (opts: { getActiveProjectId: () => string | null }) => void;
@@ -64,6 +66,20 @@
 	// Whether the user has a real (non-placeholder) provider configured.
 	// null = still waiting for daemon to respond
 	let hasConfig = $state<boolean | null>(null);
+
+	// Mobile setup wizard gate (W4.T4 / MH4). Shown on Capacitor builds
+	// when there is no non-localhost daemon configured. Desktop and
+	// browser builds NEVER see this — `isCapacitorRuntime` is false in
+	// both cases. Gate is decided once during initializeDaemonConnection()
+	// after settingsStore.init() reads from @capacitor/preferences, so
+	// the wizard never flashes on app reopen if config already exists.
+	let showMobileWizard = $state(false);
+
+	// Captured by onMount() so the wizard's onComplete callback can
+	// re-trigger the daemon initialization after writing the user's
+	// chosen URL to Capacitor Preferences. Without this, the connection
+	// polling loop never starts and the chat surface stays empty.
+	let runDaemonInit: (() => Promise<void>) | null = null;
 
 	// Re-check config whenever the daemon connection comes up
 	$effect(() => {
@@ -186,6 +202,25 @@
 			await settingsStore.init();
 			if (disposed) return;
 
+			// Capacitor first-launch gate (W4.T4 / MH4). On Capacitor with no
+			// real (non-localhost) daemon configured, render the mobile setup
+			// wizard instead of starting the connection polling loop. Once
+			// the wizard's onComplete fires, this function is invoked again
+			// and the gate falls through. Desktop and browser builds skip
+			// this branch entirely (isCapacitorRuntime is false).
+			if (isCapacitorRuntime) {
+				const hasRealServer = settingsStore.servers.some(
+					(s) =>
+						s.url &&
+						!s.url.includes("localhost") &&
+						!s.url.includes("127.0.0.1"),
+				);
+				if (!hasRealServer) {
+					showMobileWizard = true;
+					return;
+				}
+			}
+
 			for (const server of settingsStore.servers) {
 				registry.register(server);
 			}
@@ -211,6 +246,12 @@
 			if (disposed) return;
 			void loadConfigWhenReady();
 		}
+
+		// Capture the initializer so the wizard's onComplete handler can
+		// re-run it after persisting config — that re-entry path falls
+		// through the wizard gate (real server is now present) and starts
+		// the connection polling loop. Cleaned up on unmount via `disposed`.
+		runDaemonInit = initializeDaemonConnection;
 
 		void initializeDaemonConnection();
 
@@ -263,7 +304,18 @@
 	const currentView = $derived(navigationStore.current);
 </script>
 
-{#if isDesignSystemRoute}
+{#if showMobileWizard}
+	<!-- Capacitor first-launch wizard (MH4). Takes precedence over the
+	     main app shell so users can't navigate away mid-setup. Once the
+	     wizard's onComplete fires, we clear the gate and re-run daemon
+	     init so the connection store kicks off with the new URL. -->
+	<MobileSetupWizard
+		onComplete={async () => {
+			showMobileWizard = false;
+			await runDaemonInit?.();
+		}}
+	/>
+{:else if isDesignSystemRoute}
 	<DesignSystemPage />
 {:else}
 	<AppShell {layoutMode} {rightPanelOpen}>
