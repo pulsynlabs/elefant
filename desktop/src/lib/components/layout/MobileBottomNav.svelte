@@ -14,11 +14,9 @@
 	 * viewport width — well above the 44×44px minimum. Active state uses
 	 * --color-primary (Electric Indigo) per design tokens.
 	 *
-	 * Haptics: when running inside Capacitor, tab tap fires a light impact
-	 * via @capacitor/haptics. The dynamic import is wrapped in a try/catch
-	 * so it's a no-op on desktop / browser builds where the plugin isn't
-	 * present. Wave 6 will add a centralised haptics wrapper; this inline
-	 * call keeps T3.1 self-contained.
+	 * Haptics: tab taps fire a light impact via the centralised
+	 * $lib/native/haptics wrapper (MH5). On desktop / browser builds the
+	 * wrapper is a no-op — no dynamic import in this component's hot path.
 	 *
 	 * Safe area: padding-bottom uses env(safe-area-inset-bottom) so the nav
 	 * clears the home indicator on devices that report it.
@@ -32,6 +30,7 @@
 		SettingsIcon,
 		MoreHorizontalIcon,
 	} from '$lib/icons/index.js';
+	import { haptics } from '$lib/native/haptics.js';
 
 	type Props = {
 		onMoreTap?: () => void;
@@ -76,34 +75,13 @@
 
 	const isMoreActive = $derived(moreViews.includes(currentView));
 
-	/**
-	 * Fire a light haptic if running in Capacitor.
-	 *
-	 * @capacitor/haptics is installed in `mobile/` (the Capacitor wrapper)
-	 * but NOT in `desktop/` — the desktop tsconfig doesn't see it. We use a
-	 * @vite-ignore comment so Vite/Rollup doesn't try to resolve the module
-	 * at build time on desktop, and a dynamic specifier prevents TS from
-	 * doing module resolution for it. On Capacitor builds Vite resolves it
-	 * normally because the package is in scope. The try/catch ensures the
-	 * UI flow always continues even when the plugin is missing.
-	 */
-	async function lightHaptic(): Promise<void> {
-		try {
-			const moduleName = '@capacitor/haptics';
-			const mod = await import(/* @vite-ignore */ moduleName);
-			await mod.Haptics.impact({ style: mod.ImpactStyle.Light });
-		} catch {
-			/* no-op outside Capacitor */
-		}
-	}
-
 	async function handleTabTap(tabId: PrimaryTabId): Promise<void> {
-		void lightHaptic();
+		void haptics.light();
 		navigationStore.navigate(tabId);
 	}
 
 	async function handleMoreTap(): Promise<void> {
-		void lightHaptic();
+		void haptics.light();
 		onMoreTap?.();
 	}
 </script>

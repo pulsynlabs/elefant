@@ -36,6 +36,7 @@
 	import MoreNavSheet from "$lib/components/layout/MoreNavSheet.svelte";
 	import MobileSetupWizard from "./features/mobile-setup/MobileSetupWizard.svelte";
 	import { isCapacitorRuntime } from "$lib/runtime.js";
+	import { initLifecycle, cleanupLifecycle } from '$lib/native/lifecycle.js';
 
 	type NavigationRuntime = typeof navigationStore & {
 		initNavigation: (opts: { getActiveProjectId: () => string | null }) => void;
@@ -261,6 +262,11 @@
 
 		void initializeDaemonConnection();
 
+		// Wire Capacitor app-lifecycle events → WebSocket pause/resume (MH7 / MH10).
+		// Fire-and-forget: initLifecycle() is idempotent and gates on
+		// isCapacitorRuntime internally. On desktop / browser this is a no-op.
+		void initLifecycle();
+
 		// Keyboard shortcuts
 		function handleKeydown(event: KeyboardEvent): void {
 			// Close mobile drawer on Escape (highest-priority handler)
@@ -301,6 +307,7 @@
 		return () => {
 			disposed = true;
 			connectionStore.stop();
+			cleanupLifecycle();
 			window.removeEventListener("keydown", handleKeydown);
 			window.removeEventListener("resize", handleResize);
 			window.removeEventListener("hashchange", checkDesignSystemRoute);

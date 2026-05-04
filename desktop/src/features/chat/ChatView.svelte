@@ -38,6 +38,7 @@
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
 	import { rightPanelStore } from '../right-panel/index.js';
+	import { haptics } from '$lib/native/haptics.js';
 	import { isCapacitorRuntime } from '$lib/runtime.js';
 	import {
 		HugeiconsIcon,
@@ -254,6 +255,10 @@
 			// Add user message to conversation. `/btw` skips this because
 			// `enterSideContext` already appended the side-context question.
 			chatStore.addUserMessage(trimmed);
+
+			// Medium haptic on send (MH5). Fire-and-forget — the wrapper
+			// is a no-op on desktop so we don't need to gate here.
+			void haptics.medium();
 		}
 
 		// Build API messages from conversation history (user messages only, before the assistant placeholder)
@@ -311,12 +316,14 @@
 					chatStore.finalizeMessage(event.finishReason);
 					break;
 				} else if (event.type === 'error') {
+					void haptics.error();
 					chatStore.setStreamingError(`${event.code}: ${event.message}`);
 					break;
 				}
 			}
 		} catch (err) {
 			if (err instanceof Error && err.name !== 'AbortError') {
+				void haptics.error();
 				chatStore.setStreamingError(err.message);
 			} else {
 				chatStore.finalizeMessage('stop');
