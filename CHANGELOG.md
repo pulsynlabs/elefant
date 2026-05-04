@@ -4,6 +4,15 @@
 
 ### Added
 
+#### LSP Deep Integration
+
+- Agents now receive **live LSP diagnostic feedback** after every `write` or `edit` tool call. Type errors, undefined references, and other language-server diagnostics appear directly in the tool result — agents self-correct without human intervention.
+- Added **`lsp_diagnostics` tool** — agents can explicitly query all current diagnostics across the workspace, with optional `filePath` and `severity` filters (`error | warning | information | hint | all`).
+- Added **language-agnostic LSP server registry** (`src/lsp/servers.ts`) supporting 10 built-in language servers: TypeScript/JavaScript, Python (pyright + pylsp), Go (gopls), Rust (rust-analyzer), CSS, HTML, JSON, YAML, and Markdown. Servers spawn lazily and degrade gracefully when binaries are missing.
+- Added `textDocument/didChange` and `textDocument/didSave` notifications so language servers always see the file content agents just wrote, not stale disk state.
+- Added **LSP diagnostic squiggles** in the desktop diff viewer — the `EditToolCard` and `WriteToolCard` now show inline error/warning markers in CodeMirror's modified pane via `@codemirror/lint`.
+- Retired `ELEFANT_EXPERIMENTAL_LSP` feature flag — LSP is now always-on for all supported languages.
+
 #### Research Base System
 
 - Added per-project **Research Base** at `.elefant/markdown-db/` — a structured, versionable, agent-curated knowledge garden for long-form findings, comparisons, and reference notes.
