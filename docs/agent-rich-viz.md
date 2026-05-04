@@ -93,10 +93,62 @@ Prefer plain text (or a follow-up summary) when:
 - Reporting a single high-confidence result the user must read in full.
 - Synthesising findings rather than listing them.
 
-## Subagent suggest pattern
+## Subagent Suggest Pattern (MH9)
 
-Subagents (researcher, executor, etc.) cannot call `visualize`
-themselves — the tool is enforced as orchestrator-only via the agent
-toolkit allowlist. Instead, subagents emit a `<suggest-viz />` hint in
-their closing XML envelope; the orchestrator decides whether to render
-it. See Wave 5 for the parser and full pattern.
+Subagents cannot call `visualize` directly. Instead, they emit a
+`<suggest-viz>` element in their closing XML envelope:
+
+```xml
+<goop_report version="0.2.8">
+  ...
+  <suggest-viz type="stat-grid" data='{"items":[{"label":"Tests","value":42,"trend":"up"}]}' intent="Show test suite results" />
+  <handoff>...</handoff>
+</goop_report>
+```
+
+The main orchestrator reads suggestions via `parseSuggestViz(closingXml)`
+and decides whether to call `visualize`.
+
+### Orchestrator Decision Flow
+
+```typescript
+import { parseSuggestViz } from '../src/agents/suggest-viz.js';
+
+const suggestions = parseSuggestViz(subagentXml);
+for (const suggestion of suggestions) {
+  // Orchestrator decides based on context, user preferences, etc.
+  await visualizeTool.execute({
+    type: suggestion.type,
+    data: suggestion.data,
+    intent: suggestion.intent ?? 'Agent suggested visualization',
+  });
+}
+```
+
+### Suggest-viz Placement
+
+Place `<suggest-viz>` as a top-level sibling of `<handoff>` under
+`<goop_report>`:
+
+```xml
+<goop_report>
+  <status>COMPLETE</status>
+  <summary>...</summary>
+  <suggest-viz type="mermaid" data='{"src":"graph LR; A-->B"}' />
+  <handoff>...</handoff>
+</goop_report>
+```
+
+## Adding a New Viz Type
+
+1. Define the Zod schema in `src/tools/visualize/schemas.ts` (add to
+   discriminated union)
+2. Add the TypeScript type to `src/tools/visualize/types.ts`
+3. Create `desktop/src/features/chat/viz/MyNewViz.svelte` (Svelte 5
+   runes, Quire tokens)
+4. Register in `desktop/src/features/chat/viz/registry.ts`:
+   ```typescript
+   import MyNewViz from './MyNewViz.svelte';
+   registerVizRenderer('my-new-type', MyNewViz);
+   ```
+5. Add tests for any pure helpers in `*-state.ts`
