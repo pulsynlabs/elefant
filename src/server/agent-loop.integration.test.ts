@@ -6,7 +6,7 @@ import { OpenAIAdapter } from '../providers/openai.ts'
 import type { ProviderRouter } from '../providers/router.ts'
 import type { ProviderAdapter, StreamEvent } from '../providers/types.ts'
 import type { RunContext } from '../runs/types.ts'
-import type { Message, ProviderConfig } from '../types/providers.ts'
+import type { ProviderConfig } from '../types/providers.ts'
 import type { ToolDefinition } from '../types/tools.ts'
 import { ok } from '../types/result.ts'
 import { runAgentLoop, type ToolExecutor } from './agent-loop.ts'
@@ -78,7 +78,7 @@ function createDeferredFixture(runId: string) {
 			name: 'tool_search',
 			description: 'Search available tools by keyword',
 			parameters: {
-				query: { type: 'string', required: true },
+				query: { type: 'string', description: 'Search keyword', required: true },
 			},
 			execute: async () => ok('unused in integration test'),
 		},
@@ -93,7 +93,7 @@ function createDeferredFixture(runId: string) {
 			description: 'Deferred MCP git tool',
 			deferred: true,
 			parameters: {
-				repo: { type: 'string', required: false },
+				repo: { type: 'string', description: 'Repository URL', required: false },
 			},
 			execute: async () => ok('git tool ok'),
 		},
