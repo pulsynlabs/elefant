@@ -1011,7 +1011,7 @@ export const PROVIDER_REGISTRY: readonly RegistryProvider[] = [
     baseURL: "https://api.dinference.com/v1",
     format: "openai",
     envVar: ["DINFERENCE_API_KEY"],
-    iconSvg: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" class=\"lucide lucide-terminal h-5 w-5 text-primary\"><path d=\"m4 17 6-6-6-6M12 19h8\"/></svg>\n",
+    iconSvg: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" class=\"provider-icon provider-icon--terminal\"><path d=\"m4 17 6-6-6-6M12 19h8\"/></svg>\n",
     docUrl: "https://dinference.com",
     models: [
       { id: "glm-4.7", name: "GLM-4.7" },
