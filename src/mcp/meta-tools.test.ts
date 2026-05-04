@@ -43,16 +43,7 @@ function runContext(discoveredTools = new Set<string>()): RunContext {
 
 function managerReturning(matches: ToolWithMeta[]): MCPManager {
 	return {
-		searchTools: (query: string, options?: { server?: string; maxResults?: number }) => {
-			if (query.toLowerCase().startsWith('select:')) {
-				const names = query.slice('select:'.length).split(',').map((name) => name.trim());
-				return matches.filter((match) => names.includes(match.tool.name));
-			}
-
-			return matches
-				.filter((match) => !options?.server || match.serverName === options.server || match.serverId === options.server)
-				.slice(0, options?.maxResults ?? 5);
-		},
+		listAllTools: () => matches,
 	} as unknown as MCPManager;
 }
 
