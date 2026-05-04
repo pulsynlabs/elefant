@@ -7,6 +7,8 @@
 		sidebar?: Snippet;
 		topbar?: Snippet;
 		children?: Snippet;
+		rightPanel?: Snippet;
+		rightPanelOpen?: boolean;
 		layoutMode?: 'expanded' | 'collapsed' | 'mobileOverlay';
 	};
 
@@ -14,8 +16,20 @@
 		sidebar,
 		topbar,
 		children,
+		rightPanel,
+		rightPanelOpen = false,
 		layoutMode = 'expanded',
 	}: Props = $props();
+
+	// The right panel is an inline grid column on desktop only.
+	// On mobile (≤640px) the panel is rendered as a separate bottom sheet
+	// outside this shell — see SPEC MH10. We never widen the grid in
+	// mobileOverlay mode, regardless of `rightPanelOpen`, so the chat
+	// content keeps the full viewport width when a mobile sheet is open
+	// underneath.
+	const rightPanelInlineOpen = $derived(
+		rightPanelOpen && rightPanel !== undefined && layoutMode !== 'mobileOverlay',
+	);
 
 	// Pre-fetch slash commands so the completion overlay has data
 	// immediately when the user first types `/`. Without this the
@@ -31,13 +45,16 @@
 	class="app-shell"
 	class:mode-collapsed={layoutMode === 'collapsed'}
 	class:mode-mobile={layoutMode === 'mobileOverlay'}
+	class:has-right-panel={rightPanelInlineOpen}
 >
 	<!-- Sidebar — Quire md surface (bound editorial sheet, no blur) -->
 	<aside class="sidebar quire-md" aria-label="Navigation sidebar">
 		{@render sidebar?.()}
 	</aside>
 
-	<!-- Main area: topbar + content -->
+	<!-- Main area: topbar + content. Topbar deliberately lives inside the
+	     main column so it never spans across the right panel — the right
+	     panel renders its own header (added in W1.T2). -->
 	<div class="main-area">
 		<header class="topbar quire-sm" aria-label="Application toolbar">
 			{@render topbar?.()}
@@ -46,10 +63,29 @@
 			{@render children?.()}
 		</main>
 	</div>
+
+	<!-- Right panel — optional 3rd inline column. Only rendered on desktop
+	     (≥641px) and only when the consumer passes both `rightPanel` and
+	     `rightPanelOpen=true`. On mobile (≤640px) the panel is rendered
+	     as a fixed bottom sheet outside this shell (see SPEC MH10). -->
+	{#if rightPanelInlineOpen}
+		<aside
+			class="right-panel"
+			aria-label="Session panel"
+		>
+			{@render rightPanel?.()}
+		</aside>
+	{/if}
 </div>
 
 <style>
+	/* Component-scoped width for the optional right panel column. Defined
+	   here (not in tokens.css) because it's component-specific to AppShell —
+	   no other surface owns this measurement. SPEC MH9 fixes v1 at 320px,
+	   not user-resizable. */
 	.app-shell {
+		--right-panel-width: 320px;
+
 		display: grid;
 		grid-template-columns: var(--sidebar-width) 1fr;
 		grid-template-rows: 1fr;
@@ -110,6 +146,18 @@
 		   The drawer is rendered as a sibling outside this grid (in App.svelte)
 		   so it isn't clipped by the shell's overflow:hidden. */
 		grid-template-columns: 0 1fr;
+	}
+
+	/* Three-column layout — right panel inline at desktop widths. The
+	   `has-right-panel` class is only applied when layoutMode !== 'mobileOverlay'
+	   (computed in script), so this rule never fires on mobile. The
+	   transition on .app-shell animates this change smoothly. */
+	.app-shell.has-right-panel {
+		grid-template-columns: var(--sidebar-width) 1fr var(--right-panel-width);
+	}
+
+	.app-shell.has-right-panel.mode-collapsed {
+		grid-template-columns: var(--sidebar-width-collapsed) 1fr var(--right-panel-width);
 	}
 
 	/* In mobile-overlay mode the inline aside is unused (drawer takes its
@@ -193,15 +241,39 @@
 		background: transparent;
 	}
 
+	/* Right panel column — sits at column 3 / 4. Has its own internal
+	   header/footer (rendered by the consumer via the `rightPanel` snippet);
+	   AppShell is purely the layout slot. The leading hairline border
+	   matches the trailing border on .sidebar for visual symmetry. */
+	.right-panel {
+		grid-row: 1 / 2;
+		grid-column: 3 / 4;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		height: 100vh;
+		height: 100dvh;
+		position: relative;
+		z-index: var(--z-sticky);
+		background-color: var(--surface-substrate);
+		border-left: 1px solid var(--border-edge);
+	}
+
 	@media (max-width: 900px) {
-		.app-shell:not(.mode-mobile) {
+		.app-shell:not(.mode-mobile):not(.has-right-panel) {
 			grid-template-columns: var(--sidebar-width-collapsed) 1fr;
 		}
+		/* When the right panel is open in this width band the sidebar is
+		   already collapsed (see .app-shell.has-right-panel.mode-collapsed
+		   above); the main column simply takes the remaining 1fr space. */
 	}
 
 	@media (max-width: 640px) {
-		/* Force full-width content even before JS hydrates the layout mode. */
-		.app-shell {
+		/* Force full-width content even before JS hydrates the layout mode.
+		   Also overrides .has-right-panel — on mobile the panel is rendered
+		   as a separate bottom sheet (SPEC MH10), never as an inline column. */
+		.app-shell,
+		.app-shell.has-right-panel {
 			grid-template-columns: 0 1fr;
 		}
 	}

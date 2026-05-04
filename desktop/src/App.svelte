@@ -44,6 +44,13 @@
 	let drawerOpen = $state(false);
 	let isDesignSystemRoute = $state(false);
 
+	// Right session panel (SPEC MH1, MH9). The panel state + persistence
+	// store and the chat-topbar toggle land in W1.T4 / W1.T5; for now this
+	// stays `false` so AppShell renders the existing 2-column grid
+	// unchanged. Wiring this to a real store is intentionally a separate
+	// commit — keeping this task scoped to the layout contract only.
+	let rightPanelOpen = $state(false);
+
 	// Whether the user has a real (non-placeholder) provider configured.
 	// null = still waiting for daemon to respond
 	let hasConfig = $state<boolean | null>(null);
@@ -249,7 +256,7 @@
 {#if isDesignSystemRoute}
 	<DesignSystemPage />
 {:else}
-	<AppShell {layoutMode}>
+	<AppShell {layoutMode} {rightPanelOpen}>
 		{#snippet sidebar()}
 			<Sidebar collapsed={layoutMode === 'collapsed'} />
 		{/snippet}
@@ -259,6 +266,13 @@
 				<ConnectionStatus />
 				<ThemeToggle />
 			</TopBar>
+		{/snippet}
+
+		{#snippet rightPanel()}
+			<!-- Placeholder slot. The real RightPanel.svelte (tabs, footer,
+			     token bar) is built in W1.T2 and wired in subsequent tasks.
+			     Kept empty so the column has zero visible content until
+			     content is opted-in via `rightPanelOpen`. -->
 		{/snippet}
 
 		<!-- Onboarding gate: show setup flow until a real provider is configured -->
