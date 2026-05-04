@@ -18,7 +18,7 @@ import type { RunRegistry } from '../../runs/registry.js'
 import type { RunContext } from '../../runs/types.js'
 import { runAgentLoop } from '../../server/agent-loop.js'
 import { createQuestionEmitter } from '../question/emitter.js'
-import type { ToolRegistry } from '../registry.js'
+import { filterToolsForAgent, type ToolRegistry } from '../registry.js'
 import type { MetadataEmitter } from './metadata-emitter.js'
 import type { ElefantError } from '../../types/errors.js'
 import type { Message } from '../../types/providers.js'
@@ -444,9 +444,10 @@ Use agent_session_search to query the child's full message history by runId.`,
 			}
 
 			try {
+				const filteredTools = filterToolsForAgent(toolRegistry.getAll(), agentType)
 				for await (const event of runAgentLoop(providerRouter, toolRegistry, {
 					messages: initialMessages,
-					tools: toolRegistry.getAll(),
+					tools: filteredTools,
 					hookRegistry,
 					runContext: childCtx,
 					sseManager,

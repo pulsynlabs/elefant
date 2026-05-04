@@ -2,10 +2,10 @@ import { describe, expect, it } from 'bun:test'
 
 import { HookRegistry } from '../hooks/index.ts'
 import type { ToolDefinition } from '../types/tools.ts'
-import { createToolRegistry, createToolRegistryForRun, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
+import { createToolRegistry, createToolRegistryForRun, filterToolsForAgent, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all 22 tools including research_* tools', () => {
+	it('registers all 23 tools including research_* and visualize tools', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
@@ -29,11 +29,12 @@ describe('ToolRegistry', () => {
 			'todoread',
 			'todowrite',
 			'tool_list',
+			'visualize',
 			'webfetch',
 			'websearch',
 			'write',
 		])
-		expect(names.length).toBe(22)
+		expect(names.length).toBe(23)
 	})
 
 	it('execute() calls the matching tool', async () => {
@@ -487,5 +488,105 @@ describe('ToolRegistry', () => {
 		if (tool.ok) {
 			expect(tool.data.allowedAgents).toEqual(['researcher', 'writer', 'librarian'])
 		}
+	})
+
+	it('blocks non-orchestrator from calling visualize via allowedAgents', async () => {
+		const registry = new ToolRegistry(new HookRegistry())
+		registry.setCurrentAgentName('executor-medium')
+
+		registry.register({
+			name: 'visualize',
+			description: 'Render inline viz',
+			parameters: {},
+			allowedAgents: ['orchestrator'],
+			execute: async () => ({ ok: true, data: 'should not run' }),
+		})
+
+		const result = await registry.execute('visualize', {})
+		expect(result.ok).toBe(false)
+		if (!result.ok) {
+			expect(result.error.code).toBe('PERMISSION_DENIED')
+			expect(result.error.message).toContain('restricted to agents: orchestrator')
+			expect(result.error.message).toContain('called by executor-medium')
+		}
+	})
+
+	it('allows orchestrator to call visualize via allowedAgents', async () => {
+		const registry = new ToolRegistry(new HookRegistry())
+		registry.setCurrentAgentName('orchestrator')
+
+		registry.register({
+			name: 'visualize',
+			description: 'Render inline viz',
+			parameters: {},
+			allowedAgents: ['orchestrator'],
+			execute: async () => ({ ok: true, data: 'viz ok' }),
+		})
+
+		const result = await registry.execute('visualize', {})
+		expect(result.ok).toBe(true)
+		if (result.ok) {
+			expect(result.data).toBe('viz ok')
+		}
+	})
+})
+
+describe('filterToolsForAgent', () => {
+	const publicTool: ToolDefinition = {
+		name: 'public-tool',
+		description: 'Everyone can use',
+		parameters: {},
+		execute: async () => ({ ok: true, data: 'ok' }),
+	}
+
+	const restrictedTool: ToolDefinition = {
+		name: 'restricted-tool',
+		description: 'Only orchestrator',
+		parameters: {},
+		allowedAgents: ['orchestrator'],
+		execute: async () => ({ ok: true, data: 'ok' }),
+	}
+
+	const multiAgentTool: ToolDefinition = {
+		name: 'multi-agent-tool',
+		description: 'Researcher and writer',
+		parameters: {},
+		allowedAgents: ['researcher', 'writer'],
+		execute: async () => ({ ok: true, data: 'ok' }),
+	}
+
+	it('includes public tools for any agent', () => {
+		const result = filterToolsForAgent([publicTool], 'executor-medium')
+		expect(result).toHaveLength(1)
+		expect(result[0]!.name).toBe('public-tool')
+	})
+
+	it('excludes restricted tools for non-matching agent', () => {
+		const result = filterToolsForAgent([publicTool, restrictedTool], 'executor-medium')
+		expect(result).toHaveLength(1)
+		expect(result[0]!.name).toBe('public-tool')
+	})
+
+	it('includes restricted tools for matching agent', () => {
+		const result = filterToolsForAgent([publicTool, restrictedTool], 'orchestrator')
+		expect(result).toHaveLength(2)
+		expect(result.map((t) => t.name).sort()).toEqual(['public-tool', 'restricted-tool'])
+	})
+
+	it('handles multi-agent allowlists', () => {
+		expect(filterToolsForAgent([multiAgentTool], 'researcher')).toHaveLength(1)
+		expect(filterToolsForAgent([multiAgentTool], 'writer')).toHaveLength(1)
+		expect(filterToolsForAgent([multiAgentTool], 'executor-medium')).toHaveLength(0)
+	})
+
+	it('includes all tools when agentType matches no restriction but some have none', () => {
+		const allTools = [publicTool, restrictedTool, multiAgentTool]
+		// orchestrator matches restricted, but not multi-agent
+		const result = filterToolsForAgent(allTools, 'orchestrator')
+		expect(result.map((t) => t.name).sort()).toEqual(['public-tool', 'restricted-tool'])
+	})
+
+	it('returns empty array for empty input', () => {
+		expect(filterToolsForAgent([], 'orchestrator')).toEqual([])
 	})
 })

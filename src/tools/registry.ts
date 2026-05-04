@@ -370,6 +370,30 @@ export class ToolRegistry {
 }
 
 /**
+ * Filter a tool list to only include tools accessible to a given agent type.
+ *
+ * A tool is accessible when:
+ * - It has no `allowedAgents` restriction (public to all agents), OR
+ * - The agent's type is explicitly listed in `allowedAgents`.
+ *
+ * This mirrors the runtime enforcement in `ToolRegistry.execute()` (line 251–258)
+ * but operates on the static tool definitions so the LLM never sees tools it
+ * cannot call. The execute()-level check remains as a belt-and-suspenders guard.
+ */
+export function filterToolsForAgent(
+	tools: ToolDefinition[],
+	agentType: string,
+): ToolDefinition[] {
+	return tools.filter((tool) => {
+		if (!tool.allowedAgents || tool.allowedAgents.length === 0) {
+			return true
+		}
+
+		return tool.allowedAgents.includes(agentType)
+	})
+}
+
+/**
  * Resolve a project's absolute filesystem path from the daemon database.
  * Used by createToolRegistryForRun to provide projectPath to research tools.
  */
