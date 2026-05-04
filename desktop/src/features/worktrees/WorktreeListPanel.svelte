@@ -107,12 +107,16 @@
 {/if}
 
 <style>
-	.panel { display: grid; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
-	.header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }
+	.panel { display: grid; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); min-width: 0; overflow-x: hidden; }
+	.header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+	.header > div { min-width: 0; flex: 1 1 12rem; }
 	h3 { margin: 0; font-size: var(--font-size-base); }
 	p { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-xs); }
-	.header-actions { display: flex; gap: var(--space-2); }
-	button { border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); cursor: pointer; }
+	.header-actions { display: flex; gap: var(--space-2); flex: 0 0 auto; }
+	/* 44×44 touch target floor for action buttons so the panel passes the
+	   mobile audit at 390×844; spacing tokens determine the visual size at
+	   wider widths. */
+	button { border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); min-height: 44px; border: 1px solid var(--color-border); cursor: pointer; }
 	button.primary { background: var(--color-primary, #3b82f6); color: var(--color-primary-foreground, #fff); border-color: var(--color-primary, #3b82f6); }
 	button.ghost { background: transparent; color: var(--color-text-primary); }
 	button:disabled { opacity: 0.5; cursor: not-allowed; }

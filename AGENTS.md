@@ -269,3 +269,53 @@ The chat view includes a collapsible right session panel (desktop: inline 320px 
 **Token Bar (footer):** Always-visible context window usage counter (window + session cumulative). Click to open the Context Window Visualizer treemap.
 
 **Persistence:** Panel open/closed is global; active tab is per-session (localStorage / Tauri plugin-store).
+
+---
+
+## Mobile Build Pipeline
+
+Elefant has a native Android app built with Capacitor 7. The mobile app wraps
+the existing Svelte frontend with a native-feeling mobile UI layer.
+
+### Quick Start
+
+```bash
+# 1. Build the Android debug APK
+bun run mobile:build
+
+# 2. Install on a connected Android device
+bun run mobile:deploy
+
+# 3. Install and launch immediately
+./scripts/mobile-deploy.sh --launch
+```
+
+### Prerequisites
+
+- **Java 21** (JDK 21) — required by Capacitor's Android Gradle plugin
+- **Android SDK** — set `ANDROID_HOME` or `ANDROID_SDK_ROOT` env var
+- **ADB** — included with Android Platform Tools (needed for deploy)
+- **Bun** — monorepo runtime
+- **Node.js 20+** — for Capacitor CLI (`npx cap`)
+
+### Output
+
+Debug APK: `mobile/android/app/build/outputs/apk/debug/app-debug.apk`
+
+### Mobile Project Structure
+
+```
+mobile/
+├── capacitor.config.ts     ← Capacitor config (webDir: ../desktop/dist)
+├── package.json            ← Capacitor + plugin dependencies
+├── android/                ← Android native project (commit sources, not build/)
+│   ├── app/src/main/
+│   │   ├── AndroidManifest.xml
+│   │   └── res/xml/network_security_config.xml
+│   └── gradlew             ← Gradle wrapper
+└── ios/                    ← iOS scaffold (future use)
+```
+
+### Release Builds
+
+See `./scripts/mobile-release.sh` for keystore setup and signed APK build instructions.

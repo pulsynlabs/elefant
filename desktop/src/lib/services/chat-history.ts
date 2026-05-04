@@ -1,7 +1,7 @@
-// Chat history persistence via Tauri Store.
+// Chat history persistence via Tauri Store (desktop) / Capacitor Preferences (mobile).
 //
 // The /api/chat endpoint is stateless — messages are never written to
-// the daemon DB. We persist them ourselves in a local Tauri Store file,
+// the daemon DB. We persist them ourselves in a local store file,
 // keyed by sessionId. This gives us session restore without any daemon
 // changes.
 //
@@ -11,7 +11,8 @@
 // We serialize only the fields we need to reconstruct the display —
 // full ContentBlock trees are stored so tool cards re-render correctly.
 
-import { Store } from '@tauri-apps/plugin-store';
+import type { Store } from '@tauri-apps/plugin-store';
+import { isTauriRuntime } from '$lib/runtime.js';
 import type { ChatMessage, ContentBlock } from '../../features/chat/types.js';
 
 const STORE_FILE = 'chat-history.json';
@@ -29,8 +30,12 @@ interface SerializedMessage {
 
 let store: Store | null = null;
 
-async function getStore(): Promise<Store> {
-	if (!store) store = await Store.load(STORE_FILE);
+async function getStore(): Promise<Store | null> {
+	if (!isTauriRuntime) return null;
+	if (!store) {
+		const { Store } = await import('@tauri-apps/plugin-store');
+		store = await Store.load(STORE_FILE);
+	}
 	return store;
 }
 
@@ -68,6 +73,7 @@ export async function saveSessionHistory(
 ): Promise<void> {
 	try {
 		const s = await getStore();
+		if (!s) return; // non-Tauri runtime — no persistence available
 		const serialized = messages
 			.map(serialize)
 			.filter((m): m is SerializedMessage => m !== null)
@@ -86,6 +92,7 @@ export async function saveSessionHistory(
 export async function loadSessionHistory(sessionId: string): Promise<ChatMessage[]> {
 	try {
 		const s = await getStore();
+		if (!s) return []; // non-Tauri runtime — nothing to load
 		const raw = await s.get<SerializedMessage[]>(sessionId);
 		if (!Array.isArray(raw)) return [];
 		return raw.map(deserialize);

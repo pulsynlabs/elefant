@@ -7,6 +7,7 @@ import {
 	isLocalUrl,
 	serverDisplayNameFallback,
 } from '$lib/daemon/server-utils.js';
+import { isCapacitorRuntime } from '$lib/runtime.js';
 
 /**
  * True when running inside a Tauri webview; false in plain browser/serve mode.
@@ -52,10 +53,26 @@ async function getStore(): Promise<TauriStore> {
 
 async function persistServers(s: TauriStore): Promise<void> {
 	await s.set('servers', servers);
+	await persistToCapacitor('servers', servers);
 }
 
 async function persistActiveServerId(s: TauriStore): Promise<void> {
 	await s.set('activeServerId', activeServerId);
+	await persistToCapacitor('activeServerId', activeServerId);
+}
+
+/**
+ * Persist a value to Capacitor Preferences when running in Capacitor runtime.
+ * Silently no-ops on other platforms.
+ */
+async function persistToCapacitor(key: string, value: unknown): Promise<void> {
+	if (!isCapacitorRuntime) return;
+	try {
+		const { Preferences } = await import('@capacitor/preferences');
+		await Preferences.set({ key, value: JSON.stringify(value) });
+	} catch {
+		/* silent — best-effort persistence */
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -80,11 +97,6 @@ function ensureOneDefault(): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Initialises settings from the Tauri Store. Runs an idempotent one-time
- * migration so that users of the legacy `daemonUrl` preference are
- * transparently upgraded to the multi-server `servers[]` format.
- */
-/**
  * Seeds the server list from `window.location.origin` when running in
  * browser/serve mode (no Tauri runtime). The origin IS the proxy URL for the
  * daemon, so no configuration is needed — the browser already knows where it is.
@@ -105,17 +117,59 @@ function initBrowserMode(): void {
 	getDaemonClient(origin);
 }
 
+/**
+ * Initialises settings from Capacitor Preferences when running in Capacitor
+ * runtime. Uses the same key names as the Tauri Store so config migrates
+ * naturally if someone switches builds.
+ */
+async function initCapacitorMode(): Promise<void> {
+	try {
+		const { Preferences } = await import('@capacitor/preferences');
+
+		const savedServers = (await Preferences.get({ key: 'servers' })).value;
+		if (savedServers) {
+			const parsed = JSON.parse(savedServers) as ServerConfig[];
+			if (Array.isArray(parsed) && parsed.length > 0) {
+				servers = parsed;
+			}
+		}
+
+		ensureOneDefault();
+
+		const savedActiveId = (await Preferences.get({ key: 'activeServerId' })).value;
+		if (savedActiveId && servers.some((s) => s.id === savedActiveId)) {
+			activeServerId = savedActiveId;
+		} else {
+			activeServerId = servers.find((s) => s.isDefault)?.id ?? servers[0]?.id ?? null;
+		}
+
+		// Bootstrap the daemon client
+		const activeUrl = servers.find((s) => s.id === activeServerId)?.url ?? '';
+		getDaemonClient(activeUrl || DEFAULT_LOCAL_SERVER_SEED.url);
+	} catch {
+		// Fall back to browser mode seed (already applied by initBrowserMode())
+	}
+}
+
 export async function initSettings(): Promise<void> {
 	// Always seed from the page origin first so the app is never left with
-	// an empty server list. If we're in a Tauri runtime, the Tauri Store
-	// load below will overwrite this with the user's persisted preferences.
+	// an empty server list. If we're in a Tauri or Capacitor runtime, the
+	// platform-specific load below will overwrite this with the user's
+	// persisted preferences.
 	initBrowserMode();
 
-	// Non-Tauri (browser/serve mode) — browser-mode seed is all we need.
-	if (!isTauriRuntime) {
+	// Non-Tauri, non-Capacitor (browser/serve mode) — browser-mode seed is all we need.
+	if (!isTauriRuntime && !isCapacitorRuntime) {
 		return;
 	}
 
+	// Capacitor mode — load from @capacitor/preferences
+	if (isCapacitorRuntime) {
+		await initCapacitorMode();
+		return;
+	}
+
+	// Tauri mode — load from Tauri Store
 	try {
 		const s = await getStore().catch(() => null);
 		if (!s) {
@@ -237,9 +291,12 @@ export async function addServer(
 
 	servers = [...servers, server];
 
-	const s = await getStore();
-	await persistServers(s);
-	await s.save();
+	if (isTauriRuntime) {
+		const s = await getStore();
+		await persistServers(s);
+		await s.save();
+	}
+	await persistToCapacitor('servers', servers);
 }
 
 /**
@@ -268,9 +325,12 @@ export async function updateServer(
 	// Replace in-place via map to produce a new array reference
 	servers = servers.map((s) => (s.id === id ? updated : s));
 
-	const s = await getStore();
-	await persistServers(s);
-	await s.save();
+	if (isTauriRuntime) {
+		const s = await getStore();
+		await persistServers(s);
+		await s.save();
+	}
+	await persistToCapacitor('servers', servers);
 }
 
 /**
@@ -305,10 +365,14 @@ export async function removeServer(id: string): Promise<void> {
 
 	servers = newServers;
 
-	const s = await getStore();
-	await persistServers(s);
-	await persistActiveServerId(s);
-	await s.save();
+	if (isTauriRuntime) {
+		const s = await getStore();
+		await persistServers(s);
+		await persistActiveServerId(s);
+		await s.save();
+	}
+	await persistToCapacitor('servers', servers);
+	await persistToCapacitor('activeServerId', activeServerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,9 +387,12 @@ export async function setActiveServer(id: string): Promise<void> {
 
 	activeServerId = id;
 
-	const s = await getStore();
-	await persistActiveServerId(s);
-	await s.save();
+	if (isTauriRuntime) {
+		const s = await getStore();
+		await persistActiveServerId(s);
+		await s.save();
+	}
+	await persistToCapacitor('activeServerId', activeServerId);
 }
 
 /**
@@ -339,9 +406,12 @@ export async function setDefaultServer(id: string): Promise<void> {
 		isDefault: s.id === id,
 	}));
 
-	const s = await getStore();
-	await persistServers(s);
-	await s.save();
+	if (isTauriRuntime) {
+		const s = await getStore();
+		await persistServers(s);
+		await s.save();
+	}
+	await persistToCapacitor('servers', servers);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,13 +421,16 @@ export async function setDefaultServer(id: string): Promise<void> {
 export async function setAutoStartDaemon(value: boolean): Promise<void> {
 	autoStartDaemon = value;
 
-	try {
-		const s = await getStore();
-		await s.set('autoStartDaemon', value);
-		await s.save();
-	} catch {
-		// Silent
+	if (isTauriRuntime) {
+		try {
+			const s = await getStore();
+			await s.set('autoStartDaemon', value);
+			await s.save();
+		} catch {
+			// Silent
+		}
 	}
+	await persistToCapacitor('autoStartDaemon', value);
 }
 
 // ---------------------------------------------------------------------------
@@ -397,13 +470,16 @@ export async function setDaemonUrl(url: string): Promise<void> {
 	// the singleton being pre-configured.
 	getDaemonClient(url);
 
-	try {
-		const s = await getStore();
-		await persistServers(s);
-		await s.save();
-	} catch {
-		// Silent
+	if (isTauriRuntime) {
+		try {
+			const s = await getStore();
+			await persistServers(s);
+			await s.save();
+		} catch {
+			// Silent
+		}
 	}
+	await persistToCapacitor('servers', servers);
 }
 
 // ---------------------------------------------------------------------------

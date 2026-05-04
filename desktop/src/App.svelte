@@ -32,6 +32,11 @@
 	import { SpecModeView } from "./features/spec-mode/index.js";
 	import { ResearchView } from "./features/research/index.js";
 	import { RightPanel, RightPanelMobile, TokenBar, rightPanelStore } from "./features/right-panel/index.js";
+	import MobileBottomNav from "$lib/components/layout/MobileBottomNav.svelte";
+	import MoreNavSheet from "$lib/components/layout/MoreNavSheet.svelte";
+	import MobileSetupWizard from "./features/mobile-setup/MobileSetupWizard.svelte";
+	import { isCapacitorRuntime } from "$lib/runtime.js";
+	import { initLifecycle, cleanupLifecycle } from '$lib/native/lifecycle.js';
 
 	type NavigationRuntime = typeof navigationStore & {
 		initNavigation: (opts: { getActiveProjectId: () => string | null }) => void;
@@ -44,6 +49,10 @@
 	let layoutMode = $state<LayoutMode>('expanded');
 	let drawerOpen = $state(false);
 	let isDesignSystemRoute = $state(false);
+	// "More" secondary-nav sheet open state (W3.T4). Lives at the App
+	// level alongside drawerOpen so the bottom nav (a sibling of AppShell)
+	// can drive it without prop-drilling through the shell.
+	let moreSheetOpen = $state(false);
 
 	// Right session panel (SPEC MH1, MH9, MH2). Driven by the persistence
 	// store; the in-chat topbar toggle (ChatView.svelte) flips
@@ -58,6 +67,20 @@
 	// Whether the user has a real (non-placeholder) provider configured.
 	// null = still waiting for daemon to respond
 	let hasConfig = $state<boolean | null>(null);
+
+	// Mobile setup wizard gate (W4.T4 / MH4). Shown on Capacitor builds
+	// when there is no non-localhost daemon configured. Desktop and
+	// browser builds NEVER see this — `isCapacitorRuntime` is false in
+	// both cases. Gate is decided once during initializeDaemonConnection()
+	// after settingsStore.init() reads from @capacitor/preferences, so
+	// the wizard never flashes on app reopen if config already exists.
+	let showMobileWizard = $state(false);
+
+	// Captured by onMount() so the wizard's onComplete callback can
+	// re-trigger the daemon initialization after writing the user's
+	// chosen URL to Capacitor Preferences. Without this, the connection
+	// polling loop never starts and the chat surface stays empty.
+	let runDaemonInit: (() => Promise<void>) | null = null;
 
 	// Re-check config whenever the daemon connection comes up
 	$effect(() => {
@@ -180,6 +203,25 @@
 			await settingsStore.init();
 			if (disposed) return;
 
+			// Capacitor first-launch gate (W4.T4 / MH4). On Capacitor with no
+			// real (non-localhost) daemon configured, render the mobile setup
+			// wizard instead of starting the connection polling loop. Once
+			// the wizard's onComplete fires, this function is invoked again
+			// and the gate falls through. Desktop and browser builds skip
+			// this branch entirely (isCapacitorRuntime is false).
+			if (isCapacitorRuntime) {
+				const hasRealServer = settingsStore.servers.some(
+					(s) =>
+						s.url &&
+						!s.url.includes("localhost") &&
+						!s.url.includes("127.0.0.1"),
+				);
+				if (!hasRealServer) {
+					showMobileWizard = true;
+					return;
+				}
+			}
+
 			for (const server of settingsStore.servers) {
 				registry.register(server);
 			}
@@ -189,8 +231,14 @@
 				registry.setActive(activeServerId);
 			}
 
-			// Auto-start daemon if configured
-			if (settingsStore.autoStartDaemon) {
+			// Auto-start daemon if configured. Mobile (Capacitor) is
+			// remote-only per MH7 — never spawns a local daemon process —
+			// so skip this entirely on Capacitor builds even if the
+			// persisted setting somehow ended up true (e.g. config
+			// imported from a desktop install). Desktop/Tauri keeps the
+			// existing behavior: silently ignore failures so a missing
+			// daemon binary doesn't break first launch.
+			if (settingsStore.autoStartDaemon && !isCapacitorRuntime) {
 				daemonLifecycle.getDaemonStatus().then((status) => {
 					if (status !== "running") {
 						daemonLifecycle.startDaemon().catch(() => {
@@ -206,7 +254,18 @@
 			void loadConfigWhenReady();
 		}
 
+		// Capture the initializer so the wizard's onComplete handler can
+		// re-run it after persisting config — that re-entry path falls
+		// through the wizard gate (real server is now present) and starts
+		// the connection polling loop. Cleaned up on unmount via `disposed`.
+		runDaemonInit = initializeDaemonConnection;
+
 		void initializeDaemonConnection();
+
+		// Wire Capacitor app-lifecycle events → WebSocket pause/resume (MH7 / MH10).
+		// Fire-and-forget: initLifecycle() is idempotent and gates on
+		// isCapacitorRuntime internally. On desktop / browser this is a no-op.
+		void initLifecycle();
 
 		// Keyboard shortcuts
 		function handleKeydown(event: KeyboardEvent): void {
@@ -248,6 +307,7 @@
 		return () => {
 			disposed = true;
 			connectionStore.stop();
+			cleanupLifecycle();
 			window.removeEventListener("keydown", handleKeydown);
 			window.removeEventListener("resize", handleResize);
 			window.removeEventListener("hashchange", checkDesignSystemRoute);
@@ -257,7 +317,18 @@
 	const currentView = $derived(navigationStore.current);
 </script>
 
-{#if isDesignSystemRoute}
+{#if showMobileWizard}
+	<!-- Capacitor first-launch wizard (MH4). Takes precedence over the
+	     main app shell so users can't navigate away mid-setup. Once the
+	     wizard's onComplete fires, we clear the gate and re-run daemon
+	     init so the connection store kicks off with the new URL. -->
+	<MobileSetupWizard
+		onComplete={async () => {
+			showMobileWizard = false;
+			await runDaemonInit?.();
+		}}
+	/>
+{:else if isDesignSystemRoute}
 	<DesignSystemPage />
 {:else}
 	<AppShell {layoutMode} {rightPanelOpen}>
@@ -405,6 +476,20 @@
 			aria-label="Close session panel"
 			tabindex="-1"
 		></button>
+	{/if}
+
+	<!-- Mobile bottom navigation bar (W3.T2 / MH3). Sibling of AppShell so
+	     the shell's overflow:hidden doesn't clip its fixed positioning, and
+	     so its z-index is independent of the grid. Only mounted in
+	     mobileOverlay mode — desktop and tablet views (>640px) use the
+	     existing inline sidebar and never see this nav. The "More" tap
+	     opens MoreNavSheet for secondary destinations. -->
+	{#if layoutMode === 'mobileOverlay'}
+		<MobileBottomNav onMoreTap={() => { moreSheetOpen = true; }} />
+		<MoreNavSheet
+			open={moreSheetOpen}
+			onClose={() => { moreSheetOpen = false; }}
+		/>
 	{/if}
 
 	<!-- Floating tool-call approval overlay (shown when daemon requests user decision) -->

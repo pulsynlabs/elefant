@@ -24,6 +24,7 @@
 	 * itself (see `UnifiedChatInput`), so a separate header bar is
 	 * redundant and visually noisy.
 	 */
+	import { onMount } from 'svelte';
 	import { chatStore } from './chat.svelte.js';
 	import { parseSlashCommand } from './slash-parser.js';
 	import MessageList, { type GhostEntry } from './MessageList.svelte';
@@ -37,6 +38,8 @@
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import { agentRunsStore } from '$lib/stores/agent-runs.svelte.js';
 	import { rightPanelStore } from '../right-panel/index.js';
+	import { haptics } from '$lib/native/haptics.js';
+	import { isCapacitorRuntime } from '$lib/runtime.js';
 	import {
 		HugeiconsIcon,
 		PanelRightIcon,
@@ -141,6 +144,65 @@
 		requestAnimationFrame(() => { pendingInputRestore = ''; });
 	}
 
+	// --- Keyboard avoidance (W5.T1 / MH6) -------------------------------
+	//
+	// On Capacitor (Android/iOS), the soft keyboard sliding up would
+	// otherwise cover the bottom-pinned composer. We listen for the
+	// platform's `keyboardWillShow` / `keyboardWillHide` events and push
+	// the keyboard's height into a CSS custom property — the .chat-view
+	// container's padding-bottom reads that variable so both the message
+	// list and the input bar lift above the keyboard in lock-step.
+	//
+	// Desktop and plain-browser builds skip this branch entirely; the
+	// `--keyboard-offset` variable stays at its default `0px` and the
+	// existing safe-area padding on `.chat-active-input` still applies.
+	let chatRoot: HTMLDivElement | undefined = $state(undefined);
+
+	onMount(() => {
+		if (!isCapacitorRuntime) return;
+
+		// Variable specifier + /* @vite-ignore */ defeats both TS module
+		// resolution (the package lives in mobile/node_modules) and Vite's
+		// static dependency analysis. The whole branch is silent on desktop
+		// because the runtime guard above short-circuits before this runs.
+		const moduleName = '@capacitor/keyboard';
+		let showHandle: { remove: () => Promise<void> } | null = null;
+		let hideHandle: { remove: () => Promise<void> } | null = null;
+		let cancelled = false;
+
+		(async () => {
+			try {
+				const { Keyboard } = await import(/* @vite-ignore */ moduleName);
+				if (cancelled) return;
+
+				showHandle = await Keyboard.addListener(
+					'keyboardWillShow',
+					(info: { keyboardHeight: number }) => {
+						chatRoot?.style.setProperty(
+							'--keyboard-offset',
+							`${info.keyboardHeight}px`,
+						);
+					},
+				);
+
+				hideHandle = await Keyboard.addListener(
+					'keyboardWillHide',
+					() => {
+						chatRoot?.style.setProperty('--keyboard-offset', '0px');
+					},
+				);
+			} catch {
+				// Silent — keyboard plugin may be unavailable in dev/web preview.
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+			void showHandle?.remove();
+			void hideHandle?.remove();
+		};
+	});
+
 	async function handleSend(content: string): Promise<void> {
 		// Client-side slash command intercepts. These commands operate on
 		// in-memory chat state only and must NEVER reach the daemon — even
@@ -193,6 +255,10 @@
 			// Add user message to conversation. `/btw` skips this because
 			// `enterSideContext` already appended the side-context question.
 			chatStore.addUserMessage(trimmed);
+
+			// Medium haptic on send (MH5). Fire-and-forget — the wrapper
+			// is a no-op on desktop so we don't need to gate here.
+			void haptics.medium();
 		}
 
 		// Build API messages from conversation history (user messages only, before the assistant placeholder)
@@ -250,12 +316,14 @@
 					chatStore.finalizeMessage(event.finishReason);
 					break;
 				} else if (event.type === 'error') {
+					void haptics.error();
 					chatStore.setStreamingError(`${event.code}: ${event.message}`);
 					break;
 				}
 			}
 		} catch (err) {
 			if (err instanceof Error && err.name !== 'AbortError') {
+				void haptics.error();
 				chatStore.setStreamingError(err.message);
 			} else {
 				chatStore.finalizeMessage('stop');
@@ -356,7 +424,7 @@
 	}
 </script>
 
-<div class="chat-view">
+<div class="chat-view" bind:this={chatRoot}>
 	<!-- Connection status banner (always visible, top-pinned) -->
 	<ConnectionBanner />
 
@@ -481,14 +549,30 @@
 	/* ----- Root ---------------------------------------------------------
 	 * Fills the content area. The banner sits at the top (auto height),
 	 * then .chat-layers claims all remaining space via flex:1.
+	 *
+	 * `--keyboard-offset` is updated by the Capacitor keyboard listener
+	 * (see W5.T1 onMount block in script). It defaults to 0px so desktop
+	 * and browser builds — where the listener never installs — render
+	 * exactly as before. When the soft keyboard opens on mobile, this
+	 * value becomes the keyboard's logical-pixel height and the layered
+	 * sections shift up via padding-bottom in lock-step.
 	 */
 	.chat-view {
+		--keyboard-offset: 0px;
 		position: absolute;
 		inset: 0;
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
 		background-color: var(--surface-substrate);
+		padding-bottom: var(--keyboard-offset);
+		transition: padding-bottom var(--duration-fast) var(--ease-out-expo);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.chat-view {
+			transition: none;
+		}
 	}
 
 	/* ----- Layers container --------------------------------------------

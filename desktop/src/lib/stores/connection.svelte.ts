@@ -1,6 +1,7 @@
 import { registry } from '$lib/daemon/registry.js';
 import { checkServerHealth } from '$lib/daemon/health.js';
 import { settingsStore } from '$lib/stores/settings.svelte.js';
+import { isCapacitorRuntime } from '$lib/runtime.js';
 import type { ConnectionStatus } from '$lib/daemon/types.js';
 import type { ServerHealthStatus } from '$lib/types/server.js';
 
@@ -18,6 +19,7 @@ let lastError = $state<string | null>(null);
 
 let started = false;
 let _unsubscribe: (() => void) | null = null;
+let _networkHandle: { remove: () => Promise<void> } | null = null;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,11 +96,43 @@ function start(): void {
 
 	// 5. Kick off an immediate health check so the UI resolves quickly.
 	void doHealthCheck();
+
+	// 6. Mobile network-change reconnect (W5.T4 / MH7). On Capacitor,
+	//    when the device transitions WiFi → cellular or wakes from
+	//    background, fire a fresh health check so the UI reconnects
+	//    without waiting for the next poll cycle. The variable specifier
+	//    + /* @vite-ignore */ pattern keeps Vite from trying to resolve
+	//    @capacitor/network at desktop build time (the package lives in
+	//    mobile/node_modules) and the isCapacitorRuntime guard prevents
+	//    the dynamic import from running on desktop or browser builds.
+	//    A 1-second settle delay lets Android finish DNS / route updates
+	//    before we hit the daemon — without it, the first probe usually
+	//    races the network bring-up and reports a false negative.
+	if (isCapacitorRuntime) {
+		const moduleName = '@capacitor/network';
+		(async () => {
+			try {
+				const { Network } = await import(/* @vite-ignore */ moduleName);
+				_networkHandle = await Network.addListener(
+					'networkStatusChange',
+					(status: { connected: boolean }) => {
+						if (status.connected && started) {
+							setTimeout(() => void doHealthCheck(), 1000);
+						}
+					},
+				);
+			} catch {
+				// Silent — network plugin may be unavailable in dev/web preview.
+			}
+		})();
+	}
 }
 
 function stop(): void {
 	_unsubscribe?.();
 	_unsubscribe = null;
+	void _networkHandle?.remove();
+	_networkHandle = null;
 	registry.clear();
 	started = false;
 

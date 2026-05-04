@@ -70,7 +70,13 @@ async function loadApp(page: Page, timeout = 15000): Promise<void> {
 
 /** Open the mobile drawer, navigate to a view, then close the drawer.
  *  On mobile (≤640px) the drawer is a fixed overlay — we must cycle
- *  it open/closed to reach nav items. */
+ *  it open/closed to reach nav items.
+ *
+ *  Note: the bottom-nav (W3) exposes the same nav labels (Settings,
+ *  Models, etc.) as the drawer's sidebar, so a top-level
+ *  `getByRole("button", { name })` would resolve to two elements and
+ *  throw a strict-mode violation. Scope the click to the drawer
+ *  dialog so only the drawer copy is targeted. */
 async function navigateViaDrawer(page: Page, navAriaLabel: string): Promise<void> {
   // Open the drawer
   const hamburger = page.getByRole("button", { name: "Toggle sidebar" });
@@ -80,8 +86,12 @@ async function navigateViaDrawer(page: Page, navAriaLabel: string): Promise<void
   // Verify drawer is open
   await page.locator(".mobile-drawer.drawer-open").waitFor({ state: "visible", timeout: 5000 });
 
-  // Click the nav item
-  await page.getByRole("button", { name: navAriaLabel, exact: true }).click();
+  // Click the nav item — scoped to the drawer dialog so the bottom-nav
+  // copy of the same label doesn't trigger a strict-mode collision.
+  await page
+    .getByRole("dialog", { name: "Navigation" })
+    .getByRole("button", { name: navAriaLabel, exact: true })
+    .click();
   await page.waitForTimeout(400); // navigation $effect
 
   // Close the drawer via backdrop. Use force:true because Playwright's
@@ -102,7 +112,12 @@ async function isNavItemAvailable(page: Page, ariaLabel: string): Promise<boolea
   await page.waitForTimeout(400);
   await page.locator(".mobile-drawer.drawer-open").waitFor({ state: "visible", timeout: 5000 });
 
+  // Scope to the drawer dialog so this query only sees the sidebar's
+  // copy of the nav label (the bottom-nav doesn't render project-only
+  // destinations like agent-config / worktrees, but scoping is still
+  // the safer pattern and stays consistent with navigateViaDrawer above).
   const visible = await page
+    .getByRole("dialog", { name: "Navigation" })
     .getByRole("button", { name: ariaLabel, exact: true })
     .isVisible()
     .catch(() => false);

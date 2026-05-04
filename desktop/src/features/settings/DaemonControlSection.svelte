@@ -9,6 +9,7 @@
 	import { configService } from '$lib/services/config-service.js';
 	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import { HugeiconsIcon, WarningIcon } from '$lib/icons/index.js';
+	import { isCapacitorRuntime } from '$lib/runtime.js';
 
 	let daemonStatus = $state<DaemonLifecycleStatus>('unknown');
 	let isStarting = $state(false);
@@ -154,24 +155,30 @@
 		{/if}
 	</div>
 
-	<div class="auto-start-row">
-		<div class="auto-start-info">
-			<span class="auto-start-label">Auto-start on launch</span>
-			<span class="auto-start-desc"
-				>Automatically start the daemon when Elefant opens.</span
+	<!-- Auto-start toggle is desktop-only. Mobile (Capacitor) is remote-only
+	     per MH7 — there is no embedded daemon to start — so this control
+	     is hidden rather than disabled to keep the settings surface honest
+	     about what the platform actually supports. -->
+	{#if !isCapacitorRuntime}
+		<div class="auto-start-row">
+			<div class="auto-start-info">
+				<span class="auto-start-label">Auto-start on launch</span>
+				<span class="auto-start-desc"
+					>Automatically start the daemon when Elefant opens.</span
+				>
+			</div>
+			<button
+				class="toggle-switch"
+				class:enabled={autoStart}
+				onclick={handleAutoStartToggle}
+				role="switch"
+				aria-checked={autoStart}
+				aria-label="Auto-start daemon on launch"
 			>
+				<span class="toggle-thumb"></span>
+			</button>
 		</div>
-		<button
-			class="toggle-switch"
-			class:enabled={autoStart}
-			onclick={handleAutoStartToggle}
-			role="switch"
-			aria-checked={autoStart}
-			aria-label="Auto-start daemon on launch"
-		>
-			<span class="toggle-thumb"></span>
-		</button>
-	</div>
+	{/if}
 </div>
 
 <style>

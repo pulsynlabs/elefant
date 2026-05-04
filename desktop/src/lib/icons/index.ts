@@ -44,7 +44,9 @@ export { default as TerminalIcon } from '@hugeicons/core-free-icons/TerminalIcon
 export { default as EditIcon } from '@hugeicons/core-free-icons/Edit02Icon';
 export { default as DeleteIcon } from '@hugeicons/core-free-icons/Delete02Icon';
 export { default as FolderIcon } from '@hugeicons/core-free-icons/Folder01Icon';
+export { default as FolderOpenIcon } from '@hugeicons/core-free-icons/FolderOpenIcon';
 export { default as FolderAddIcon } from '@hugeicons/core-free-icons/FolderAddIcon';
+export { default as MoreHorizontalIcon } from '@hugeicons/core-free-icons/MoreHorizontalIcon';
 export { default as FlashIcon } from '@hugeicons/core-free-icons/FlashIcon';
 export { default as CommandIcon } from '@hugeicons/core-free-icons/CommandIcon';
 export { default as GithubIcon } from '@hugeicons/core-free-icons/Github01Icon';

@@ -322,6 +322,24 @@
 	   sidebar into the overlay drawer mode. Documented as a token so
 	   future @media queries can reference a single source of truth. */
 	--mobile-breakpoint: 640px;
+
+	/* === SAFE AREA (mobile native) ===
+	   Map env() values to named tokens so components can reference safe
+	   areas without spelling env(safe-area-inset-*) at every call site.
+	   On desktop / non-Capacitor browsers these resolve to 0px and have
+	   no visual effect. On Capacitor Android / iOS they reflect the
+	   device's notch / punch-hole / home-indicator insets when the
+	   viewport meta tag includes viewport-fit=cover. */
+	--safe-area-top: env(safe-area-inset-top, 0px);
+	--safe-area-bottom: env(safe-area-inset-bottom, 0px);
+	--safe-area-left: env(safe-area-inset-left, 0px);
+	--safe-area-right: env(safe-area-inset-right, 0px);
+
+	/* Bottom nav height: 56px icon row + device home-indicator inset.
+	   Used by MobileBottomNav.svelte (height) and AppShell.svelte
+	   (.mode-mobile .content padding-bottom) so content never hides
+	   behind the nav. */
+	--bottom-nav-height: calc(56px + env(safe-area-inset-bottom, 0px));
 }
 
 /* =========================================

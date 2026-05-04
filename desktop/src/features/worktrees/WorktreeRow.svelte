@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { invoke } from '@tauri-apps/api/core'
 	import { DeleteIcon, FolderIcon, HugeiconsIcon, TerminalIcon } from '$lib/icons/index.js'
+	import { isTauriRuntime } from '$lib/runtime.js';
 	import type { WorktreeSummary } from '$lib/types/worktree.js'
 
 	type Props = {
@@ -13,11 +13,15 @@
 	let { worktree, isActive = false, onSwitch, onDelete }: Props = $props()
 
 	async function openTerminal(): Promise<void> {
-		await invoke('open_terminal_at_path', { path: worktree.path })
+		if (!isTauriRuntime) return;
+		const { invoke } = await import('@tauri-apps/api/core');
+		await invoke('open_terminal_at_path', { path: worktree.path });
 	}
 
 	async function revealPath(): Promise<void> {
-		await invoke('reveal_in_file_manager', { path: worktree.path })
+		if (!isTauriRuntime) return;
+		const { invoke } = await import('@tauri-apps/api/core');
+		await invoke('reveal_in_file_manager', { path: worktree.path });
 	}
 </script>
 
