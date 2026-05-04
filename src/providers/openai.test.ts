@@ -225,10 +225,7 @@ function withMockPreconnect(mockFetch: MockFetchFunction, originalFetch: typeof 
 
 		expect(events.some((event) => event.type === 'done')).toBe(true)
 		expect(capturedBody).not.toBeNull()
-		if (!capturedBody) {
-			throw new Error('Expected request body to be captured')
-		}
-		expect((capturedBody.tools ?? []).map((entry) => entry.function?.name)).toEqual(['always_tool', 'deferred_tool'])
+		expect((capturedBody!.tools ?? []).map((entry) => entry.function?.name)).toEqual(['always_tool', 'deferred_tool'])
 	})
 
 	it('yields UsageEvent when final chunk includes usage data', async () => {
