@@ -427,3 +427,171 @@ describe('tool_search — no filters', () => {
 		expect(runContext.discoveredTools.has('mcp__github__search_repos')).toBe(true);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Skill catalog integration
+// ---------------------------------------------------------------------------
+
+import type { SkillCatalogEntry } from './index.js';
+
+/** A fake skill catalog for testing — three skills with distinct keywords. */
+const fixtureSkillCatalog: SkillCatalogEntry[] = [
+	{ name: 'video-marketing', summary: 'Plan and create video marketing scripts and content' },
+	{ name: 'p5js', summary: 'Production pipeline for interactive and generative visual art using p5.js' },
+	{ name: 'comfyui', summary: 'Generate images, video, and audio with ComfyUI' },
+];
+
+function createToolSearchWithSkills(
+	registry: ToolRegistry,
+	runContext: RunContext,
+): ReturnType<typeof createToolSearchTool> {
+	return createToolSearchTool({ registry, runContext, skillCatalog: fixtureSkillCatalog });
+}
+
+describe('tool_search — skill catalog search', () => {
+	let registry: ToolRegistry;
+	let runContext: RunContext;
+
+	beforeEach(() => {
+		registry = new ToolRegistry(new HookRegistry());
+		registerFixtureTools(registry);
+		runContext = createMockRunContext();
+	});
+
+	async function search(params: ToolSearchParams): Promise<string> {
+		const tool = createToolSearchWithSkills(registry, runContext);
+		const result = await tool.execute(params);
+		if (!result.ok) throw new Error(result.error.message);
+		return result.data;
+	}
+
+	it('returns matching skills by keyword', async () => {
+		const output = await search({ query: 'video' });
+		// 'video-marketing' and 'comfyui' both mention 'video'
+		expect(output).toContain('video-marketing');
+		expect(output).toContain('comfyui');
+		// 'p5js' does not mention 'video'
+		expect(output).not.toContain('p5js');
+	});
+
+	it('filters to only skills with category: "skill"', async () => {
+		const output = await search({ category: 'skill' });
+		expect(output).toContain('video-marketing');
+		expect(output).toContain('p5js');
+		expect(output).toContain('comfyui');
+		// No tool entries should leak in
+		expect(output).not.toContain('## read');
+		expect(output).not.toContain('mcp__');
+		expect(output).toContain('Found 3 tools in category "skill"');
+	});
+
+	it('filters skills by both query and category', async () => {
+		const output = await search({ query: 'video', category: 'skill' });
+		expect(output).toContain('video-marketing');
+		expect(output).toContain('comfyui');
+		expect(output).not.toContain('p5js');
+		// Tools matching 'video' should be excluded by category filter
+		expect(output).not.toContain('mcp__');
+	});
+
+	it('includes skill summary in output', async () => {
+		const output = await search({ query: 'p5js' });
+		expect(output).toContain('## p5js (skill)');
+		expect(output).toContain('Summary: Production pipeline for interactive and generative visual art');
+	});
+
+	it('includes invocation hint for skills', async () => {
+		const output = await search({ query: 'comfyui' });
+		expect(output).toContain("Hint: Call skill('comfyui') to load the full content");
+	});
+
+	it('does NOT add skill names to discoveredTools', async () => {
+		await search({ query: 'video', category: 'skill' });
+		expect(runContext.discoveredTools.has('video-marketing')).toBe(false);
+		expect(runContext.discoveredTools.has('comfyui')).toBe(false);
+		expect(runContext.discoveredTools.has('p5js')).toBe(false);
+	});
+
+	it('only adds actual tools (not skills) to discoveredTools in mixed results', async () => {
+		// 'edit' matches 'edit' tool AND could match skills in description
+		await search({ query: 'content' });
+		// Skills matching 'content' should NOT be in discoveredTools
+		expect(runContext.discoveredTools.has('video-marketing')).toBe(false);
+		// Actual tools should still be added
+		expect(runContext.discoveredTools.has('write')).toBe(true);
+	});
+
+	it('finds skills by exact name', async () => {
+		const output = await search({ names: ['p5js', 'video-marketing'] });
+		expect(output).toContain('## p5js (skill)');
+		expect(output).toContain('## video-marketing (skill)');
+		expect(output).toContain('Found 2 tools');
+	});
+
+	it('handles mixed exact names (tools + skills)', async () => {
+		const output = await search({ names: ['read', 'p5js'] });
+		expect(output).toContain('## read');
+		expect(output).toContain('## p5js (skill)');
+		expect(output).toContain('Found 2 tools');
+		expect(runContext.discoveredTools.has('read')).toBe(true);
+		expect(runContext.discoveredTools.has('p5js')).toBe(false);
+	});
+
+	it('returns no-match for skill query with wrong category', async () => {
+		// 'video' matches skills, but with category='builtin' no skill passes
+		const output = await search({ query: 'video', category: 'builtin' });
+		expect(output).toContain('No tools found matching your search');
+	});
+
+	it('returns skills with other categories in mixed mode (no filter)', async () => {
+		const output = await search({ query: 'video' });
+		// Should find both skills and any tools matching 'video'
+		expect(output).toContain('video-marketing');
+		expect(output).toContain('comfyui');
+	});
+
+	it('no-match message still lists skill category', async () => {
+		const output = await search({ query: 'xyznonexistent123' });
+		expect(output).toContain('builtin, mcp, skill');
+	});
+});
+
+describe('tool_search — skill catalog: empty or absent', () => {
+	it('backward compatible — absent skillCatalog produces no skill results', async () => {
+		const registry = new ToolRegistry(new HookRegistry());
+		registerFixtureTools(registry);
+		const runContext = createMockRunContext();
+		const tool = createToolSearchTool({ registry, runContext });
+
+		const result = await tool.execute({ category: 'skill' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data).toContain('No tools found matching your search');
+	});
+
+	it('empty skillCatalog produces no skill results', async () => {
+		const registry = new ToolRegistry(new HookRegistry());
+		registerFixtureTools(registry);
+		const runContext = createMockRunContext();
+		const tool = createToolSearchTool({ registry, runContext, skillCatalog: [] });
+
+		const result = await tool.execute({ category: 'skill' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data).toContain('No tools found matching your search');
+	});
+
+	it('empty skillCatalog does not affect tool-only search', async () => {
+		const registry = new ToolRegistry(new HookRegistry());
+		registerFixtureTools(registry);
+		const runContext = createMockRunContext();
+		const tool = createToolSearchTool({ registry, runContext, skillCatalog: [] });
+
+		const result = await tool.execute({ query: 'git' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data).toContain('git_status');
+		expect(result.data).toContain('git_commit');
+		expect(runContext.discoveredTools.has('git_status')).toBe(true);
+	});
+});

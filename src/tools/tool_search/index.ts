@@ -21,9 +21,16 @@ export interface ToolSearchParams {
 	limit?: number;
 }
 
+export interface SkillCatalogEntry {
+	name: string;
+	summary: string;
+}
+
 export interface ToolSearchDeps {
 	registry: ToolRegistry;
 	runContext: RunContext;
+	/** Optional skill catalog — merged into the search index under `category: 'skill'`. */
+	skillCatalog?: SkillCatalogEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +67,21 @@ function formatToolResult(tool: ToolDefinition): string {
 		'Parameters:',
 		params.length > 0 ? params : '  (none)',
 	].join('\n');
+}
+
+/**
+ * Format a skill index entry for agent-readable output.
+ * Skills don't have parameter schemas — the agent loads full content via `skill()`.
+ */
+function formatSkillResult(entry: IndexEntry): string {
+	const lines = [
+		`## ${entry.name} (skill)`,
+		`Summary: ${entry.description}`,
+	];
+	if (entry.invocationHint) {
+		lines.push(`Hint: ${entry.invocationHint}`);
+	}
+	return lines.join('\n');
 }
 
 /**
@@ -145,6 +167,19 @@ Returns full tool descriptions for matched tools.`,
 				category: inferCategory(tool.name),
 			}));
 
+			// Merge skill catalog entries under category: 'skill'.
+			// Skills are not registered tools — they're loaded via the `skill()` tool.
+			if (deps.skillCatalog) {
+				for (const skill of deps.skillCatalog) {
+					entries.push({
+						name: skill.name,
+						description: skill.summary,
+						category: 'skill',
+						invocationHint: `Call skill('${skill.name}') to load the full content`,
+					});
+				}
+			}
+
 			const index = buildToolIndex(entries);
 			const results = searchIndex(index, {
 				query: params.query,
@@ -153,20 +188,26 @@ Returns full tool descriptions for matched tools.`,
 				limit: params.limit,
 			});
 
-			// Always write matched names into the discovery set so the agent
+			// Write matched tool names into the discovery set so the agent
 			// loop can promote their schemas on the next turn.
+			// Skills are NOT added — they're loaded via the `skill()` tool separately.
 			for (const entry of results) {
-				deps.runContext.discoveredTools.add(entry.name);
+				if (entry.category !== 'skill') {
+					deps.runContext.discoveredTools.add(entry.name);
+				}
 			}
 
 			if (results.length === 0) {
 				return ok(noMatchMessage(entries.length));
 			}
 
-			// Resolve each index entry back to the full ToolDefinition so we
-			// can emit parameter details.  Index entries only carry name +
-			// description — the full schema lives in the registry.
+			// Resolve each index entry to a formatted result.
+			// Skills use their own format (name + summary + invocation hint);
+			// tools are resolved from the registry for full parameter details.
 			const descriptions = results.map((entry) => {
+				if (entry.category === 'skill') {
+					return formatSkillResult(entry);
+				}
 				const tool = allTools.find((t) => t.name === entry.name);
 				if (tool) {
 					return formatToolResult(tool);

@@ -33,7 +33,7 @@ export { questionTool, type QuestionParams, type Question, type QuestionOption }
 export { skillTool, createSkillTool, initializeSkillTool, type SkillParams } from './skill/index.js';
 export { lspTool, type LspParams, type LspOperation } from './lsp/index.js';
 export { createToolListTool, type ToolListParams } from './tool_list/index.js';
-export { createToolSearchTool, type ToolSearchParams, type ToolSearchDeps } from './tool_search/index.js';
+export { createToolSearchTool, type ToolSearchParams, type ToolSearchDeps, type SkillCatalogEntry } from './tool_search/index.js';
 
 // Task and agent_session_search tools (per-run registry only)
 export { createTaskTool, type TaskParams, type TaskToolDeps, DEFAULT_MAX_CHILDREN } from './task/index.js';
