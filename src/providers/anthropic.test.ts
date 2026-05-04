@@ -167,6 +167,45 @@ describe('AnthropicAdapter', () => {
 		})
 	})
 
+	it('serializes exactly the tools provided without deferred filtering logic', async () => {
+		let capturedBody = ''
+		globalThis.fetch = withMockPreconnect(
+			async (_input, init) => {
+				capturedBody = typeof init?.body === 'string' ? init.body : ''
+				return createSseResponse(['event: message_stop\ndata: {}\n\n'])
+			},
+			originalFetch,
+		)
+
+		const adapter = new AnthropicCompatibleAdapter(ANTHROPIC_CONFIG)
+		const tools: ToolDefinition[] = [
+			{
+				name: 'always_tool',
+				description: 'Always tool',
+				parameters: {},
+				alwaysLoad: true,
+				execute: async () => ok('ok'),
+			},
+			{
+				name: 'deferred_tool',
+				description: 'Deferred tool',
+				parameters: {},
+				deferred: true,
+				execute: async () => ok('ok'),
+			},
+		]
+
+		for await (const _event of adapter.sendMessage([{ role: 'user', content: 'hello' }], tools)) {
+			// exhaust stream
+		}
+
+		const parsed = JSON.parse(capturedBody) as {
+			tools: Array<{ name: string }>
+		}
+
+		expect(parsed.tools.map((tool) => tool.name)).toEqual(['always_tool', 'deferred_tool'])
+	})
+
 	it('emits typed error when provider returns non-2xx', async () => {
 		globalThis.fetch = withMockPreconnect(
 			async () => new Response('invalid key', { status: 403 }),
