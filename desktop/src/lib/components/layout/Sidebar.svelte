@@ -35,7 +35,6 @@
 	import {
 		HugeiconsIcon,
 		SettingsIcon,
-		ModelsIcon,
 		AboutIcon,
 		AgentsIcon,
 		RunsIcon,
@@ -50,10 +49,8 @@
 	import type { IconSvgElement } from '$lib/icons/index.js';
 	import ProjectAvatar from '../../../features/projects/ProjectAvatar.svelte';
 	import SidebarProjectRow from './SidebarProjectRow.svelte';
-	import NewSessionDialog from '../../../features/chat/mode-picker/NewSessionDialog.svelte';
 	import {
 		getLastMode,
-		setLastMode,
 	} from '../../../features/chat/mode-picker/last-mode.js';
 	import type { SessionMode } from '../../../features/chat/mode-picker/mode-picker-state.js';
 	import {
@@ -68,9 +65,10 @@
 
 	type Props = {
 		collapsed?: boolean;
+		onOpenNewSession?: (project: Project, defaultMode: SessionMode) => void;
 	};
 
-	let { collapsed = false }: Props = $props();
+	let { collapsed = false, onOpenNewSession }: Props = $props();
 
 	const logoSrc = $derived(
 		themeStore.isDark ? '/elefant-dark.png' : '/elefant-light.png',
@@ -80,11 +78,7 @@
 	// is expanded iff its id maps to `true` here.
 	let expandedProjectIds = $state<Record<string, boolean>>({});
 
-	// New-session dialog state. `pendingProject` doubles as the visibility
-	// flag — when non-null, the dialog is mounted for that project.
-	let pendingProject = $state<Project | null>(null);
-	let pendingDefaultMode = $state<SessionMode>('quick');
-	let isCreatingSession = $state(false);
+
 
 	// Derived: the list of runs in the active session. Used to find the
 	// session's root run (the ancestor of `currentChildRunId`) so we can
@@ -166,7 +160,6 @@
 
 	type NavItemId =
 		| 'settings'
-		| 'models'
 		| 'about'
 		| 'agent-config'
 		| 'agent-runs'
@@ -192,7 +185,6 @@
 	/* Nav items that are always available — independent of project state */
 	const globalNavItems: BottomNavItem[] = [
 		{ id: 'settings', label: 'Settings', icon: SettingsIcon },
-		{ id: 'models', label: 'Models', icon: ModelsIcon },
 		{ id: 'about', label: 'About', icon: AboutIcon },
 	];
 
@@ -225,50 +217,8 @@
 	}
 
 	function openNewSessionDialog(project: Project): void {
-		// Pre-select the user's most recent mode for this project so the
-		// dialog defaults to their personal preference rather than the
-		// global fallback. First-time users get the spec-defined default.
-		pendingDefaultMode = getLastMode(project.id);
-		pendingProject = project;
-		isCreatingSession = false;
-	}
-
-	function closeNewSessionDialog(): void {
-		pendingProject = null;
-		isCreatingSession = false;
-	}
-
-	async function confirmNewSession(mode: SessionMode): Promise<void> {
-		const project = pendingProject;
-		if (!project || isCreatingSession) return;
-		isCreatingSession = true;
-
-		// Ensure the newly-created session lands under the correct active
-		// project, then navigate into chat.
-		if (projectsStore.activeProjectId !== project.id) {
-			await projectsStore.selectProject(project.id);
-		}
-
-		try {
-			await projectsStore.createSession(project.id, { mode });
-			// Persist the chosen mode so the next dialog opens on the same
-			// preference. Done after a successful create so a failed POST
-			// doesn't poison the next attempt.
-			setLastMode(project.id, mode);
-			// Clear chat so the new session starts with an empty message list.
-			clearConversation();
-			// Make sure the project row is expanded so the user sees the new
-			// session appear at the top of the list.
-			if (expandedProjectIds[project.id] !== true) {
-				expandedProjectIds = { ...expandedProjectIds, [project.id]: true };
-			}
-			navigationStore.navigate('chat');
-			closeNewSessionDialog();
-		} catch {
-			// Errors are surfaced via projectsStore.lastError. Keep the
-			// dialog open so the user can retry or cancel.
-			isCreatingSession = false;
-		}
+		const defaultMode = getLastMode(project.id);
+		onOpenNewSession?.(project, defaultMode);
 	}
 
 	// Collapsed-mode avatar click: select the project and open chat. We do not
@@ -405,16 +355,6 @@
 		{/each}
 	</ul>
 </nav>
-
-{#if pendingProject}
-	<NewSessionDialog
-		projectName={pendingProject.name}
-		defaultMode={pendingDefaultMode}
-		isCreating={isCreatingSession}
-		onCreate={confirmNewSession}
-		onCancel={closeNewSessionDialog}
-	/>
-{/if}
 
 <style>
 	/* ── Sidebar nav shell ────────────────────────────────────────── */
