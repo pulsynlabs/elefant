@@ -181,6 +181,71 @@
 		</div>
 	{/if}
 
+	{#if showQuickAdd}
+		<ProviderQuickAdd
+			onSelect={handleQuickAddSelect}
+		/>
+	{/if}
+
+	{#if showForm}
+		{@const editTemplate = editingProvider
+			? (registryMap.get(editingProvider.name.toLowerCase()) ?? undefined)
+			: selectedTemplate}
+		<ProviderForm
+			provider={editingProvider}
+			template={editTemplate}
+			mode={editTemplate ? 'quick-add' : 'manual'}
+			onSave={handleSave}
+			onCancel={handleCancelForm}
+		/>
+	{/if}
+
+	{#if providers.length === 0 && !showForm && !showQuickAdd}
+		<div class="empty-providers">
+			<p class="empty-text">No providers configured.</p>
+			<p class="empty-hint">Add an OpenAI-compatible or Anthropic provider to get started.</p>
+		</div>
+	{:else if providers.length > 0}
+		<ul class="provider-list" role="list">
+			{#each providers as provider (provider.name)}
+				{#if editingProvider?.name !== provider.name}
+				{@const iconSvg = lookupIcon(provider.name)}
+				<li class="provider-item">
+					<div class="provider-info">
+						<span
+							class="provider-icon"
+							class:provider-icon-fallback={!iconSvg}
+							aria-hidden="true"
+						>
+							{@html iconSvg || FALLBACK_SVG}
+						</span>
+						<span class="provider-name">{provider.name}</span>
+					</div>
+					<div class="provider-details">
+						<span class="provider-url">{provider.baseURL}</span>
+					</div>
+					<div class="provider-actions">
+						<button
+							class="btn-action"
+							onclick={() => handleEdit(provider)}
+							aria-label={`Edit ${provider.name}`}
+						>
+							Edit
+						</button>
+						<button
+							class="btn-action danger"
+							onclick={() => handleDelete(provider.name)}
+							aria-label={`Delete ${provider.name}`}
+						>
+							Delete
+						</button>
+					</div>
+				</li>
+				{/if}
+			{/each}
+		</ul>
+	{/if}
+
 	<section class="override-card" aria-labelledby="visualize-override-heading">
 		<div class="override-header">
 			<div>
@@ -239,79 +304,6 @@
 			</button>
 		</div>
 	</section>
-
-	{#if showQuickAdd}
-		<ProviderQuickAdd
-			onSelect={handleQuickAddSelect}
-		/>
-	{/if}
-
-	{#if showForm}
-		<ProviderForm
-			provider={editingProvider}
-			template={editingProvider ? undefined : selectedTemplate}
-			mode={selectedTemplate && !editingProvider ? 'quick-add' : 'manual'}
-			onSave={handleSave}
-			onCancel={handleCancelForm}
-		/>
-	{/if}
-
-	{#if providers.length === 0 && !showForm && !showQuickAdd}
-		<div class="empty-providers">
-			<p class="empty-text">No providers configured.</p>
-			<p class="empty-hint">Add an OpenAI-compatible or Anthropic provider to get started.</p>
-		</div>
-	{:else if providers.length > 0}
-		<ul class="provider-list" role="list">
-			{#each providers as provider (provider.name)}
-				{@const iconSvg = lookupIcon(provider.name)}
-				<li class="provider-item">
-					<div class="provider-info">
-						<span
-							class="provider-icon"
-							class:provider-icon-fallback={!iconSvg}
-							aria-hidden="true"
-						>
-							{@html iconSvg || FALLBACK_SVG}
-						</span>
-						<span class="provider-name">{provider.name}</span>
-						<span
-							class="provider-badge"
-							class:openai={provider.format === 'openai'}
-							class:anthropic={provider.format === 'anthropic'}
-							class:anthropic-compatible={provider.format === 'anthropic-compatible'}
-						>
-							{provider.format === 'openai'
-								? 'OpenAI'
-								: provider.format === 'anthropic'
-									? 'Anthropic'
-									: 'Anthropic-compat'}
-						</span>
-					</div>
-					<div class="provider-details">
-						<span class="provider-model">{provider.model}</span>
-						<span class="provider-url">{provider.baseURL}</span>
-					</div>
-					<div class="provider-actions">
-						<button
-							class="btn-action"
-							onclick={() => handleEdit(provider)}
-							aria-label={`Edit ${provider.name}`}
-						>
-							Edit
-						</button>
-						<button
-							class="btn-action danger"
-							onclick={() => handleDelete(provider.name)}
-							aria-label={`Delete ${provider.name}`}
-						>
-							Delete
-						</button>
-					</div>
-				</li>
-			{/each}
-		</ul>
-	{/if}
 </div>
 
 <style>
@@ -599,44 +591,12 @@
 		font-size: var(--font-size-md);
 	}
 
-	.provider-badge {
-		font-size: var(--font-size-xs);
-		padding: 2px 6px;
-		border-radius: var(--radius-full);
-		font-weight: var(--font-weight-medium);
-		white-space: nowrap;
-	}
-
-	.provider-badge.openai {
-		background-color: color-mix(in oklch, var(--color-info) 12%, transparent);
-		color: var(--color-info);
-		border: 1px solid color-mix(in oklch, var(--color-info) 25%, transparent);
-	}
-
-	.provider-badge.anthropic {
-		background-color: color-mix(in oklch, var(--color-warning) 12%, transparent);
-		color: var(--color-warning);
-		border: 1px solid color-mix(in oklch, var(--color-warning) 25%, transparent);
-	}
-
-	.provider-badge.anthropic-compatible {
-		background-color: color-mix(in oklch, var(--color-primary) 12%, transparent);
-		color: var(--color-primary);
-		border: 1px solid color-mix(in oklch, var(--color-primary) 25%, transparent);
-	}
-
 	.provider-details {
 		flex: 1;
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 		min-width: 0;
-	}
-
-	.provider-model {
-		font-family: var(--font-mono);
-		font-size: var(--font-size-sm);
-		color: var(--color-text-primary);
 	}
 
 	.provider-url {
