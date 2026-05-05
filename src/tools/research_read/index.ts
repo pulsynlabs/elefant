@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import type { ToolDefinition } from '../../types/tools.js';
 import type { ElefantError } from '../../types/errors.js';
 import { ok, err, type Result } from '../../types/result.js';
-import { researchBaseDir } from '../../project/paths.js';
+import { fieldNotesDir } from '../../project/paths.js';
 import { assertInsideResearchBase } from '../../research/membership.js';
 import {
   parseFrontmatter,
@@ -248,7 +248,7 @@ export function createResearchReadTool(
       }
 
       // ── 3. Resolve absolute path and validate membership ──
-      const baseDir = researchBaseDir(projectPath);
+      const baseDir = fieldNotesDir(projectPath);
       const absolutePath = join(baseDir, resolvedRelPath);
 
       const membershipResult = assertInsideResearchBase(

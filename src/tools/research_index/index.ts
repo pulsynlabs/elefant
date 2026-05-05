@@ -2,7 +2,7 @@
  * research_index — list/browse the Research Base by section, tag, or recency.
  *
  * Supports two output formats:
- *   - `tree` — grouped by section, ordered by RESEARCH_SECTIONS
+ *   - `tree` — grouped by section, ordered by FIELD_NOTES_SECTIONS
  *   - `flat` — sorted by last-updated descending
  *
  * Filters (section, tag, recencyDays) are applied in that order, with `limit`
@@ -14,7 +14,7 @@ import type { ElefantError } from '../../types/errors.js';
 import type { Result } from '../../types/result.js';
 import { ok, err } from '../../types/result.js';
 import type { DocumentRow } from '../../research/store.js';
-import { RESEARCH_SECTIONS } from '../../project/paths.js';
+import { FIELD_NOTES_SECTIONS } from '../../project/paths.js';
 import { serializeResearchLink } from '../../research/link.js';
 
 // ─── Parameters ─────────────────────────────────────────────────────────────
@@ -142,9 +142,9 @@ function filterByRecency(
 // ─── Output builders ────────────────────────────────────────────────────────
 
 function buildTree(docs: DocumentRow[], limit: number): TreeOutput {
-	// Collect section docs preserving RESEARCH_SECTIONS order
+	// Collect section docs preserving FIELD_NOTES_SECTIONS order
 	const sectionMap = new Map<string, DocumentRow[]>();
-	for (const section of RESEARCH_SECTIONS) {
+	for (const section of FIELD_NOTES_SECTIONS) {
 		sectionMap.set(section, []);
 	}
 	for (const doc of docs) {
@@ -153,7 +153,7 @@ function buildTree(docs: DocumentRow[], limit: number): TreeOutput {
 	}
 
 	const sections: TreeSection[] = [];
-	for (const section of RESEARCH_SECTIONS) {
+	for (const section of FIELD_NOTES_SECTIONS) {
 		const sectionDocs = sectionMap.get(section)!;
 		if (sectionDocs.length === 0) continue;
 
@@ -270,7 +270,7 @@ export function createResearchIndexTool(
 			if (
 				section !== undefined &&
 				section !== '' &&
-				!RESEARCH_SECTIONS.includes(section)
+				!FIELD_NOTES_SECTIONS.includes(section)
 			) {
 				if (output === 'tree') {
 					return ok(

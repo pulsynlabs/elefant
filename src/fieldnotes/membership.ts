@@ -7,7 +7,7 @@
 
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { realpathSync } from 'node:fs';
-import { researchBaseDir } from '../project/paths.js';
+import { fieldNotesDir } from '../project/paths.js';
 import { ok, err } from '../types/result.js';
 import type { Result } from '../types/result.js';
 import type { ElefantError } from '../types/errors.js';
@@ -28,7 +28,7 @@ export function assertInsideFieldNotes(
     });
   }
 
-  const baseResolved = resolve(researchBaseDir(projectPath));
+  const baseResolved = resolve(fieldNotesDir(projectPath));
 
   // resolve(projectPath, candidate) handles both absolute and relative inputs
   const candidateResolved = resolve(projectPath, candidate);

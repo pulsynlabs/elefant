@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import type { ElefantError } from '../types/errors.ts';
 import { ok, type Result } from '../types/result.ts';
-import { researchBaseDir } from '../project/paths.ts';
+import { fieldNotesDir } from '../project/paths.ts';
 import { assertInsideFieldNotes } from './membership.ts';
 import { parseFrontmatter, type Frontmatter } from './frontmatter.ts';
 import { chunkMarkdown, type Chunk } from './chunker.ts';
@@ -70,7 +70,7 @@ function hashBody(body: string): string {
 }
 
 function toFieldNotesRelativePath(projectPath: string, filePath: string): string {
-  return relative(researchBaseDir(projectPath), filePath).split(sep).join('/');
+  return relative(fieldNotesDir(projectPath), filePath).split(sep).join('/');
 }
 
 function isSectionRootIndexFile(relativePath: string): boolean {
@@ -87,7 +87,7 @@ function shouldSkipRelative(relativePath: string): boolean {
 }
 
 function walkMarkdownFiles(projectPath: string): string[] {
-  const base = researchBaseDir(projectPath);
+  const base = fieldNotesDir(projectPath);
   if (!existsSync(base)) return [];
 
   const files: string[] = [];

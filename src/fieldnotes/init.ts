@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { RESEARCH_SECTIONS, researchBaseDir } from '../project/paths.js';
+import { FIELD_NOTES_SECTIONS, fieldNotesDir } from '../project/paths.js';
 import { err, ok, type Result } from '../types/result.js';
 import type { ElefantError } from '../types/errors.js';
 import { assertInsideFieldNotes } from './membership.js';
@@ -37,14 +37,14 @@ export function ensureFieldNotes(projectPath: string): Result<{ created: string[
   const created: string[] = [];
   const existed: string[] = [];
   try {
-    const base = researchBaseDir(projectPath);
+    const base = fieldNotesDir(projectPath);
     if (existsSync(base)) existed.push(base);
     else { mkdirSync(base, { recursive: true }); created.push(base); }
 
     writeIfMissing(join(base, 'README.md'), '# Field Notes\n\nProject-local markdown knowledge garden.\n\n<!-- managed-by: writer-agent -->\n', created, existed);
     writeIfMissing(join(base, 'INDEX.md'), '# Field Notes Index\n\nGenerated index of Field Notes documents.\n\n<!-- managed-by: writer-agent -->\n', created, existed);
 
-    for (const section of RESEARCH_SECTIONS) {
+    for (const section of FIELD_NOTES_SECTIONS) {
       const dir = join(base, section);
       if (existsSync(dir)) existed.push(dir);
       else { mkdirSync(dir, { recursive: true }); created.push(dir); }

@@ -12,7 +12,7 @@ import {
   type Frontmatter,
 } from '../../research/frontmatter.ts';
 import { serializeResearchLink } from '../../research/link.ts';
-import { RESEARCH_SECTIONS, researchBaseDir } from '../../project/paths.ts';
+import { FIELD_NOTES_SECTIONS, fieldNotesDir } from '../../project/paths.ts';
 import type { RunContext } from '../../runs/types.ts';
 import type { ElefantError } from '../../types/errors.ts';
 import { err, ok, type Result } from '../../types/result.ts';
@@ -112,7 +112,7 @@ function validateConfidence(value: string | undefined): Result<Confidence, Elefa
 }
 
 function isKnownSection(section: string): section is Frontmatter['section'] {
-  return (RESEARCH_SECTIONS as readonly string[]).includes(section);
+  return (FIELD_NOTES_SECTIONS as readonly string[]).includes(section);
 }
 
 function pathSection(relativePath: string): string {
@@ -126,14 +126,14 @@ function isScratchPath(relativePath: string): boolean {
 function validateSection(params: ResearchWriteParams, scratch: boolean): Result<Frontmatter['section'], ElefantError> {
   const section = params.section ?? (scratch ? '99-scratch' : undefined);
   if (!section) return err(validationError('section is required outside 99-scratch/'));
-  if (!isKnownSection(section)) return err(validationError(`section must be one of ${RESEARCH_SECTIONS.join(', ')}; got ${section}`));
+  if (!isKnownSection(section)) return err(validationError(`section must be one of ${FIELD_NOTES_SECTIONS.join(', ')}; got ${section}`));
   return ok(section);
 }
 
 function validatePathMatchesSection(relativePath: string, section: Frontmatter['section']): Result<void, ElefantError> {
   const firstSegment = pathSection(relativePath);
   if (!isKnownSection(firstSegment)) {
-    return err(validationError(`path must start with one of ${RESEARCH_SECTIONS.join(', ')}; got ${firstSegment}`));
+    return err(validationError(`path must start with one of ${FIELD_NOTES_SECTIONS.join(', ')}; got ${firstSegment}`));
   }
   if (firstSegment !== section) {
     return err(validationError(`path section (${firstSegment}) must match frontmatter section (${section})`));
@@ -142,7 +142,7 @@ function validatePathMatchesSection(relativePath: string, section: Frontmatter['
 }
 
 function researchRelativePath(projectPath: string, absolutePath: string): string {
-  return relative(researchBaseDir(projectPath), absolutePath).split(sep).join('/');
+  return relative(fieldNotesDir(projectPath), absolutePath).split(sep).join('/');
 }
 
 async function existingFrontmatter(absolutePath: string): Promise<Frontmatter | null> {
@@ -217,7 +217,7 @@ export async function executeResearchWrite(
     const ensure = ensureResearchBase(projectPath);
     if (!ensure.ok) return err(ensure.error);
 
-    const absoluteCandidate = join(researchBaseDir(projectPath), relativePath.data);
+    const absoluteCandidate = join(fieldNotesDir(projectPath), relativePath.data);
     const membership = assertInsideResearchBase(projectPath, absoluteCandidate, { requireMarkdown: true });
     if (!membership.ok) return err(membership.error);
 
@@ -284,7 +284,7 @@ export function createResearchWriteTool(deps: ResearchWriteDeps = {}): ToolDefin
         path: { type: 'string' },
         title: { type: 'string' },
         summary: { type: 'string' },
-        section: { type: 'string', enum: RESEARCH_SECTIONS },
+        section: { type: 'string', enum: FIELD_NOTES_SECTIONS },
         body: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' }, default: [] },
         sources: { type: 'array', items: { type: 'string' }, default: [] },

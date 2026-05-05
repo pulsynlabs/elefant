@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import { mkdirSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { z } from 'zod';
-import { researchIndexPath } from '../project/paths.js';
+import { fieldNotesIndexPath } from '../project/paths.js';
 import { err, ok, type Result } from '../types/result.js';
 import type { ElefantError } from '../types/errors.js';
 import { ConfidenceSchema, SectionSchema, AuthorAgentSchema, type Frontmatter } from './frontmatter.js';
@@ -229,7 +229,7 @@ export class FieldNotesStore {
 
   static open(projectPath: string): Result<FieldNotesStore, ElefantError> {
     try {
-      const path = researchIndexPath(projectPath);
+      const path = fieldNotesIndexPath(projectPath);
       mkdirSync(dirname(path), { recursive: true });
       const db = new Database(path, { create: true });
       db.exec(INIT_SQL);

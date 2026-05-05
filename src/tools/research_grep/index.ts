@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 
 import { executeBinary, getRipgrepPath } from '../binary.js';
-import { researchBaseDir } from '../../project/paths.js';
+import { fieldNotesDir } from '../../project/paths.js';
 import { assertInsideResearchBase } from '../../research/membership.js';
 import { parseFrontmatter } from '../../research/frontmatter.js';
 import { serializeResearchLink } from '../../research/link.js';
@@ -145,7 +145,7 @@ export const researchGrepTool: ToolDefinition<ResearchGrepParams, string> = {
 
 		// ── Resolve and validate search path ──
 
-		const base = researchBaseDir(projectPath);
+		const base = fieldNotesDir(projectPath);
 		const searchRoot = section ? join(base, section) : base;
 
 		// The base directory itself passes by definition; section

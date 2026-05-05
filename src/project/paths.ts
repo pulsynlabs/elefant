@@ -26,13 +26,13 @@ export const memoryDir = (projectPath: string): string =>
 export const pluginsDir = (projectPath: string): string =>
   join(elefantDir(projectPath), 'plugins');
 
-export const researchBaseDir = (projectPath: string): string =>
-  join(elefantDir(projectPath), 'markdown-db');
+export const fieldNotesDir = (projectPath: string): string =>
+  join(elefantDir(projectPath), 'field-notes');
 
-export const researchIndexPath = (projectPath: string): string =>
-  join(elefantDir(projectPath), 'research-index.sqlite');
+export const fieldNotesIndexPath = (projectPath: string): string =>
+  join(elefantDir(projectPath), 'field-notes-index.sqlite');
 
-export const RESEARCH_SECTIONS: readonly string[] = [
+export const FIELD_NOTES_SECTIONS: readonly string[] = [
   '00-index',
   '01-domain',
   '02-tech',
@@ -43,5 +43,5 @@ export const RESEARCH_SECTIONS: readonly string[] = [
   '99-scratch',
 ] as const;
 
-export const researchSectionDirs = (projectPath: string): string[] =>
-  RESEARCH_SECTIONS.map((s) => join(researchBaseDir(projectPath), s));
+export const fieldNotesSectionDirs = (projectPath: string): string[] =>
+  FIELD_NOTES_SECTIONS.map((s) => join(fieldNotesDir(projectPath), s));

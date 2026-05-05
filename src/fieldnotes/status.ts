@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { researchIndexPath, researchBaseDir } from '../project/paths.js';
+import { fieldNotesIndexPath, fieldNotesDir } from '../project/paths.js';
 import { ok, err, type Result } from '../types/result.js';
 import type { ElefantError } from '../types/errors.js';
 import type { FieldNotesStore } from './store.js';
@@ -126,7 +126,7 @@ export async function getFieldNotesStatus(opts: {
     const { projectPath, projectId, store, provider, hardware } = opts;
 
     // Check if index exists
-    const indexPath = researchIndexPath(projectPath);
+    const indexPath = fieldNotesIndexPath(projectPath);
     const indexExists = existsSync(indexPath);
 
     // Get store metrics
@@ -140,7 +140,7 @@ export async function getFieldNotesStatus(opts: {
     // Calculate drift
     let driftCount = 0;
     if (lastIndexedAt !== null) {
-      const markdownDir = researchBaseDir(projectPath);
+      const markdownDir = fieldNotesDir(projectPath);
       const { files, exceeded } = collectMarkdownFiles(markdownDir, DRIFT_SCAN_MAX_FILES);
       
       if (exceeded) {

@@ -1,6 +1,6 @@
 import { existsSync, watch, type FSWatcher } from 'node:fs';
 import { resolve } from 'node:path';
-import { researchBaseDir } from '../project/paths.ts';
+import { fieldNotesDir } from '../project/paths.ts';
 import { watcherLog } from './log.ts';
 
 export interface WatcherOptions {
@@ -23,7 +23,7 @@ export class FieldNotesWatcher {
   start(): void {
     if (this.watcher !== null) return;
     this.stopped = false;
-    const base = researchBaseDir(this.opts.projectPath);
+    const base = fieldNotesDir(this.opts.projectPath);
     watcherLog.info('watcher started', { dir: base, debounceMs: this.debounceMs });
     this.watcher = watch(base, { recursive: true }, (eventType, filename) => {
       if (this.stopped || !filename) return;

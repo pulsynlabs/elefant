@@ -5,7 +5,7 @@ import type { Elysia } from 'elysia';
 
 import type { Database } from '../db/database.ts';
 import { getProjectById } from '../db/repo/projects.ts';
-import { RESEARCH_SECTIONS, researchBaseDir } from '../project/paths.ts';
+import { FIELD_NOTES_SECTIONS, fieldNotesDir } from '../project/paths.ts';
 import { assertInsideResearchBase } from '../research/membership.ts';
 import { parseFrontmatter, type Frontmatter } from '../research/frontmatter.ts';
 import { serializeResearchLink } from '../research/link.ts';
@@ -103,11 +103,11 @@ function projectContext(db: Database, projectId: string): { status: number; body
 }
 
 function researchRelativePath(projectPath: string, absolutePath: string): string {
-  return relative(researchBaseDir(projectPath), absolutePath).split(sep).join('/');
+  return relative(fieldNotesDir(projectPath), absolutePath).split(sep).join('/');
 }
 
 function resolveResearchPath(projectPath: string, relativePath: string): { status: number; body?: unknown; absolutePath?: string; relativePath?: string } {
-  const absoluteCandidate = resolve(researchBaseDir(projectPath), relativePath);
+  const absoluteCandidate = resolve(fieldNotesDir(projectPath), relativePath);
   const membership = assertInsideResearchBase(projectPath, absoluteCandidate, { requireMarkdown: true });
   if (!membership.ok) {
     const status = mapErrorStatus(membership.error.code);
@@ -167,15 +167,15 @@ function isTreeMarkdownFile(name: string): boolean {
 }
 
 function buildResearchTree(projectPath: string): { sections: ResearchTreeSection[]; lastRefreshed: string } {
-  const base = researchBaseDir(projectPath);
-  const sectionSet = new Set(RESEARCH_SECTIONS);
+  const base = fieldNotesDir(projectPath);
+  const sectionSet = new Set(FIELD_NOTES_SECTIONS);
   const presentSections = existsSync(base)
     ? readdirSync(base, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
     : [];
 
   const sections = presentSections
     .filter((section) => sectionSet.has(section))
-    .sort((left, right) => RESEARCH_SECTIONS.indexOf(left) - RESEARCH_SECTIONS.indexOf(right))
+    .sort((left, right) => FIELD_NOTES_SECTIONS.indexOf(left) - FIELD_NOTES_SECTIONS.indexOf(right))
     .map((section): ResearchTreeSection => {
       const sectionDir = join(base, section);
       const files = readdirSync(sectionDir, { withFileTypes: true })
