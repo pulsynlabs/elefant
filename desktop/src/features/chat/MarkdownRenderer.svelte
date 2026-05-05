@@ -26,17 +26,17 @@ the throttle for a synchronous first paint.
 	import { onDestroy, untrack } from 'svelte';
 	import SvelteMarkdown, { buildUnsupportedHTML } from '@humanspeak/svelte-markdown';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
-	import ResearchChip from './ResearchChip.svelte';
+	import FieldNotesChip from './FieldNotesChip.svelte';
 	import { sanitizeUrl } from './url-sanitizer.js';
 	import { splitAtOpenFence } from './markdown-stream.js';
 	import {
-		autoLinkResearchRefs,
-		RESEARCH_LINK_REGEX,
+		autoLinkFieldNotesRefs,
+		FIELD_NOTES_LINK_REGEX,
 	} from './markdown-autolinker.js';
 
 	// Reusable single-match regex (the global one above mutates lastIndex
 	// so it can't be used directly inside the link-snippet predicate).
-	const RESEARCH_LINK_TEST = new RegExp(RESEARCH_LINK_REGEX.source);
+	const FIELD_NOTES_LINK_TEST = new RegExp(FIELD_NOTES_LINK_REGEX.source);
 
 	type Props = {
 		source: string;
@@ -58,15 +58,15 @@ the throttle for a synchronous first paint.
 	// trailing unclosed fence is rendered as plain <pre> until it closes.
 	const split = $derived(splitAtOpenFence(displayedSource));
 
-	// Pre-process the markdown source so bare research:// URIs become
+	// Pre-process the markdown source so bare fieldnotes:// URIs become
 	// real anchors that the link snippet can intercept and replace with
-	// a ResearchChip. Skipped for the partial trailing chunk because
+	// a FieldNotesChip. Skipped for the partial trailing chunk because
 	// streamed text might split a URI mid-character.
-	const linkedMarkdown = $derived(autoLinkResearchRefs(split.markdown));
+	const linkedMarkdown = $derived(autoLinkFieldNotesRefs(split.markdown));
 
-	function isResearchHref(href: string | undefined | null): boolean {
+	function isFieldNotesHref(href: string | undefined | null): boolean {
 		if (!href) return false;
-		return RESEARCH_LINK_TEST.test(href);
+		return FIELD_NOTES_LINK_TEST.test(href);
 	}
 
 	function extractText(value: unknown): string {
@@ -172,16 +172,16 @@ the throttle for a synchronous first paint.
 		{/snippet}
 
 		{#snippet link({ href, title, children, text })}
-			{#if isResearchHref(href)}
+			{#if isFieldNotesHref(href)}
 				<!--
-					Research chips intercept the normal anchor render
+					Field-notes chips intercept the normal anchor render
 					path. The visible label may either be the URI itself
 					(autolinked case) or an explicit `[label](uri)` from
-					the agent. We pass either through to ResearchChip so
+					the agent. We pass either through to FieldNotesChip so
 					it can prefer the label and fall back to a fetched
 					title.
 				-->
-				<ResearchChip uri={href!} label={extractText(text) || undefined} />
+				<FieldNotesChip uri={href!} label={extractText(text) || undefined} />
 			{:else}
 				<a
 					href={sanitize(href ?? '')}

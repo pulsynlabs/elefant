@@ -1,0 +1,30 @@
+[
+  {
+    "path": "02-tech/opencode-analysis.md",
+    "section": "02-tech",
+    "title": "OpenCode Analysis",
+    "summary": "Deep dive into OpenCode architecture",
+    "score": 0.95,
+    "snippet": "The <mark>plugin</mark> system uses hook-based architecture allowing extensions to intercept agent behavior...",
+    "frontmatter": {
+      "title": "OpenCode Analysis",
+      "tags": ["opencode", "architecture"],
+      "confidence": "high"
+    },
+    "fieldnotes_link": "fieldnotes://project-1/02-tech/opencode-analysis.md"
+  },
+  {
+    "path": "02-tech/goopspec-research.md",
+    "section": "02-tech",
+    "title": "GoopSpec Research",
+    "summary": "GoopSpec plugin architecture analysis",
+    "score": 0.87,
+    "snippet": "GoopSpec enforces behavioral constraints via permission hooks and context injection...",
+    "frontmatter": {
+      "title": "GoopSpec Research",
+      "tags": ["goopspec", "plugin"],
+      "confidence": "medium"
+    },
+    "fieldnotes_link": "fieldnotes://project-1/02-tech/goopspec-research.md"
+  }
+]

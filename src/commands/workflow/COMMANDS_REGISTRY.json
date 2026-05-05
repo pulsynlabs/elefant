@@ -10,7 +10,7 @@
   { "name": "pause", "trigger": "/pause", "description": "Save checkpoint and pause. Generates HANDOFF.md.", "category": "spec-mode" },
   { "name": "resume", "trigger": "/resume", "description": "Resume from last checkpoint.", "category": "spec-mode" },
   { "name": "quick", "trigger": "/quick", "description": "Fast-track a small task. Runs full pipeline in lazy autopilot.", "category": "spec-mode", "args": "<task description>" },
-  { "name": "research", "trigger": "/research", "description": "Dispatch researcher agent on a specific topic.", "category": "spec-mode", "args": "<topic>" },
+  { "name": "fieldnotes", "trigger": "/fieldnotes", "description": "Dispatch researcher agent on a specific topic.", "category": "spec-mode", "args": "<topic>" },
   { "name": "debug", "trigger": "/debug", "description": "Dispatch debugger with scientific debugging workflow.", "category": "spec-mode" },
   { "name": "map-codebase", "trigger": "/map-codebase", "description": "Dispatch explorer to map codebase and build knowledge base.", "category": "spec-mode" },
   { "name": "pr-review", "trigger": "/pr-review", "description": "Review a GitHub PR end-to-end with fix options.", "category": "spec-mode", "args": "<pr-url>" },

@@ -91,16 +91,16 @@ describe('visualize tool', () => {
 
 	it('renders research-card happy path', async () => {
 		const envelope = await executeSuccess({
-			type: 'research-card',
+			type: 'field-notes-card',
 			data: {
 				cards: [{ title: 'Finding', summary: 'A concise result', url: 'https://example.com', confidence: 0.9, tags: ['ai'] }],
 			},
 			intent: 'Show research results',
 		})
 
-		expect(envelope.type).toBe('research-card')
+		expect(envelope.type).toBe('field-notes-card')
 		expect(envelope.data).toEqual({
-			type: 'research-card',
+			type: 'field-notes-card',
 			cards: [{ title: 'Finding', summary: 'A concise result', url: 'https://example.com', confidence: 0.9, tags: ['ai'] }],
 		})
 	})
@@ -151,7 +151,7 @@ describe('visualize tool', () => {
 	})
 
 	it('rejects invalid research-card data', async () => {
-		await executeInvalid({ type: 'research-card', data: { wrongField: 123 }, intent: 'Test' }, 'research-card')
+		await executeInvalid({ type: 'field-notes-card', data: { wrongField: 123 }, intent: 'Test' }, 'field-notes-card')
 	})
 
 	it('rejects invalid loading data', async () => {

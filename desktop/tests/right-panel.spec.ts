@@ -21,7 +21,7 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { installCommonMocks, loadAppShell } from "./helpers/research-mocks";
+import { installCommonMocks, loadAppShell } from "./helpers/field-notes-mocks";
 
 const DESKTOP = { width: 1280, height: 800 };
 

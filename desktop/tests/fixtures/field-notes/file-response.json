@@ -1,0 +1,19 @@
+{
+  "path": "02-tech/opencode-analysis.md",
+  "frontmatter": {
+    "id": "opencode-analysis",
+    "title": "OpenCode Analysis",
+    "section": "02-tech",
+    "tags": ["opencode", "architecture", "agent"],
+    "sources": ["https://github.com/anomalyco/opencode"],
+    "confidence": "high",
+    "created": "2026-05-01T10:00:00Z",
+    "updated": "2026-05-02T14:30:00Z",
+    "author_agent": "researcher",
+    "workflow": "feat-field-notes",
+    "summary": "Deep dive into the OpenCode architecture, plugin system, and Effect-TS service composition."
+  },
+  "html": "<h1 id=\"opencode-analysis\" class=\"research-heading\">OpenCode Analysis</h1><p>This document explores the OpenCode architecture in detail.</p><h2 id=\"plugin-system\" class=\"research-heading\">Plugin System</h2><p>OpenCode uses a hook-based plugin architecture that allows extensions to intercept and modify agent behavior at key points.</p><h3 id=\"hook-types\" class=\"research-heading\">Hook Types</h3><p>The system supports several hook types including <code>chat.message</code>, <code>tool.execute.before</code>, and <code>tool.execute.after</code>.</p><h2 id=\"effect-ts\" class=\"research-heading\">Effect-TS Service Composition</h2><p>The core services are composed using Effect-TS, providing type-safe dependency injection and error handling.</p><h3 id=\"layer-pattern\" class=\"research-heading\">Layer Pattern</h3><p>Services are defined as Layers that can be composed and torn down dynamically.</p><h2 id=\"conclusions\" class=\"research-heading\">Conclusions</h2><p>The architecture demonstrates a clean separation of concerns with well-defined extension points.</p>",
+  "rawBody": "# OpenCode Analysis\n\nThis document explores the OpenCode architecture in detail.\n\n## Plugin System\n\nOpenCode uses a hook-based plugin architecture...\n\n### Hook Types\n\nThe system supports several hook types...\n\n## Effect-TS Service Composition\n\nThe core services are composed using Effect-TS...\n\n### Layer Pattern\n\nServices are defined as Layers...\n\n## Conclusions\n\nThe architecture demonstrates...",
+  "fieldnotes_link": "fieldnotes://project-1/02-tech/opencode-analysis.md"
+}

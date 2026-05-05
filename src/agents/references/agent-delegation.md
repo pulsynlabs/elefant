@@ -77,7 +77,7 @@ Choose the correct executor tier based on task complexity:
 |-----------|-------------|-----------------|
 | **planner** | Creating or revising SPEC.md and BLUEPRINT.md | Wave decomposition, task scoping, executor tier assignment, dependency analysis |
 | **researcher** | Investigating technology choices, library comparisons, domain research | Multi-source analysis, tradeoff documentation, recommendation with evidence |
-| **writer** | Authoring documentation, references, changelogs | Following markdown conventions, audience-targeted writing, Research Base publishing |
+| **writer** | Authoring documentation, references, changelogs | Following markdown conventions, audience-targeted writing, Field Notes publishing |
 | **verifier** | Auditing implementation against spec | Spec traceability checking, acceptance criteria verification, gap analysis |
 | **debugger** | Root cause analysis of bugs | Hypothesis formation, experiment design, minimal reproduction |
 | **explorer** | Mapping unfamiliar codebases | Pattern discovery, convention extraction, integration point identification |

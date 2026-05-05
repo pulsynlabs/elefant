@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EmbeddingProviderNameSchema } from "../research/embeddings/provider.ts";
+import { EmbeddingProviderNameSchema } from "../fieldnotes/embeddings/provider.ts";
 
 const providerSchema = z.object({
 	name: z.string().min(1),
@@ -109,18 +109,18 @@ const registryConfigSchema = z.discriminatedUnion('type', [
 	}),
 ]);
 
-const researchProviderConfigSchema = z.object({
+const fieldNotesProviderConfigSchema = z.object({
 	baseUrl: z.string().optional(),
 	apiKey: z.string().optional(),
 	model: z.string().optional(),
 	bundledModelId: z.string().optional(),
 }).strict();
 
-const researchConfigSchema = z.object({
+const fieldNotesConfigSchema = z.object({
 	enabled: z.boolean().default(true),
 	provider: EmbeddingProviderNameSchema.default('bundled-cpu'),
 	editorOverride: z.string().optional(),
-	providerConfig: researchProviderConfigSchema.optional(),
+	providerConfig: fieldNotesProviderConfigSchema.optional(),
 }).strict();
 
 const visualizeModelOverrideSchema = z.object({
@@ -169,7 +169,7 @@ const configSchema = z.object({
 		registries: BUNDLED_REGISTRIES,
 		cacheTtlHours: 24,
 	}),
-	research: researchConfigSchema.optional().default({
+	research: fieldNotesConfigSchema.optional().default({
 		enabled: true,
 		provider: 'bundled-cpu',
 	}),
@@ -227,8 +227,8 @@ export {
 	mcpRemoteConfigSchema,
 	registryConfigSchema,
 	skillsConfigSchema,
-	researchProviderConfigSchema,
-	researchConfigSchema,
+	fieldNotesProviderConfigSchema,
+	fieldNotesConfigSchema,
 	visualizeModelOverrideSchema,
 	agentsMdConfigSchema,
 	BUNDLED_REGISTRIES,
@@ -246,7 +246,7 @@ export type McpStdioConfig = z.infer<typeof mcpStdioConfigSchema>;
 export type McpRemoteConfig = z.infer<typeof mcpRemoteConfigSchema>;
 export type RegistryConfig = z.infer<typeof registryConfigSchema>;
 export type SkillsConfig = z.infer<typeof skillsConfigSchema>;
-export type ResearchProviderConfig = z.infer<typeof researchProviderConfigSchema>;
-export type ResearchConfig = z.infer<typeof researchConfigSchema>;
+export type FieldNotesProviderConfig = z.infer<typeof fieldNotesProviderConfigSchema>;
+export type FieldNotesConfig = z.infer<typeof fieldNotesConfigSchema>;
 export type VisualizeModelOverride = z.infer<typeof visualizeModelOverrideSchema>;
 export type AgentsMdConfig = z.infer<typeof agentsMdConfigSchema>;

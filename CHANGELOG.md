@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- **Field Notes rebrand**: The Research Base subsystem has been renamed to **Field Notes** across the entire codebase.
+  - Agent tools: `research_search`, `research_grep`, `research_read`, `research_write`, `research_index` → `field_notes_search`, `field_notes_grep`, `field_notes_read`, `field_notes_write`, `field_notes_index`
+  - URI scheme: `research://` → `fieldnotes://`
+  - HTTP API: `/v1/research/*` → `/v1/fieldnotes/*`
+  - On-disk path: `.elefant/markdown-db/` → `.elefant/field-notes/`, `research-index.sqlite` → `field-notes-index.sqlite`
+  - UI: "Research" sidebar label → "Field Notes"; settings tab → "Field Notes"
+  - Agent reference files renamed: `research-base-workflow.md` → `field-notes-workflow.md`, etc.
+
 ### Added
 
 #### LSP Deep Integration

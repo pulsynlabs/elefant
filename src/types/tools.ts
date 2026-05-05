@@ -19,7 +19,7 @@ export interface ToolDefinition<TParams = unknown, TResult = string> {
    * before the tool's own execute() runs.
    *
    * Tools that handle their own permission checks internally (e.g.
-   * research_write) SHOULD also set this field as a belt-and-suspenders
+   * field_notes_write) SHOULD also set this field as a belt-and-suspenders
    * guard at the registry boundary.
    */
   allowedAgents?: string[];

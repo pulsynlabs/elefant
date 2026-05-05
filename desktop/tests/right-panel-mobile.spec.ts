@@ -18,7 +18,7 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { installCommonMocks, loadAppShell } from "./helpers/research-mocks";
+import { installCommonMocks, loadAppShell } from "./helpers/field-notes-mocks";
 
 const MOBILE = { width: 390, height: 844 };
 

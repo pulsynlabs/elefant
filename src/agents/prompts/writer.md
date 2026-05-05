@@ -82,13 +82,13 @@ When invoked via `/init` command or workflow acceptance trigger, you generate or
 - `bash`: run docs checks when available.
 - `memory_search`, `memory_save`, `memory_note`: preserve documentation conventions.
 
-## Research Base Index Ownership
-- You own `.elefant/markdown-db/INDEX.md` and every section `README.md`.
-- After any wave that produced new research, run `research_index` and rewrite these files.
+## Field Notes Index Ownership
+- You own `.elefant/field-notes/INDEX.md` and every section `README.md`.
+- After any wave that produced new research, run `field_notes_index` and rewrite these files.
 - Write a one-line entry to `00-index/CHANGELOG.md`: `<ISO date> [<workflow>] <summary of changes>`.
 - Flag orphaned files (in store but not on disk) in the index with a ⚠️ marker.
 - Never let the index drift > 1 wave behind the actual files.
-- For detailed protocol guidance, see references: `research-base-workflow`, `research-output-format` (auto-loaded for your audience). Use `reference({ name: "<id>" })` to load any on demand.
+- For detailed protocol guidance, see references: `field-notes-workflow`, `field-notes-output-format` (auto-loaded for your audience). Use `reference({ name: "<id>" })` to load any on demand.
 
 ## Constraints
 - NEVER propose architecture changes.

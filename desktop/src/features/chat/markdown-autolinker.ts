@@ -1,14 +1,14 @@
 /**
- * Markdown autolinker — rewrites bare research:// URIs and
- * `.elefant/markdown-db/**\/*.md` paths inside chat output into chip
+ * Markdown autolinker — rewrites bare fieldnotes:// URIs and
+ * `.elefant/field-notes/**\/*.md` paths inside chat output into chip
  * placeholders that the renderer post-processes into clickable
- * `ResearchChip` markup.
+ * `FieldNotesChip` markup.
  *
  * Two stages, deliberately split so each is unit-testable in Bun
  * without a DOM:
  *
- *   1. {@link autoLinkResearchRefs} runs BEFORE markdown parsing.
- *      It walks the raw source text, finds research links that are
+ *   1. {@link autoLinkFieldNotesRefs} runs BEFORE markdown parsing.
+ *      It walks the raw source text, finds field-notes links that are
  *      NOT already inside a markdown link `[text](url)` or fenced /
  *      inline code block, and wraps each match in an inline anchor of
  *      the shape `[<uri>](<uri>)`. The library then renders these as
@@ -19,13 +19,13 @@
  *      lets the markdown parser handle escaping, fence detection, and
  *      link-title parsing for us, instead of us hand-rolling all three.
  *
- *   2. {@link injectResearchChips} runs AFTER markdown→HTML rendering
+ *   2. {@link injectFieldNotesChips} runs AFTER markdown→HTML rendering
  *      (used by paths that operate on rendered HTML rather than tokens,
  *      e.g. SSR or the future `MessageBody` integration). It finds the
- *      anchor tags whose href matches a research link and rewrites them
- *      into `<a class="research-chip">` markup carrying the URI on a
- *      `data-research-uri` attribute. A separate mount step turns those
- *      into live `ResearchChip` instances.
+ *      anchor tags whose href matches a field-notes link and rewrites
+ *      them into `<a class="field-notes-chip">` markup carrying the URI
+ *      on a `data-field-notes-uri` attribute. A separate mount step
+ *      turns those into live `FieldNotesChip` instances.
  *
  * Keeping the two stages independent means the chat MarkdownRenderer
  * (which uses Svelte snippets, not raw HTML) can wire stage 1 alone and
@@ -33,29 +33,29 @@
  */
 
 /**
- * Regex matching `research://workflow/path[#anchor]` URIs and
- * `.elefant/markdown-db/<path>[#anchor]` relative paths.
+ * Regex matching `fieldnotes://workflow/path[#anchor]` URIs and
+ * `.elefant/field-notes/<path>[#anchor]` relative paths.
  *
- * Inlined verbatim from `src/research/link.ts` (RESEARCH_LINK_REGEX) so
- * the desktop bundle does not have to cross the daemon's package
+ * Inlined verbatim from `src/fieldnotes/link.ts` (FIELD_NOTES_LINK_REGEX)
+ * so the desktop bundle does not have to cross the daemon's package
  * boundary at build time. If the upstream regex tightens, mirror the
  * change here and bump the round-trip test in this file.
  */
-export const RESEARCH_LINK_REGEX =
-	/(?:research:\/\/(?:[a-zA-Z0-9][a-zA-Z0-9_-]*|_)\/[^\s#)\]}"']+\.md(?:#[^\s)\]}"'.]+)?|\.elefant\/markdown-db\/[^\s#)\]}"']+\.md(?:#[^\s)\]}"'.]+)?)/g;
+export const FIELD_NOTES_LINK_REGEX =
+	/(?:fieldnotes:\/\/(?:[a-zA-Z0-9][a-zA-Z0-9_-]*|_)\/[^\s#)\]}"']+\.md(?:#[^\s)\]}"'.]+)?|\.elefant\/field-notes\/[^\s#)\]}"']+\.md(?:#[^\s)\]}"'.]+)?)/g;
 
 /**
  * A non-global clone for single-match operations (`.test`, `.match`).
  * Sharing a global regex across calls breaks because of `lastIndex`.
  */
-const SINGLE_MATCH_REGEX = new RegExp(RESEARCH_LINK_REGEX.source);
+const SINGLE_MATCH_REGEX = new RegExp(FIELD_NOTES_LINK_REGEX.source);
 
 /**
- * Test whether a string contains at least one research link. Useful as
- * a fast-path skip before running the full autolinker on a large
+ * Test whether a string contains at least one field-notes link. Useful
+ * as a fast-path skip before running the full autolinker on a large
  * message body.
  */
-export function containsResearchLink(text: string): boolean {
+export function containsFieldNotesLink(text: string): boolean {
 	return SINGLE_MATCH_REGEX.test(text);
 }
 
@@ -106,17 +106,17 @@ function isInsideRange(index: number, ranges: Array<[number, number]>): boolean 
 }
 
 /**
- * Wrap every bare research link in the markdown source with
+ * Wrap every bare field-notes link in the markdown source with
  * `[<uri>](<uri>)` so the markdown renderer turns it into a real
  * anchor tag. Anchors that already exist (because the agent wrote
- * `[label](research://...)`) are left untouched.
+ * `[label](fieldnotes://...)`) are left untouched.
  *
- * Returns the rewritten source. The `RESEARCH_LINK_REGEX.lastIndex`
+ * Returns the rewritten source. The `FIELD_NOTES_LINK_REGEX.lastIndex`
  * mutation is contained inside this function — callers may pass the
  * exported regex without copying it.
  */
-export function autoLinkResearchRefs(source: string): string {
-	if (!source || !containsResearchLink(source)) return source;
+export function autoLinkFieldNotesRefs(source: string): string {
+	if (!source || !containsFieldNotesLink(source)) return source;
 
 	const protectedRanges = findProtectedRanges(source);
 
@@ -126,7 +126,7 @@ export function autoLinkResearchRefs(source: string): string {
 	// Use `matchAll` against a fresh regex iterator to keep this
 	// function reentrant — running it twice on the same input must
 	// produce the same output.
-	const matches = Array.from(source.matchAll(RESEARCH_LINK_REGEX));
+	const matches = Array.from(source.matchAll(FIELD_NOTES_LINK_REGEX));
 	for (const match of matches) {
 		const start = match.index ?? -1;
 		if (start < 0) continue;
@@ -143,20 +143,20 @@ export function autoLinkResearchRefs(source: string): string {
 
 /**
  * Post-process rendered HTML, replacing every anchor whose `href` is a
- * research link with a chip placeholder that the mount step can
- * upgrade into a live `ResearchChip` instance.
+ * field-notes link with a chip placeholder that the mount step can
+ * upgrade into a live `FieldNotesChip` instance.
  *
  * The placeholder is itself a real `<a>` so it remains accessible /
  * keyboard-focusable even before the upgrade runs (or in environments
  * where the upgrade is skipped, e.g. server-rendered previews).
  *
- * The `data-research-uri` attribute carries the original URI verbatim.
+ * The `data-field-notes-uri` attribute carries the original URI verbatim.
  */
-export function injectResearchChips(html: string): string {
+export function injectFieldNotesChips(html: string): string {
 	if (!html) return html;
 
 	// Match anchors of the form <a href="...">label</a> where the href
-	// is a research link. We deliberately accept either single or
+	// is a field-notes link. We deliberately accept either single or
 	// double quotes; svelte-markdown emits double quotes today.
 	const anchorRe = /<a([^>]*?)href=(['"])([^'"]+)\2([^>]*?)>([^<]*)<\/a>/g;
 
@@ -172,7 +172,7 @@ export function injectResearchChips(html: string): string {
 			.replace(/\s+rel=(['"])[^'"]*\1/g, '')
 			.trim();
 		const attrSep = cleanedAttrs ? ` ${cleanedAttrs}` : '';
-		return `<a class="research-chip" href="#"${attrSep} data-research-uri="${escapedHref}" role="link">${escapedLabel}</a>`;
+		return `<a class="field-notes-chip" href="#"${attrSep} data-field-notes-uri="${escapedHref}" role="link">${escapedLabel}</a>`;
 	});
 }
 

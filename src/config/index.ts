@@ -13,8 +13,8 @@ export {
 	mcpRemoteConfigSchema,
 	registryConfigSchema,
 	skillsConfigSchema,
-	researchConfigSchema,
-	researchProviderConfigSchema,
+	fieldNotesConfigSchema,
+	fieldNotesProviderConfigSchema,
 	BUNDLED_REGISTRIES,
 } from './schema.ts';
 export type {
@@ -31,8 +31,8 @@ export type {
 	McpRemoteConfig,
 	RegistryConfig,
 	SkillsConfig,
-	ResearchConfig,
-	ResearchProviderConfig,
+	FieldNotesConfig,
+	FieldNotesProviderConfig,
 } from './schema.ts';
 export {
 	ConfigManager,

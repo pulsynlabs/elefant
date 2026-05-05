@@ -73,15 +73,15 @@ export const fixtures: BenchmarkFixture[] = [
 **AI21** offers the jamba-1.5-large model with a 256K context window. Pricing is $2 per million input tokens and $8 per million output tokens.`
   },
   {
-    name: 'research-card (4 cards)',
+    name: 'field-notes-card (4 cards)',
     vizCall: {
-      type: 'research-card',
+      type: 'field-notes-card',
       data: {
         cards: [
-          { title: 'OpenCode Architecture', summary: 'Effect-TS service composition with plugin hooks.', url: 'research://02-tech/opencode', confidence: 0.9, tags: ['opencode', 'effect-ts', 'plugins'] },
-          { title: 'GoopSpec Workflow', summary: 'Spec-driven development via behavioral hooks.', url: 'research://02-harness/goopspec', confidence: 0.85, tags: ['goopspec', 'spec-driven'] },
-          { title: 'Pi Extension API', summary: 'Minimal runtime with JSONL session tree.', url: 'research://02-harness/pi', confidence: 0.75, tags: ['pi', 'extension-api'] },
-          { title: 'Claude Code Hooks', summary: 'Permission model with sub-agent system.', url: 'research://02-tech/claude-code', confidence: 0.8, tags: ['claude', 'hooks', 'agents'] }
+          { title: 'OpenCode Architecture', summary: 'Effect-TS service composition with plugin hooks.', url: 'fieldnotes://02-tech/opencode', confidence: 0.9, tags: ['opencode', 'effect-ts', 'plugins'] },
+          { title: 'GoopSpec Workflow', summary: 'Spec-driven development via behavioral hooks.', url: 'fieldnotes://02-harness/goopspec', confidence: 0.85, tags: ['goopspec', 'spec-driven'] },
+          { title: 'Pi Extension API', summary: 'Minimal runtime with JSONL session tree.', url: 'fieldnotes://02-harness/pi', confidence: 0.75, tags: ['pi', 'extension-api'] },
+          { title: 'Claude Code Hooks', summary: 'Permission model with sub-agent system.', url: 'fieldnotes://02-tech/claude-code', confidence: 0.8, tags: ['claude', 'hooks', 'agents'] }
         ]
       },
       intent: 'Show research findings'
@@ -89,16 +89,16 @@ export const fixtures: BenchmarkFixture[] = [
     markdownEquiv: `### Research Findings on Agent Platforms
 
 **OpenCode Architecture** (confidence level: high, approximately 90%)
-This research finding covers OpenCode's architecture which uses Effect-TS service composition with plugin hooks for lifecycle management. The implementation demonstrates how functional programming patterns can be applied to agent runtime design. Relevant tags include: opencode, effect-ts, plugins. Source reference: research://02-tech/opencode
+This research finding covers OpenCode's architecture which uses Effect-TS service composition with plugin hooks for lifecycle management. The implementation demonstrates how functional programming patterns can be applied to agent runtime design. Relevant tags include: opencode, effect-ts, plugins. Source reference: fieldnotes://02-tech/opencode
 
 **GoopSpec Workflow** (confidence level: high, approximately 85%)
-This research finding covers GoopSpec's workflow which enforces spec-driven development via behavioral hooks and markdown state files. The system provides a structured approach to agent task management with clear contracts. Relevant tags include: goopspec, spec-driven. Source reference: research://02-harness/goopspec
+This research finding covers GoopSpec's workflow which enforces spec-driven development via behavioral hooks and markdown state files. The system provides a structured approach to agent task management with clear contracts. Relevant tags include: goopspec, spec-driven. Source reference: fieldnotes://02-harness/goopspec
 
 **Pi Extension API** (confidence level: medium, approximately 75%)
-This research finding covers Pi's extension API which keeps the runtime minimal with JSONL session tree and clean extension interface. The design philosophy emphasizes simplicity in the core with extensibility at the edges. Relevant tags include: pi, extension-api. Source reference: research://02-harness/pi
+This research finding covers Pi's extension API which keeps the runtime minimal with JSONL session tree and clean extension interface. The design philosophy emphasizes simplicity in the core with extensibility at the edges. Relevant tags include: pi, extension-api. Source reference: fieldnotes://02-harness/pi
 
 **Claude Code Hooks** (confidence level: high, approximately 80%)
-This research finding covers Claude Code's hooks which provide a permission model with sub-agent system and event-based hooks. The architecture enables fine-grained control over agent capabilities. Relevant tags include: claude, hooks, agents. Source reference: research://02-tech/claude-code`
+This research finding covers Claude Code's hooks which provide a permission model with sub-agent system and event-based hooks. The architecture enables fine-grained control over agent capabilities. Relevant tags include: claude, hooks, agents. Source reference: fieldnotes://02-tech/claude-code`
   },
   {
     name: 'comparison (2 sides, 6 items each)',

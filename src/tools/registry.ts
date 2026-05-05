@@ -6,8 +6,8 @@ import type { RunRegistry } from '../runs/registry.ts';
 import type { RunContext } from '../runs/types.ts';
 import type { MCPManager } from '../mcp/manager.ts';
 import { createMcpSearchToolsTool } from '../mcp/meta-tools.ts';
-import { createDisabledProvider } from '../research/embeddings/disabled.js';
-import { ResearchStore } from '../research/store.ts';
+import { createDisabledProvider } from '../fieldnotes/embeddings/disabled.js';
+import { FieldNotesStore } from '../fieldnotes/store.ts';
 import type { ElefantError } from '../types/errors.ts';
 import { err, ok, type Result } from '../types/result.ts';
 import type { ParameterDefinition, ToolDefinition, ToolResult } from '../types/tools.ts';
@@ -35,11 +35,11 @@ import { webfetchTool } from './webfetch.js';
 import { websearchTool } from './websearch.js';
 import { getDatetimeTool } from './get_datetime/index.js';
 import { writeTool, createWriteTool } from './write.js';
-import { createResearchSearchTool } from './research_search/index.js';
-import { researchGrepTool } from './research_grep/index.js';
-import { createResearchReadTool } from './research_read/index.js';
-import { researchWriteTool } from './research_write/index.js';
-import { createResearchIndexTool } from './research_index/index.js';
+import { createFieldNotesSearchTool } from './field_notes_search/index.js';
+import { fieldNotesGrepTool } from './field_notes_grep/index.js';
+import { createFieldNotesReadTool } from './field_notes_read/index.js';
+import { fieldNotesWriteTool } from './field_notes_write/index.js';
+import { createFieldNotesIndexTool } from './field_notes_index/index.js';
 import { createVisualizeTool } from './visualize/index.js';
 
 export const MAX_TOOL_OUTPUT_CHARS = 100_000;
@@ -464,13 +464,13 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 	registry.register(lspDiagnosticsTool);
 	const visualizeTool = createVisualizeTool();
 	registry.register(visualizeTool);
-	// Research Base tools — read-only tools available to all agents.
-	// See reference: research-base-workflow (auto-loaded for researcher/writer agents).
-	registry.register(researchGrepTool);
-	registry.register(researchWriteTool);
-	registry.register(createResearchReadTool({ projectPath: process.cwd() }));
-	registry.register(createResearchSearchTool({ embeddingProvider: createDisabledProvider() }));
-	registry.register(createResearchIndexTool({
+	// Field Notes tools — read-only tools available to all agents.
+	// See reference: field-notes-workflow (auto-loaded for researcher/writer agents).
+	registry.register(fieldNotesGrepTool);
+	registry.register(fieldNotesWriteTool);
+	registry.register(createFieldNotesReadTool({ projectPath: process.cwd() }));
+	registry.register(createFieldNotesSearchTool({ embeddingProvider: createDisabledProvider() }));
+	registry.register(createFieldNotesIndexTool({
 		listDocuments: () => ok([]),
 	}));
 	// tool_list is registered last so it reflects the complete set, including
@@ -559,26 +559,26 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	})
 	registry.register(visualizeTool)
 
-	// ── Research Base tools (per-run deps) ────────────────────────────────
-	// All agents get read-only research access; researcher/writer/librarian
-	// also get research_write (enforced via allowedAgents on the tool def
+	// ── Field Notes tools (per-run deps) ─────────────────────────────────
+	// All agents get read-only field notes access; researcher/writer/librarian
+	// also get field_notes_write (enforced via allowedAgents on the tool def
 	// and double-checked at the registry execute() boundary).
-	registry.register(researchGrepTool);
-	registry.register(researchWriteTool);
+	registry.register(fieldNotesGrepTool);
+	registry.register(fieldNotesWriteTool);
 	{
 		const projectPath = resolveProjectPath(deps.database, deps.currentRun.projectId);
-		registry.register(createResearchReadTool({ projectPath }));
-		registry.register(createResearchSearchTool({
+		registry.register(createFieldNotesReadTool({ projectPath }));
+		registry.register(createFieldNotesSearchTool({
 			embeddingProvider: createDisabledProvider(),
 			projectPath,
 			database: deps.database,
 			currentRun: deps.currentRun,
 		}));
-		// ResearchStore.open is a lazy-init — if the index DB hasn't been
+		// FieldNotesStore.open is a lazy-init — if the index DB hasn't been
 		// created yet the store opens cleanly with zero documents.
-		const storeResult = ResearchStore.open(projectPath);
+		const storeResult = FieldNotesStore.open(projectPath);
 		if (storeResult.ok) {
-			registry.register(createResearchIndexTool(storeResult.data));
+			registry.register(createFieldNotesIndexTool(storeResult.data));
 		}
 	}
 

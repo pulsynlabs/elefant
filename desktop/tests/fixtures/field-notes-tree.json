@@ -1,0 +1,21 @@
+{
+  "sections": [
+    {
+      "name": "02-tech",
+      "label": "Technologies",
+      "files": [
+        {
+          "name": "sqlite-vec.md",
+          "path": "02-tech/sqlite-vec.md",
+          "title": "SQLite-Vec Notes",
+          "summary": "Vector storage research.",
+          "tags": ["sqlite"],
+          "confidence": "high",
+          "updated": "2026-05-03T10:00:00Z",
+          "fieldnotes_link": "fieldnotes://_/02-tech/sqlite-vec.md"
+        }
+      ]
+    }
+  ],
+  "lastRefreshed": "2026-05-03T10:00:00Z"
+}

@@ -25,7 +25,7 @@ describe('Token efficiency benchmark (MH8)', () => {
   }
   
   it('all fixtures have valid viz type', () => {
-    const validTypes = ['mermaid', 'table', 'stat-grid', 'code', 'research-card', 'loading', 'comparison']
+    const validTypes = ['mermaid', 'table', 'stat-grid', 'code', 'field-notes-card', 'loading', 'comparison']
     for (const f of fixtures) {
       expect(validTypes).toContain((f.vizCall as { type: string }).type)
     }

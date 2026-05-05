@@ -1,7 +1,7 @@
 # Agent Rich Visualization
 
 The `visualize` tool lets the orchestrator agent inline-render premium
-visualization components (mermaid, tables, stat grids, research cards,
+visualization components (mermaid, tables, stat grids, field-notes cards,
 etc.) directly in the chat transcript. The full design lives under
 `.goopspec/feat-rich-viz/`; this document is the agent-facing guide.
 
@@ -10,7 +10,7 @@ etc.) directly in the chat transcript. The full design lives under
 ```ts
 visualize({
   type: 'mermaid' | 'table' | 'stat-grid' | 'code'
-       | 'research-card' | 'loading' | 'comparison',
+       | 'field-notes-card' | 'loading' | 'comparison',
   data: { /* per-type payload, validated by Zod */ },
   intent: string,           // why this viz exists (used as accessibility label fallback)
   title?: string,           // optional caption above the renderer
@@ -22,17 +22,17 @@ Calls that fail validation never reach the frontend.
 
 ## Rendering Research Results
 
-The `research-card` viz is the bento-grid renderer for any list of
-research-style results — typically the output of `research_search` or
-`research_index`. Its payload schema is:
+The `field-notes-card` viz is the bento-grid renderer for any list of
+research-style results — typically the output of `field_notes_search` or
+`field_notes_index`. Its payload schema is:
 
 ```ts
 {
-  type: 'research-card',
+  type: 'field-notes-card',
   cards: Array<{
     title: string;
     summary: string;
-    url?: string;        // `research://...` chips route to the Research View
+    url?: string;        // `fieldnotes://...` chips route to the Field Notes
     confidence?: number; // 0–1; rendered as a high/med/low pill
     tags?: string[];     // first 4 displayed; overflow shown as "+N"
   }>;
@@ -42,28 +42,28 @@ research-style results — typically the output of `research_search` or
 ### Worked example: search → visualize
 
 The orchestrator runs a search and renders the hits as cards via the
-`researchHitsToCards` adapter (in
-`src/tools/visualize/adapters/research.ts`):
+`fieldNotesHitsToCards` adapter (in
+`src/tools/visualize/adapters/field-notes.ts`):
 
 ```ts
-import { researchHitsToCards } from '../tools/visualize/adapters/research.js';
+import { fieldNotesHitsToCards } from '../tools/visualize/adapters/field-notes.js';
 
-// 1. Get hits from research_search.
-const hits = await research_search({ query: 'mermaid theming', k: 5 });
+// 1. Get hits from field_notes_search.
+const hits = await field_notes_search({ query: 'mermaid theming', k: 5 });
 
 // 2. Adapt the tool-shape to the viz-shape.
-const cards = researchHitsToCards(hits.results);
+const cards = fieldNotesHitsToCards(hits.results);
 
 // 3. Render inline in the transcript.
 await visualize({
-  type: 'research-card',
+  type: 'field-notes-card',
   title: 'Mermaid theming notes',
-  intent: 'Surface relevant prior research before answering',
+  intent: 'Surface relevant field notes before answering',
   data: { cards },
 });
 ```
 
-The same adapter accepts `research_index` `TreeFile` / `FlatFile`
+The same adapter accepts `field_notes_index` `TreeFile` / `FlatFile`
 output — the discrete `confidence: 'high' | 'medium' | 'low'` band is
 mapped to a representative numeric score so the pill renders
 consistently regardless of whether the upstream tool ranks numerically
@@ -71,20 +71,20 @@ or by frontmatter band.
 
 ### Field mapping reference
 
-| Research-tool field | `research-card` field | Notes |
+| Field Notes tool field | `field-notes-card` field | Notes |
 |---|---|---|
 | `title` | `title` | Falls back to `'Untitled'` when absent. |
 | `summary` / `snippet` | `summary` | Truncated to 400 chars. |
-| `research_link` / `path` | `url` | `research://` URIs render as `ResearchChip`. |
+| `fieldnotes_link` / `path` | `url` | `fieldnotes://` URIs render as `FieldNotesChip`. |
 | `score` (0–1) | `confidence` | Clamped to [0, 1]; non-finite values dropped. |
 | `confidence` ('high'\|'medium'\|'low') | `confidence` | Mapped to 0.9 / 0.6 / 0.3. |
 | `tags` | `tags` | Falls back to `[section]` when tags absent. |
 
 ### When to render cards vs. plain text
 
-Prefer `research-card` when:
+Prefer `field-notes-card` when:
 
-- Surfacing 2–8 results from a `research_*` tool call.
+- Surfacing 2–8 results from a `field_notes_\**` tool call.
 - The user asked "what did we find about X?" or similar.
 - Confidence and tags add scanability that prose would obscure.
 

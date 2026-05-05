@@ -197,7 +197,7 @@ The reference tool returns a formatted catalog of all bundled references.
 ## Out of Scope
 
 - **In-app reference editor UI** — Files are edited directly, not via GUI.
-- **Semantic search over references** — Deferred; Research Base owns semantic search.
+- **Semantic search over references** — Deferred; Field Notes owns semantic search.
 
 ---
 
