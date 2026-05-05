@@ -9,7 +9,9 @@
 	} from '$lib/icons/index.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import { tokenCounterStore } from '$lib/stores/token-counter.svelte.js';
+	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import PanelTabs, { type PanelTabDescriptor, type TabId } from './PanelTabs.svelte';
+	import McpTab from './tabs/McpTab.svelte';
 	import FileChangesTab from './tabs/FileChangesTab.svelte';
 	import TerminalTab from './tabs/TerminalTab.svelte';
 	import TodosTab from './tabs/TodosTab.svelte';
@@ -119,15 +121,9 @@
 					class:tab-panel-active={tab.id === activeTab}
 					hidden={tab.id !== activeTab}
 				>
-					<!-- Placeholder content. Real tabs land in W3 (MCP, Files,
-					     Todos) and W4 (Terminal). The structure here matches
-					     the lazy-mount + keep-alive contract from MH2. -->
-					{#if tab.id === 'mcp'}
-						<div class="tab-placeholder">
-							<HugeiconsIcon icon={McpServerIcon} size={28} strokeWidth={1.4} />
-							<p>MCP</p>
-						</div>
-					{:else if tab.id === 'terminal'}
+				{#if tab.id === 'mcp'}
+					<McpTab onOpenSettings={() => navigationStore.navigate('settings')} />
+				{:else if tab.id === 'terminal'}
 						{#if projectsStore.activeProjectId && projectsStore.activeSessionId}
 							<TerminalTab
 								projectId={projectsStore.activeProjectId}
