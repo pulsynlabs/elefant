@@ -27,7 +27,7 @@ export { default as ContextVisualizer } from './visualizer/ContextVisualizer.sve
 export { default as Treemap } from './visualizer/Treemap.svelte';
 
 // Stores and types
-export { rightPanelStore, type TabId, type PanelTabDescriptor } from './right-panel.svelte.js';
+export { rightPanelStore, type TabId } from './right-panel.svelte.js';
 export { tokenCounterStore, type TokenSegment, type TokenBreakdownCategory } from '$lib/stores/token-counter.svelte.js';
 export { fileChangesStore, type FileChange, type FileChangeType } from '$lib/stores/file-changes.svelte.js';
 export { sessionTodosStore, type TodoItem, type TodoStatus } from '$lib/stores/session-todos.svelte.js';

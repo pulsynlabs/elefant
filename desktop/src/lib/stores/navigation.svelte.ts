@@ -1,4 +1,4 @@
-type View = "chat" | "settings" | "models" | "about" | "projects" | "agent-config" | "agent-runs" | "worktrees" | "child-run" | "spec-mode" | "fieldnotes";
+type View = "chat" | "settings" | "about" | "projects" | "agent-config" | "agent-runs" | "worktrees" | "child-run" | "spec-mode" | "fieldnotes";
 
 let currentView = $state<View>("projects");
 

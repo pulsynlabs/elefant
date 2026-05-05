@@ -1,12 +1,16 @@
 import type { Elysia } from 'elysia'
+import { createRequire } from 'node:module'
 import { access } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import { getProjectById } from '../db/repo/projects.ts'
 import { getSessionById } from '../db/repo/sessions.ts'
 import type { Database } from '../db/database.ts'
-import type { ElefantError } from '../types/errors.ts'
-import type { Result } from '../types/result.ts'
-import { err, ok } from '../types/result.ts'
+
+// node-pty uses native bindings — load via createRequire so Bun doesn't
+// attempt ESM transformation of the .node file.
+const require = createRequire(import.meta.url)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const nodePty = require('node-pty') as typeof import('node-pty')
 
 type ClientMessage =
 	| { type: 'input'; data: string }
@@ -18,17 +22,15 @@ type ServerMessage =
 	| { type: 'exit'; code: number }
 	| { type: 'error'; message: string }
 
-type ShellProcess = {
-	stdin: Bun.Subprocess<'pipe', 'pipe', 'pipe'>['stdin']
-	process: Bun.Subprocess<'pipe', 'pipe', 'pipe'>
+type PtySession = {
+	pty: import('node-pty').IPty
 	closed: boolean
-	killTimer: ReturnType<typeof setTimeout> | null
 }
 
 type SessionConnection = {
 	projectId: string
 	sessionId: string
-	shell: ShellProcess
+	session: PtySession
 }
 
 type WsLike = {
@@ -71,35 +73,82 @@ export function mountPtyRoute(app: Elysia, db: Database): PtyRouteController {
 				return
 			}
 
-			const setup = await setupPtyForSession(db, projectId, sessionId)
-			if (!setup.ok) {
-				sendServerMessage(ws, { type: 'error', message: setup.error.message })
+			// Resolve project path and validate
+			const project = getProjectById(db, projectId)
+			if (!project.ok) {
+				sendServerMessage(ws, { type: 'error', message: project.error.message })
 				ws.close()
 				return
 			}
 
-			const shell = spawnInteractiveShell(setup.data.shell, setup.data.cwd)
-			if (!shell.ok) {
-				console.error('[pty] failed to spawn shell', shell.error.details)
-				sendServerMessage(ws, { type: 'error', message: shell.error.message })
+			const session = getSessionById(db, sessionId)
+			if (!session.ok) {
+				sendServerMessage(ws, { type: 'error', message: session.error.message })
 				ws.close()
 				return
 			}
 
-			const connection: SessionConnection = {
-				projectId,
-				sessionId,
-				shell: shell.data,
+			if (session.data.project_id !== projectId) {
+				sendServerMessage(ws, { type: 'error', message: `Session does not belong to project` })
+				ws.close()
+				return
 			}
+
+			try {
+				await access(project.data.path, fsConstants.R_OK | fsConstants.W_OK)
+			} catch {
+				sendServerMessage(ws, { type: 'error', message: `Project path not accessible: ${project.data.path}` })
+				ws.close()
+				return
+			}
+
+			const shell = await resolveShellPath()
+
+			let ptyProcess: import('node-pty').IPty
+			try {
+				ptyProcess = nodePty.spawn(shell, ['-i'], {
+					name: 'xterm-256color',
+					cols: 80,
+					rows: 24,
+					cwd: project.data.path,
+					env: {
+						...process.env as Record<string, string>,
+						TERM: 'xterm-256color',
+						COLORTERM: 'truecolor',
+					},
+				})
+			} catch (error) {
+				const msg = error instanceof Error ? error.message : String(error)
+				sendServerMessage(ws, { type: 'error', message: `Failed to spawn shell: ${msg}` })
+				ws.close()
+				return
+			}
+
+			const ptySession: PtySession = { pty: ptyProcess, closed: false }
+			const connection: SessionConnection = { projectId, sessionId, session: ptySession }
 			activeBySession.set(sessionId, connection)
 
-			void streamOutputToWebSocket(ws, connection, activeBySession)
+			// Stream PTY output to WebSocket
+			ptyProcess.onData((data: string) => {
+				if (ptySession.closed) return
+				sendServerMessage(ws, { type: 'output', data })
+			})
+
+			ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
+				if (!ptySession.closed) {
+					ptySession.closed = true
+					activeBySession.delete(sessionId)
+					sendServerMessage(ws, { type: 'exit', code: exitCode })
+				}
+				try { ws.close() } catch { /* ignored */ }
+			})
 		},
+
 		message: (ws, raw) => {
 			const { sessionId } = getRouteParams(ws)
 			if (!sessionId) return
 			const connection = activeBySession.get(sessionId)
-			if (!connection) return
+			if (!connection || connection.session.closed) return
 
 			const payload = parseClientMessage(raw)
 			if (!payload) {
@@ -107,24 +156,24 @@ export function mountPtyRoute(app: Elysia, db: Database): PtyRouteController {
 				return
 			}
 
-				switch (payload.type) {
+			const pty = connection.session.pty
+			switch (payload.type) {
 				case 'input':
-					void connection.shell.stdin.write(new TextEncoder().encode(payload.data))
+					pty.write(payload.data)
 					break
-				case 'resize':
-					// Bun.spawn does not expose PTY resize controls. Accept message as no-op.
-					void payload
+				case 'resize': {
+					const cols = Math.max(2, Math.floor(payload.cols))
+					const rows = Math.max(2, Math.floor(payload.rows))
+					pty.resize(cols, rows)
 					break
+				}
 				case 'close':
 					cleanupConnection(activeBySession, connection)
-					try {
-						ws.close()
-					} catch {
-						// ignored
-					}
+					try { ws.close() } catch { /* ignored */ }
 					break
 			}
 		},
+
 		close: (ws) => {
 			const { sessionId } = getRouteParams(ws)
 			if (!sessionId) return
@@ -146,7 +195,6 @@ export function mountPtyRoute(app: Elysia, db: Database): PtyRouteController {
 function getRouteParams(ws: WsLike): { projectId?: string; sessionId?: string } {
 	const data = ws.data
 	if (!data) return {}
-
 	const params = data.params as Record<string, unknown> | undefined
 	const projectId = typeof params?.projectId === 'string' ? params.projectId : undefined
 	const sessionId = typeof params?.sessionId === 'string' ? params.sessionId : undefined
@@ -174,7 +222,6 @@ function parseClientMessage(raw: unknown): ClientMessage | null {
 			rows: Math.max(1, Math.floor(candidate.rows)),
 		}
 	}
-
 	return null
 }
 
@@ -199,38 +246,9 @@ function normalizeMessageObject(raw: unknown): Record<string, unknown> | null {
 }
 
 function sendServerMessage(ws: WsLike, payload: ServerMessage): void {
-	ws.send(JSON.stringify(payload))
-}
-
-async function setupPtyForSession(
-	db: Database,
-	projectId: string,
-	sessionId: string,
-): Promise<Result<{ cwd: string; shell: string }, ElefantError>> {
-	const project = getProjectById(db, projectId)
-	if (!project.ok) return err(project.error)
-
-	const session = getSessionById(db, sessionId)
-	if (!session.ok) return err(session.error)
-	if (session.data.project_id !== projectId) {
-		return err({
-			code: 'VALIDATION_ERROR',
-			message: `Session ${sessionId} does not belong to project ${projectId}`,
-		})
-	}
-
 	try {
-		await access(project.data.path, fsConstants.R_OK | fsConstants.W_OK)
-	} catch (error) {
-		return err({
-			code: 'PERMISSION_DENIED',
-			message: `Project path is not accessible: ${project.data.path}`,
-			details: error,
-		})
-	}
-
-	const shell = await resolveShellPath()
-	return ok({ cwd: project.data.path, shell })
+		ws.send(JSON.stringify(payload))
+	} catch { /* ws may already be closing */ }
 }
 
 async function resolveShellPath(): Promise<string> {
@@ -240,90 +258,21 @@ async function resolveShellPath(): Promise<string> {
 			await access(candidate, fsConstants.X_OK)
 			return candidate
 		} catch {
-			// keep trying fallbacks
+			// keep trying
 		}
 	}
 	return '/bin/sh'
-}
-
-function spawnInteractiveShell(shell: string, cwd: string): Result<ShellProcess, ElefantError> {
-	try {
-		const child = Bun.spawn([shell, '-i'], {
-			cwd,
-			env: {
-				...process.env,
-				TERM: 'xterm-256color',
-			},
-			stdin: 'pipe',
-			stdout: 'pipe',
-			stderr: 'pipe',
-		})
-
-		return ok({
-			stdin: child.stdin,
-			process: child,
-			closed: false,
-			killTimer: null,
-		})
-	} catch (error) {
-		return err({
-			code: 'TOOL_EXECUTION_FAILED',
-			message: 'Failed to spawn shell process',
-			details: error,
-		})
-	}
-}
-
-async function streamOutputToWebSocket(
-	ws: WsLike,
-	connection: SessionConnection,
-	activeBySession: Map<string, SessionConnection>,
-): Promise<void> {
-	const decoder = new TextDecoder('utf-8')
-
-	const readStream = async (stream: ReadableStream<Uint8Array>) => {
-		for await (const chunk of stream) {
-			if (connection.shell.closed) return
-			sendServerMessage(ws, { type: 'output', data: decoder.decode(chunk, { stream: true }) })
-		}
-	}
-
-	await Promise.allSettled([
-		readStream(connection.shell.process.stdout),
-		readStream(connection.shell.process.stderr),
-	])
-
-	const code = await connection.shell.process.exited
-	if (!connection.shell.closed) {
-		sendServerMessage(ws, { type: 'exit', code })
-	}
-
-	cleanupConnection(activeBySession, connection)
-	try {
-		ws.close()
-	} catch {
-		// ignored
-	}
 }
 
 function cleanupConnection(
 	activeBySession: Map<string, SessionConnection>,
 	connection: SessionConnection,
 ): void {
-	if (connection.shell.closed) return
-	connection.shell.closed = true
+	if (connection.session.closed) return
+	connection.session.closed = true
 	activeBySession.delete(connection.sessionId)
 
 	try {
-		void connection.shell.stdin.end()
-	} catch {
-		// ignored
-	}
-
-	connection.shell.process.kill('SIGTERM')
-	connection.shell.killTimer = setTimeout(() => {
-		if (connection.shell.process.exitCode === null) {
-			connection.shell.process.kill('SIGKILL')
-		}
-	}, 2_000)
+		connection.session.pty.kill()
+	} catch { /* ignored */ }
 }
