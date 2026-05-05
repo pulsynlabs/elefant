@@ -1,6 +1,6 @@
 <!--
 @component
-FrontmatterPillBar — surfaces the locked-contract metadata of a Research Base
+FrontmatterPillBar — surfaces the locked-contract metadata of a Field Notes
 file as a row of pills under the sticky header.
 
 Hierarchy:
@@ -15,10 +15,10 @@ image so it parses identically in light + dark themes and respects user
 theme switches without an extra paint.
 -->
 <script lang="ts">
-	import type { ResearchFrontmatter } from '$lib/daemon/types.js';
+	import type { FieldNotesFrontmatter } from '$lib/daemon/types.js';
 
 	type Props = {
-		frontmatter: ResearchFrontmatter;
+		frontmatter: FieldNotesFrontmatter;
 	};
 
 	let { frontmatter }: Props = $props();

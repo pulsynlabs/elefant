@@ -2,7 +2,7 @@
 @component
 Breadcrumbs — splits a section-relative path into clickable parents.
 
-For Research Base files, the path is `<section>/<filename>` (no nested
+For Field Notes files, the path is `<section>/<filename>` (no nested
 subfolders are part of MVP). The section segment is humanized via the same
 casing rule the daemon uses (`02-tech` → `Tech`). The leaf segment is the
 file title (passed in by the parent); we strip the `.md` extension if the
@@ -42,7 +42,7 @@ section-filter affordance can wire in without an API change.
 <nav class="breadcrumbs" aria-label="Breadcrumb">
 	<ol class="crumb-list">
 		<li class="crumb crumb-root">
-			<span class="crumb-label">Research</span>
+			<span class="crumb-label">Field Notes</span>
 		</li>
 
 		{#if sectionSegment}

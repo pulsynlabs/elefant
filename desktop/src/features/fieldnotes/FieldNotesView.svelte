@@ -1,6 +1,6 @@
 <!--
 @component
-ResearchView — top-level surface for the Research Base reader.
+FieldNotesView — top-level surface for the Field Notes reader.
 
 Two-pane layout:
   • Left  (320 px) → TreePane: search + folder tree, replaces with a flat
@@ -23,11 +23,11 @@ is mounted via `keyboard.ts`.
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
-	import { researchStore } from './research-store.svelte.js';
+	import { fieldNotesStore } from './fieldnotes-store.svelte.js';
 	import TreePane from './TreePane.svelte';
 	import ReaderPane from './ReaderPane.svelte';
 	import MobileTreeDrawer from './MobileTreeDrawer.svelte';
-	import { handleResearchKeydown } from './keyboard.js';
+	import { handleFieldNotesKeydown } from './keyboard.js';
 
 	const projectId = $derived(projectsStore.activeProjectId);
 
@@ -47,12 +47,12 @@ is mounted via `keyboard.ts`.
 	$effect(() => {
 		const id = projectId;
 		if (!id) {
-			researchStore.reset();
+			fieldNotesStore.reset();
 			return;
 		}
-		if (researchStore.loadedForProjectId !== id) {
-			researchStore.reset();
-			void researchStore.loadTree(id);
+		if (fieldNotesStore.loadedForProjectId !== id) {
+			fieldNotesStore.reset();
+			void fieldNotesStore.loadTree(id);
 		}
 	});
 
@@ -63,12 +63,12 @@ is mounted via `keyboard.ts`.
 	// the first derives the order list (read-only), the second resets
 	// the cursor index (write-only) when the list shrinks.
 	const treeRowOrderDerived = $derived.by(() => {
-		const q = researchStore.searchQuery.trim();
+		const q = fieldNotesStore.searchQuery.trim();
 		if (q) {
-			return researchStore.searchResults.map((r) => r.path);
+			return fieldNotesStore.searchResults.map((r) => r.path);
 		}
 		const out: string[] = [];
-		for (const section of researchStore.tree?.sections ?? []) {
+		for (const section of fieldNotesStore.tree?.sections ?? []) {
 			for (const file of section.files) out.push(file.path);
 		}
 		return out;
@@ -103,12 +103,12 @@ is mounted via `keyboard.ts`.
 	}
 
 	function focusFirstSearch(): void {
-		const root = document.querySelector<HTMLElement>('[data-research-search]');
+		const root = document.querySelector<HTMLElement>('[data-field-notes-search]');
 		root?.focus();
 	}
 
 	function focusReader(): void {
-		const root = document.querySelector<HTMLElement>('[data-research-reader]');
+		const root = document.querySelector<HTMLElement>('[data-field-notes-reader]');
 		root?.focus({ preventScroll: false });
 	}
 
@@ -126,7 +126,7 @@ is mounted via `keyboard.ts`.
 		// expose a stable selector, so we don't fail loudly on a miss.
 		const path = treeRowOrder[next];
 		const row = document.querySelector<HTMLElement>(
-			`[data-research-tree-row="${CSS.escape(path)}"]`,
+			`[data-field-notes-tree-row="${CSS.escape(path)}"]`,
 		);
 		row?.scrollIntoView({ block: 'nearest' });
 	}
@@ -135,11 +135,11 @@ is mounted via `keyboard.ts`.
 		if (!projectId) return;
 		const path = treeRowOrder[treeRowIndex];
 		if (!path) return;
-		void researchStore.openFile(projectId, path);
+		void fieldNotesStore.openFile(projectId, path);
 	}
 
 	function handleViewKeydown(event: KeyboardEvent): void {
-		const action = handleResearchKeydown(event, {
+		const action = handleFieldNotesKeydown(event, {
 			isInputFocused: isInputFocused(),
 		});
 		if (!action) return;
@@ -194,36 +194,36 @@ is mounted via `keyboard.ts`.
 <svelte:window onkeydown={handleViewKeydown} />
 
 {#if !projectId}
-	<div class="research-no-project">
-		<p>Open a project to view its Research Base.</p>
+	<div class="field-notes-no-project">
+		<p>Open a project to view its field notes.</p>
 	</div>
 {:else}
 	<div
-		class="research-view"
-		class:research-view--mobile={isMobile}
-		data-testid="research-view"
+		class="field-notes-view"
+		class:field-notes-view--mobile={isMobile}
+		data-testid="field-notes-view"
 		in:fade={{ duration: motionDuration(150) }}
 	>
 		{#if isMobile}
-			<header class="research-mobile-bar">
+			<header class="field-notes-mobile-bar">
 				<button
 					type="button"
-					class="research-files-trigger"
+					class="field-notes-files-trigger"
 					onclick={() => (drawerOpen = true)}
 					aria-haspopup="dialog"
 					aria-expanded={drawerOpen}
-					aria-label="Open research files"
+					aria-label="Open field notes"
 				>
 					<span class="trigger-icon" aria-hidden="true">≡</span>
 					<span class="trigger-label">Files</span>
 				</button>
 			</header>
 		{:else}
-			<aside class="research-tree-pane">
+			<aside class="field-notes-tree-pane">
 				<TreePane {projectId} />
 			</aside>
 		{/if}
-		<main class="research-reader-pane" data-research-reader tabindex="-1">
+		<main class="field-notes-reader-pane" data-field-notes-reader tabindex="-1">
 			<ReaderPane {projectId} />
 		</main>
 	</div>
@@ -234,7 +234,7 @@ is mounted via `keyboard.ts`.
 {/if}
 
 <style>
-	.research-no-project {
+	.field-notes-no-project {
 		position: absolute;
 		inset: 0;
 		display: flex;
@@ -244,7 +244,7 @@ is mounted via `keyboard.ts`.
 		background-color: var(--surface-substrate);
 	}
 
-	.research-no-project p {
+	.field-notes-no-project p {
 		font-family: var(--font-body);
 		font-size: var(--font-size-sm);
 		color: var(--text-meta);
@@ -257,7 +257,7 @@ is mounted via `keyboard.ts`.
 	 * other top-level views (see scroll-fix decision in memory) so the grid
 	 * tracks resolve from the AppShell's content positioned container.
 	 */
-	.research-view {
+	.field-notes-view {
 		position: absolute;
 		inset: 0;
 		display: grid;
@@ -267,8 +267,8 @@ is mounted via `keyboard.ts`.
 		overflow: hidden;
 	}
 
-	.research-tree-pane,
-	.research-reader-pane {
+	.field-notes-tree-pane,
+	.field-notes-reader-pane {
 		min-width: 0;
 		min-height: 0;
 		height: 100%;
@@ -278,18 +278,18 @@ is mounted via `keyboard.ts`.
 	/* Reader pane needs explicit focus outline reset because it carries
 	   tabindex="-1" for the `g r` keyboard binding to focus into it
 	   programmatically. The visible focus ring is on inner controls. */
-	.research-reader-pane:focus {
+	.field-notes-reader-pane:focus {
 		outline: none;
 	}
 
 	/* Mobile layout: single column, top bar with the Files trigger,
 	   reader fills the rest. The drawer slides in over both. */
-	.research-view--mobile {
+	.field-notes-view--mobile {
 		grid-template-columns: 1fr;
 		grid-template-rows: 48px 1fr;
 	}
 
-	.research-mobile-bar {
+	.field-notes-mobile-bar {
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
@@ -298,7 +298,7 @@ is mounted via `keyboard.ts`.
 		background-color: var(--surface-plate);
 	}
 
-	.research-files-trigger {
+	.field-notes-files-trigger {
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-2);
@@ -317,12 +317,12 @@ is mounted via `keyboard.ts`.
 			border-color var(--transition-fast);
 	}
 
-	.research-files-trigger:hover {
+	.field-notes-files-trigger:hover {
 		background-color: var(--surface-hover);
 		border-color: var(--border-emphasis);
 	}
 
-	.research-files-trigger:focus-visible {
+	.field-notes-files-trigger:focus-visible {
 		outline: none;
 		box-shadow: var(--glow-focus);
 	}
@@ -340,7 +340,7 @@ is mounted via `keyboard.ts`.
 		/* Inline tree pane is hidden on mobile (drawer takes over).
 		   Kept as a safety net in case the JS-driven mobile switch
 		   hasn't hydrated on first paint. */
-		.research-view:not(.research-view--mobile) .research-tree-pane {
+		.field-notes-view:not(.field-notes-view--mobile) .field-notes-tree-pane {
 			display: none;
 		}
 	}

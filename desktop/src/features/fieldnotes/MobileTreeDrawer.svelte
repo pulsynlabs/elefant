@@ -1,6 +1,6 @@
 <!--
 @component
-MobileTreeDrawer — slide-in sheet that hosts the Research TreePane on
+MobileTreeDrawer — slide-in sheet that hosts the Field Notes TreePane on
 viewports ≤640 px.
 
 The drawer mirrors the existing global mobile drawer pattern from
@@ -14,13 +14,13 @@ The drawer mirrors the existing global mobile drawer pattern from
 The tree itself is the same TreePane component used by the desktop
 two-pane layout, so all behavior (search, expand/collapse, file
 select) is shared. The drawer auto-closes whenever the user picks a
-file by watching `researchStore.selectedFile`; this keeps the close
+file by watching `fieldNotesStore.selectedFile`; this keeps the close
 behavior centralized rather than threading a callback through TreePane.
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import TreePane from './TreePane.svelte';
-	import { researchStore } from './research-store.svelte.js';
+	import { fieldNotesStore } from './fieldnotes-store.svelte.js';
 
 	type Props = {
 		projectId: string | null;
@@ -35,10 +35,10 @@ behavior centralized rather than threading a callback through TreePane.
 	// detect *new* selections (vs. the existing one carrying over). This
 	// avoids closing the drawer immediately on mount when a file is
 	// already open from a prior session.
-	let baselineSelected = researchStore.selectedFile;
+	let baselineSelected = fieldNotesStore.selectedFile;
 
 	$effect(() => {
-		const current = researchStore.selectedFile;
+		const current = fieldNotesStore.selectedFile;
 		if (current !== baselineSelected && current !== null) {
 			onClose();
 		}
@@ -93,10 +93,10 @@ behavior centralized rather than threading a callback through TreePane.
 
 <aside
 	bind:this={drawerEl}
-	class="research-mobile-drawer"
+	class="field-notes-mobile-drawer"
 	role="dialog"
 	aria-modal="true"
-	aria-label="Research files"
+	aria-label="Field notes"
 >
 	<header class="drawer-header">
 		<h2 class="drawer-title">Files</h2>
@@ -104,7 +104,7 @@ behavior centralized rather than threading a callback through TreePane.
 			type="button"
 			class="drawer-close"
 			onclick={onClose}
-			aria-label="Close research files"
+			aria-label="Close field notes"
 		>
 			Close
 		</button>
@@ -116,14 +116,14 @@ behavior centralized rather than threading a callback through TreePane.
 
 <button
 	type="button"
-	class="research-drawer-backdrop"
+	class="field-notes-drawer-backdrop"
 	onclick={onClose}
-	aria-label="Close research files"
+	aria-label="Close field notes"
 	tabindex="-1"
 ></button>
 
 <style>
-	.research-mobile-drawer {
+	.field-notes-mobile-drawer {
 		position: fixed;
 		inset: 0 0 0 0;
 		max-width: 90vw;
@@ -192,7 +192,7 @@ behavior centralized rather than threading a callback through TreePane.
 		overflow-y: auto;
 	}
 
-	.research-drawer-backdrop {
+	.field-notes-drawer-backdrop {
 		position: fixed;
 		inset: 0;
 		z-index: var(--z-sticky);
@@ -224,8 +224,8 @@ behavior centralized rather than threading a callback through TreePane.
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.research-mobile-drawer,
-		.research-drawer-backdrop {
+		.field-notes-mobile-drawer,
+		.field-notes-drawer-backdrop {
 			animation: none;
 		}
 	}

@@ -1,11 +1,12 @@
 <!--
 @component
-TreePane — left pane of the Research View.
+TreePane — left pane of the Field Notes View.
 
-Renders the section/file hierarchy from `researchStore.tree`. Each section
-is collapsible and remembers its own open/closed state in this component
-(local UI state — survives only while the pane is mounted, which matches
-the user expectation that sections "snap back" to defaults on full reload).
+Renders the section/file hierarchy from `fieldNotesStore.tree`. Each
+section is collapsible and remembers its own open/closed state in this
+component (local UI state — survives only while the pane is mounted,
+which matches the user expectation that sections "snap back" to defaults
+on full reload).
 
 Search is wired to the store's `search()` action with a 200ms debounce. A
 non-empty query replaces the section list with a flat result list; clearing
@@ -19,13 +20,13 @@ the query restores the tree.
 		ChevronRightIcon,
 		ChevronDownIcon,
 		FolderIcon,
-		ResearchIcon,
+		FieldNotesIcon,
 	} from '$lib/icons/index.js';
-	import { researchStore } from './research-store.svelte.js';
+	import { fieldNotesStore } from './fieldnotes-store.svelte.js';
 	import type {
-		ResearchTreeFile,
-		ResearchTreeSection,
-		ResearchSearchResult,
+		FieldNotesTreeFile,
+		FieldNotesTreeSection,
+		FieldNotesSearchResult,
 	} from '$lib/daemon/types.js';
 
 	type Props = {
@@ -38,13 +39,13 @@ the query restores the tree.
 	let searchInputEl: HTMLInputElement | null = null;
 	let searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
-	const tree = $derived(researchStore.tree);
-	const isLoading = $derived(researchStore.isLoading);
-	const isSearching = $derived(researchStore.isSearching);
-	const searchResults = $derived(researchStore.searchResults);
-	const selectedFile = $derived(researchStore.selectedFile);
-	const searchQuery = $derived(researchStore.searchQuery);
-	const error = $derived(researchStore.error);
+	const tree = $derived(fieldNotesStore.tree);
+	const isLoading = $derived(fieldNotesStore.isLoading);
+	const isSearching = $derived(fieldNotesStore.isSearching);
+	const searchResults = $derived(fieldNotesStore.searchResults);
+	const selectedFile = $derived(fieldNotesStore.selectedFile);
+	const searchQuery = $derived(fieldNotesStore.searchQuery);
+	const error = $derived(fieldNotesStore.error);
 
 	const showingSearch = $derived(searchQuery.trim().length > 0);
 
@@ -70,21 +71,21 @@ the query restores the tree.
 
 	function selectFile(path: string): void {
 		if (!projectId) return;
-		void researchStore.openFile(projectId, path);
+		void fieldNotesStore.openFile(projectId, path);
 	}
 
 	function handleSearchInput(value: string): void {
-		researchStore.setSearchQuery(value);
+		fieldNotesStore.setSearchQuery(value);
 		if (searchDebounce) clearTimeout(searchDebounce);
 		const trimmed = value.trim();
 		if (!trimmed || !projectId) return;
 		searchDebounce = setTimeout(() => {
-			void researchStore.search(projectId, trimmed);
+			void fieldNotesStore.search(projectId, trimmed);
 		}, 200);
 	}
 
 	function clearSearch(): void {
-		researchStore.setSearchQuery('');
+		fieldNotesStore.setSearchQuery('');
 		if (searchDebounce) clearTimeout(searchDebounce);
 		searchInputEl?.focus();
 	}
@@ -105,7 +106,7 @@ the query restores the tree.
 	}
 </script>
 
-<div class="tree-pane" aria-label="Research file tree">
+<div class="tree-pane" aria-label="Field notes file tree">
 	<div class="tree-search">
 		<span class="search-icon" aria-hidden="true">
 			<HugeiconsIcon icon={SearchIcon} size={14} strokeWidth={1.6} />
@@ -114,9 +115,9 @@ the query restores the tree.
 			bind:this={searchInputEl}
 			type="search"
 			class="search-input"
-			data-research-search
-			placeholder="Search Research"
-			aria-label="Search Research Base"
+			data-field-notes-search
+			placeholder="Search Field Notes"
+			aria-label="Search Field Notes"
 			value={searchQuery}
 			oninput={(e) => handleSearchInput(e.currentTarget.value)}
 			autocomplete="off"
@@ -163,7 +164,7 @@ the query restores the tree.
 								type="button"
 								class="result-row"
 								class:active={isActive}
-								data-research-tree-row={result.path}
+								data-field-notes-tree-row={result.path}
 								onclick={() => selectFile(result.path)}
 							>
 								<span class="result-title">{result.title}</span>
@@ -188,9 +189,9 @@ the query restores the tree.
 		{:else if !tree || tree.sections.every((s) => s.files.length === 0)}
 			<div class="tree-zero" role="status">
 				<div class="zero-icon" aria-hidden="true">
-					<HugeiconsIcon icon={ResearchIcon} size={20} strokeWidth={1.4} />
+					<HugeiconsIcon icon={FieldNotesIcon} size={20} strokeWidth={1.4} />
 				</div>
-				<p class="zero-headline">No research files yet</p>
+				<p class="zero-headline">No field notes yet</p>
 				<p class="zero-body">
 					Agents will populate this as they work.
 				</p>
@@ -238,7 +239,7 @@ the query restores the tree.
 											type="button"
 											class="file-row"
 											class:active={isActive}
-											data-research-tree-row={file.path}
+											data-field-notes-tree-row={file.path}
 											onclick={() => selectFile(file.path)}
 											aria-current={isActive ? 'true' : undefined}
 										>

@@ -3,7 +3,7 @@
 	 * OpenInEditorButton — secondary ghost button rendered in the reader pane
 	 * sticky header. Asks the daemon to launch the user's external editor
 	 * (`$EDITOR`, then VS Code, then system default — overrideable in
-	 * Settings → Research Base) on the currently open research file.
+	 * Settings → Field Notes) on the currently open field note.
 	 *
 	 * Visual states:
 	 * - idle:        external-link icon + "Open in editor"
@@ -12,7 +12,7 @@
 	 * - error:       ✗ icon + "Failed" — auto-clears after 3 s
 	 */
 
-	import { researchClient } from '$lib/daemon/research-client.js';
+	import { fieldNotesClient } from '$lib/daemon/fieldnotes-client.js';
 	import {
 		HugeiconsIcon,
 		ExternalLinkIcon,
@@ -46,7 +46,7 @@
 		errorMessage = null;
 
 		try {
-			const result = await researchClient.openInEditor(projectId, filePath);
+			const result = await fieldNotesClient.openInEditor(projectId, filePath);
 			if (result.launched) {
 				status = 'success';
 				resetTimer = setTimeout(() => {

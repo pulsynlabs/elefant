@@ -1,5 +1,5 @@
 /**
- * Research store — Svelte 5 runes state container for the Research View.
+ * Field Notes store — Svelte 5 runes state container for the Field Notes View.
  *
  * Owns the tree, selected file, file content, search query/results, and
  * loading/error flags. All mutations happen through the methods below so
@@ -8,20 +8,20 @@
  * a frozen export object exposing getters and methods).
  */
 
-import { researchClient } from '$lib/daemon/research-client.js';
+import { fieldNotesClient } from '$lib/daemon/fieldnotes-client.js';
 import type {
-	ResearchFile,
-	ResearchSearchResult,
-	ResearchTree,
+	FieldNotesFile,
+	FieldNotesSearchResult,
+	FieldNotesTree,
 } from '$lib/daemon/types.js';
 
 // ─── Internal state ────────────────────────────────────────────────────────
 
-let tree = $state<ResearchTree | null>(null);
+let tree = $state<FieldNotesTree | null>(null);
 let selectedFile = $state<string | null>(null);
-let fileContent = $state<ResearchFile | null>(null);
+let fileContent = $state<FieldNotesFile | null>(null);
 let searchQuery = $state('');
-let searchResults = $state<ResearchSearchResult[]>([]);
+let searchResults = $state<FieldNotesSearchResult[]>([]);
 let isLoading = $state(false);
 let isLoadingFile = $state(false);
 let isSearching = $state(false);
@@ -40,7 +40,7 @@ let fileFetchToken = 0;
 
 function setError(message: string): void {
 	error = message;
-	console.error('[research]', message);
+	console.error('[field-notes]', message);
 }
 
 function clearError(): void {
@@ -54,11 +54,11 @@ async function loadTree(projectId: string): Promise<void> {
 	isLoading = true;
 	clearError();
 	try {
-		const next = await researchClient.getTree(projectId);
+		const next = await fieldNotesClient.getTree(projectId);
 		tree = next;
 		loadedForProjectId = projectId;
 	} catch (err) {
-		setError(err instanceof Error ? err.message : 'Failed to load research tree');
+		setError(err instanceof Error ? err.message : 'Failed to load field notes tree');
 	} finally {
 		isLoading = false;
 	}
@@ -67,7 +67,7 @@ async function loadTree(projectId: string): Promise<void> {
 /**
  * Open a file by section-relative path. If `anchor` is supplied, the reader
  * pane consumes `pendingAnchor` after render to scroll to that heading slug
- * — this is the entry point for `research://workflow/path#anchor` chip
+ * — this is the entry point for `fieldnotes://workflow/path#anchor` chip
  * navigation.
  */
 async function openFile(
@@ -82,7 +82,7 @@ async function openFile(
 	isLoadingFile = true;
 	clearError();
 	try {
-		const content = await researchClient.getFile(projectId, path, false);
+		const content = await fieldNotesClient.getFile(projectId, path, false);
 		// Only commit the result if we're still the latest in-flight request.
 		// Without this guard, a slow first request could overwrite the
 		// content of a later, fast click on a different file.
@@ -91,7 +91,7 @@ async function openFile(
 		}
 	} catch (err) {
 		if (token === fileFetchToken) {
-			setError(err instanceof Error ? err.message : 'Failed to load research file');
+			setError(err instanceof Error ? err.message : 'Failed to load field note');
 			fileContent = null;
 		}
 	} finally {
@@ -113,7 +113,7 @@ async function search(projectId: string, query: string): Promise<void> {
 	isSearching = true;
 	clearError();
 	try {
-		const results = await researchClient.search(projectId, trimmed, { k: 20 });
+		const results = await fieldNotesClient.search(projectId, trimmed, { k: 20 });
 		searchResults = results;
 	} catch (err) {
 		setError(err instanceof Error ? err.message : 'Search failed');
@@ -155,7 +155,7 @@ function reset(): void {
 
 // ─── Public API ────────────────────────────────────────────────────────────
 
-export const researchStore = {
+export const fieldNotesStore = {
 	get tree() {
 		return tree;
 	},
@@ -199,6 +199,6 @@ export const researchStore = {
 };
 
 // Test helper for resetting state between specs.
-export function _resetResearchStoreForTests(): void {
+export function _resetFieldNotesStoreForTests(): void {
 	reset();
 }

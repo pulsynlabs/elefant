@@ -1,5 +1,5 @@
 /**
- * Research View keyboard handler — pure logic, no DOM access.
+ * Field Notes View keyboard handler — pure logic, no DOM access.
  *
  * Lives in its own module so it can be unit-tested without a browser. The
  * Svelte view is responsible for translating the returned action into the
@@ -19,15 +19,15 @@
  * by `j` doesn't navigate the tree by accident.
  *
  * TODO(palette): The blueprint also calls for a ⌘K palette entry that
- * focuses the Research search. No global command palette exists in
+ * focuses the Field Notes search. No global command palette exists in
  * `desktop/src/features/` at the time of writing — confirmed via grep
  * for `command-palette` / `commandPalette`. When a palette ships, add a
- * "Search Research" entry that triggers the same `focus-search` action
- * as `/`, ideally by re-using `handleResearchKeydown` rather than
- * duplicating the focus logic.
+ * "Search Field Notes" entry that triggers the same `focus-search`
+ * action as `/`, ideally by re-using `handleFieldNotesKeydown` rather
+ * than duplicating the focus logic.
  */
 
-export type ResearchKeyAction =
+export type FieldNotesKeyAction =
 	| { type: 'tree-next' }
 	| { type: 'tree-prev' }
 	| { type: 'tree-open' }
@@ -35,7 +35,7 @@ export type ResearchKeyAction =
 	| { type: 'focus-reader' }
 	| { type: 'close-drawer' };
 
-export interface ResearchKeyHandlerOpts {
+export interface FieldNotesKeyHandlerOpts {
 	/** True when the user's focus is inside an `<input>`, `<textarea>`, or
 	 * `[contenteditable]` element. The caller resolves this from the
 	 * actual focused element so this module stays browser-free. */
@@ -51,8 +51,8 @@ export const G_SEQUENCE_TIMEOUT_MS = 500;
 /**
  * Tracks the timestamp of the last `g` keystroke so a follow-up `r` within
  * `G_SEQUENCE_TIMEOUT_MS` resolves to `focus-reader`. Module-level so a
- * single ResearchView mount shares the sequence state across calls; reset
- * with {@link resetKeySequence} between tests.
+ * single FieldNotesView mount shares the sequence state across calls;
+ * reset with {@link resetKeySequence} between tests.
  */
 let lastGAt: number | null = null;
 
@@ -70,10 +70,10 @@ export function resetKeySequence(): void {
  * conditionally based on the returned action so that browser shortcuts
  * (e.g. `Cmd+R` reload) are not stolen by this binding.
  */
-export function handleResearchKeydown(
+export function handleFieldNotesKeydown(
 	e: KeyboardEvent,
-	opts: ResearchKeyHandlerOpts,
-): ResearchKeyAction | null {
+	opts: FieldNotesKeyHandlerOpts,
+): FieldNotesKeyAction | null {
 	// Modifier keys are always reserved for browser/OS shortcuts so we
 	// don't accidentally hijack `Cmd+J`, `Ctrl+K`, etc.
 	if (e.metaKey || e.ctrlKey || e.altKey) {

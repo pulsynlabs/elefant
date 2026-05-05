@@ -3,7 +3,7 @@
 TableOfContents — heading outline with scroll-spy.
 
 Reads `<h2>` and `<h3>` elements from a container ref (the rendered
-research-body div) after each render and renders a sticky outline. An
+field-notes-body div) after each render and renders a sticky outline. An
 IntersectionObserver tracks which heading is currently in view so the
 active item can be highlighted as the reader scrolls.
 

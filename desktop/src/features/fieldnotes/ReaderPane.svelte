@@ -1,6 +1,6 @@
 <!--
 @component
-ReaderPane — right-pane markdown reader for the Research View.
+ReaderPane — right-pane markdown reader for the Field Notes View.
 
 Composition:
   • Sticky header  → Breadcrumbs + "Open in editor" button
@@ -8,17 +8,17 @@ Composition:
   • Body grid → TableOfContents (≥1024px) + rendered HTML body
 
 The HTML is server-rendered and sanitized by the daemon (`renderMarkdown`
-+ `sanitizeHtml` in `routes-research.ts`), so we use `{@html}` without an
-extra client-side pass. We post-process the HTML once per file to:
++ `sanitizeHtml` in `routes-fieldnotes.ts`), so we use `{@html}` without
+an extra client-side pass. We post-process the HTML once per file to:
   1. Assign deterministic IDs to h2/h3 (matches TableOfContents slug rule)
   2. Inject a hover-revealed "copy link" button inside each heading
 
-The `research://` link copied to the clipboard mirrors the format used by
-the daemon for tree/file responses, so chip navigation round-trips.
+The `fieldnotes://` link copied to the clipboard mirrors the format used
+by the daemon for tree/file responses, so chip navigation round-trips.
 -->
 <script lang="ts">
 	import { fade } from 'svelte/transition';
-	import { researchStore } from './research-store.svelte.js';
+	import { fieldNotesStore } from './fieldnotes-store.svelte.js';
 	import {
 		HugeiconsIcon,
 		LinkIcon,
@@ -41,9 +41,9 @@ the daemon for tree/file responses, so chip navigation round-trips.
 	let copyToast = $state<string | null>(null);
 	let copyToastTimer: ReturnType<typeof setTimeout> | null = null;
 
-	const fileContent = $derived(researchStore.fileContent);
-	const isLoadingFile = $derived(researchStore.isLoadingFile);
-	const selectedFile = $derived(researchStore.selectedFile);
+	const fileContent = $derived(fieldNotesStore.fileContent);
+	const isLoadingFile = $derived(fieldNotesStore.isLoadingFile);
+	const selectedFile = $derived(fieldNotesStore.selectedFile);
 
 	/**
 	 * Mirror of the daemon's slug rule + heading-id assignment in a single
@@ -87,13 +87,13 @@ the daemon for tree/file responses, so chip navigation round-trips.
 				const finalSlug = count === 0 ? slug : `${slug}-${count + 1}`;
 				seen.set(slug, count + 1);
 				const button = `<button type="button" class="heading-anchor-btn" data-anchor="${finalSlug}" aria-label="Copy link to section">#</button>`;
-				return `<${tag} id="${finalSlug}" class="research-heading">${inner}${button}</${tag}>`;
+				return `<${tag} id="${finalSlug}" class="field-notes-heading">${inner}${button}</${tag}>`;
 			},
 		);
 	}
 
 	async function copyAnchorLink(anchor: string): Promise<void> {
-		const link = fileContent?.research_link;
+		const link = fileContent?.fieldnotes_link;
 		if (!link) return;
 		const fullUri = `${link}#${anchor}`;
 		try {
@@ -101,7 +101,7 @@ the daemon for tree/file responses, so chip navigation round-trips.
 			showToast(`Copied ${fullUri}`);
 		} catch {
 			showToast('Copy failed — see console');
-			console.warn('[research] clipboard copy failed', fullUri);
+			console.warn('[field-notes] clipboard copy failed', fullUri);
 		}
 	}
 
@@ -137,7 +137,7 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		const html = processedHtml;
 		if (!html || !bodyContainer) return;
 		queueMicrotask(() => {
-			const anchor = researchStore.consumePendingAnchor();
+			const anchor = fieldNotesStore.consumePendingAnchor();
 			if (!anchor || !bodyContainer) return;
 			const target = bodyContainer.querySelector(`#${CSS.escape(anchor)}`);
 			if (target instanceof HTMLElement) {
@@ -147,12 +147,12 @@ the daemon for tree/file responses, so chip navigation round-trips.
 	});
 </script>
 
-<section class="reader-pane" aria-label="Research file reader">
+<section class="reader-pane" aria-label="Field note reader">
 	{#if !selectedFile}
 		<div class="reader-empty">
 			<p class="empty-headline">Open a file</p>
 			<p class="empty-body">
-				Select a research note from the tree on the left to read it here.
+				Select a field note from the tree on the left to read it here.
 			</p>
 		</div>
 	{:else if isLoadingFile && !fileContent}
@@ -188,7 +188,7 @@ the daemon for tree/file responses, so chip navigation round-trips.
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
-				class="research-body"
+				class="field-notes-body"
 				bind:this={bodyContainer}
 				onclick={handleBodyClick}
 			>
@@ -352,13 +352,13 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		}
 	}
 
-	/* --- Research body prose -------------------------------------------- */
+	/* --- Field notes body prose ----------------------------------------- */
 	/*
-	 * `research-body` styles target the daemon-rendered HTML. We use
+	 * `field-notes-body` styles target the daemon-rendered HTML. We use
 	 * :global because the children come from {@html} and Svelte's scoped
 	 * CSS doesn't reach them.
 	 */
-	.research-body {
+	.field-notes-body {
 		max-width: 72ch;
 		font-family: var(--font-body);
 		font-size: var(--font-size-base);
@@ -367,7 +367,7 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		min-width: 0;
 	}
 
-	.research-body :global(h1) {
+	.field-notes-body :global(h1) {
 		font-family: var(--font-display);
 		font-size: clamp(22px, 2.4vw, 28px);
 		font-weight: var(--font-weight-semibold);
@@ -377,7 +377,7 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		font-optical-sizing: auto;
 	}
 
-	.research-body :global(.research-heading) {
+	.field-notes-body :global(.field-notes-heading) {
 		position: relative;
 		font-family: var(--font-display);
 		color: var(--text-prose);
@@ -386,7 +386,7 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		scroll-margin-top: 96px;
 	}
 
-	.research-body :global(h2.research-heading) {
+	.field-notes-body :global(h2.field-notes-heading) {
 		font-size: clamp(18px, 2vw, 22px);
 		font-weight: var(--font-weight-semibold);
 		margin: var(--space-7) 0 var(--space-3);
@@ -394,14 +394,14 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		border-bottom: 1px solid var(--border-hairline);
 	}
 
-	.research-body :global(h3.research-heading) {
+	.field-notes-body :global(h3.field-notes-heading) {
 		font-size: var(--font-size-lg);
 		font-weight: var(--font-weight-medium);
 		letter-spacing: var(--tracking-snug);
 		margin: var(--space-5) 0 var(--space-2);
 	}
 
-	.research-body :global(.heading-anchor-btn) {
+	.field-notes-body :global(.heading-anchor-btn) {
 		opacity: 0;
 		margin-left: var(--space-2);
 		padding: 0 6px;
@@ -419,36 +419,36 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		vertical-align: middle;
 	}
 
-	.research-body :global(.research-heading:hover .heading-anchor-btn),
-	.research-body :global(.heading-anchor-btn:focus-visible) {
+	.field-notes-body :global(.field-notes-heading:hover .heading-anchor-btn),
+	.field-notes-body :global(.heading-anchor-btn:focus-visible) {
 		opacity: 1;
 		color: var(--color-primary);
 	}
 
-	.research-body :global(.heading-anchor-btn:hover) {
+	.field-notes-body :global(.heading-anchor-btn:hover) {
 		background-color: var(--surface-hover);
 	}
 
-	.research-body :global(.heading-anchor-btn:focus-visible) {
+	.field-notes-body :global(.heading-anchor-btn:focus-visible) {
 		outline: none;
 		box-shadow: var(--glow-focus);
 	}
 
-	.research-body :global(p) {
+	.field-notes-body :global(p) {
 		margin: 0 0 var(--space-4);
 	}
 
-	.research-body :global(ul),
-	.research-body :global(ol) {
+	.field-notes-body :global(ul),
+	.field-notes-body :global(ol) {
 		margin: 0 0 var(--space-4);
 		padding-left: var(--space-6);
 	}
 
-	.research-body :global(li) {
+	.field-notes-body :global(li) {
 		margin: var(--space-1) 0;
 	}
 
-	.research-body :global(blockquote) {
+	.field-notes-body :global(blockquote) {
 		margin: var(--space-4) 0;
 		padding: var(--space-2) var(--space-4);
 		border-left: 2px solid var(--border-emphasis);
@@ -456,17 +456,17 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		font-style: italic;
 	}
 
-	.research-body :global(blockquote p:last-child) {
+	.field-notes-body :global(blockquote p:last-child) {
 		margin-bottom: 0;
 	}
 
-	.research-body :global(hr) {
+	.field-notes-body :global(hr) {
 		border: none;
 		border-top: 1px solid var(--border-hairline);
 		margin: var(--space-6) 0;
 	}
 
-	.research-body :global(a) {
+	.field-notes-body :global(a) {
 		color: var(--color-primary);
 		text-decoration: none;
 		transition:
@@ -474,20 +474,20 @@ the daemon for tree/file responses, so chip navigation round-trips.
 			text-decoration-color var(--transition-fast);
 	}
 
-	.research-body :global(a:hover) {
+	.field-notes-body :global(a:hover) {
 		color: var(--color-primary-hover);
 		text-decoration: underline;
 		text-decoration-color: var(--color-primary);
 		text-underline-offset: 2px;
 	}
 
-	.research-body :global(a:focus-visible) {
+	.field-notes-body :global(a:focus-visible) {
 		outline: none;
 		box-shadow: var(--glow-focus);
 		border-radius: var(--radius-xs);
 	}
 
-	.research-body :global(code) {
+	.field-notes-body :global(code) {
 		font-family: var(--font-mono);
 		font-size: 0.9em;
 		padding: 1px 6px;
@@ -497,7 +497,7 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		color: var(--text-prose);
 	}
 
-	.research-body :global(pre) {
+	.field-notes-body :global(pre) {
 		margin: var(--space-4) 0;
 		padding: var(--space-4);
 		border-radius: var(--radius-md);
@@ -509,40 +509,40 @@ the daemon for tree/file responses, so chip navigation round-trips.
 		line-height: var(--leading-snug);
 	}
 
-	.research-body :global(pre code) {
+	.field-notes-body :global(pre code) {
 		background: transparent;
 		border: none;
 		padding: 0;
 		font-size: inherit;
 	}
 
-	.research-body :global(table) {
+	.field-notes-body :global(table) {
 		width: 100%;
 		border-collapse: collapse;
 		margin: var(--space-4) 0;
 		font-size: var(--font-size-sm);
 	}
 
-	.research-body :global(th),
-	.research-body :global(td) {
+	.field-notes-body :global(th),
+	.field-notes-body :global(td) {
 		padding: var(--space-2) var(--space-3);
 		border-bottom: 1px solid var(--border-hairline);
 		text-align: left;
 	}
 
-	.research-body :global(th) {
+	.field-notes-body :global(th) {
 		background-color: var(--surface-leaf);
 		color: var(--text-prose);
 		font-weight: var(--font-weight-semibold);
 		border-bottom-color: var(--border-edge);
 	}
 
-	.research-body :global(strong) {
+	.field-notes-body :global(strong) {
 		color: var(--text-prose);
 		font-weight: var(--font-weight-semibold);
 	}
 
-	.research-body :global(em) {
+	.field-notes-body :global(em) {
 		color: var(--text-meta);
 	}
 
