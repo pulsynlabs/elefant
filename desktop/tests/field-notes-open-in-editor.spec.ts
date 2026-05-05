@@ -1,9 +1,9 @@
 /**
- * research-open-in-editor.spec.ts — Wave 5, Task 5.3
+ * field-notes-open-in-editor.spec.ts — Wave 5, Task 5.3
  *
  * Tests the "Open in editor" button in the Research reader pane.
  *
- * Mocks POST /v1/research/open-in-editor and verifies:
+ * Mocks POST /v1/fieldnotes/open-in-editor and verifies:
  * - The correct path is sent in the request body
  * - The success flash appears briefly
  */
@@ -33,7 +33,7 @@ const TREE_RESPONSE = {
           tags: ["opencode"],
           confidence: "high",
           updated: "2026-05-02T14:30:00Z",
-          research_link: "research://project-1/02-tech/opencode-analysis.md",
+          fieldnotes_link: "fieldnotes://project-1/02-tech/opencode-analysis.md",
         },
       ],
     },
@@ -51,9 +51,9 @@ const FILE_RESPONSE = {
     updated: "2026-05-02T14:30:00Z",
     author_agent: "researcher",
   },
-  html: `<h1 id="opencode-analysis" class="research-heading">OpenCode Analysis</h1><p>Content here.</p>`,
+  html: `<h1 id="opencode-analysis" class="field-notes-heading">OpenCode Analysis</h1><p>Content here.</p>`,
   rawBody: "# OpenCode Analysis\n\n...",
-  research_link: "research://project-1/02-tech/opencode-analysis.md",
+  fieldnotes_link: "fieldnotes://project-1/02-tech/opencode-analysis.md",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ async function openProject(page: Page): Promise<void> {
   }
 }
 
-async function setupResearchView(page: Page): Promise<void> {
+async function setupFieldNotesView(page: Page): Promise<void> {
   await page.route(/v1\/research\/tree/, async (route) => {
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(TREE_RESPONSE) });
   });
@@ -88,7 +88,7 @@ async function setupResearchView(page: Page): Promise<void> {
 
   await openProject(page);
 
-  await page.getByRole("button", { name: "Research", exact: true }).click();
+  await page.getByRole("button", { name: "Field Notes", exact: true }).click();
   await page.waitForTimeout(600);
 
   // Select the file
@@ -107,7 +107,7 @@ test.describe("Open In Editor Button — 1280×800", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await setupResearchView(page);
+    await setupFieldNotesView(page);
   });
 
   test("button is visible and clickable when file is loaded", async ({ page }) => {
@@ -116,7 +116,7 @@ test.describe("Open In Editor Button — 1280×800", () => {
     await expect(openBtn).toBeEnabled();
   });
 
-  test("clicking button calls POST /v1/research/open-in-editor with correct path", async ({ page }) => {
+  test("clicking button calls POST /v1/fieldnotes/open-in-editor with correct path", async ({ page }) => {
     let requestBody: Record<string, unknown> | null = null;
 
     // Override the route with a tracking one

@@ -1,7 +1,7 @@
 /**
- * research-mobile.spec.ts
+ * field-notes-mobile.spec.ts
  *
- * Mobile (390×844) checks for the Research View. Verifies the mobile-only
+ * Mobile (390×844) checks for the Field Notes. Verifies the mobile-only
  * top bar with a Files trigger renders, that the inline tree pane is
  * hidden, and that the trigger meets the 44×44 touch-target minimum.
  *
@@ -17,13 +17,13 @@ import {
   installCommonMocks,
   loadAppShell,
   openFirstProject,
-} from "./helpers/research-mocks";
+} from "./helpers/field-notes-mocks";
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const SHOT_DIR = path.resolve(__dir, "screenshots/research");
 const MOBILE = { width: 390, height: 844 };
 
-test.describe("Research View — mobile", () => {
+test.describe("Field Notes View — mobile", () => {
   test.use({ viewport: MOBILE });
   test.setTimeout(30000);
 
@@ -49,7 +49,7 @@ test.describe("Research View — mobile", () => {
     const hamburger = page.getByRole("button", { name: "Toggle sidebar" });
     await hamburger.click();
     await page.waitForTimeout(400);
-    await page.getByRole("button", { name: "Research", exact: true }).click();
+    await page.getByRole("button", { name: "Field Notes", exact: true }).click();
     await page.waitForTimeout(600);
 
     const backdrop = page.locator(".drawer-backdrop");
@@ -58,10 +58,10 @@ test.describe("Research View — mobile", () => {
       await page.waitForTimeout(400);
     }
 
-    // The Research view is mounted in mobile mode (.research-view--mobile).
-    const view = page.locator('[data-testid="research-view"]');
+    // The Research view is mounted in mobile mode (.field-notes-view--mobile).
+    const view = page.locator('[data-testid="field-notes-view"]');
     await expect(view).toBeVisible({ timeout: 10000 });
-    await expect(view).toHaveClass(/research-view--mobile/);
+    await expect(view).toHaveClass(/field-notes-view--mobile/);
 
     // Mobile bar is rendered with the Files trigger button.
     const filesBtn = page.getByRole("button", { name: /Open research files|Files/i });
@@ -74,7 +74,7 @@ test.describe("Research View — mobile", () => {
     expect(bbox!.height).toBeGreaterThanOrEqual(44);
 
     // Inline tree pane is suppressed on mobile.
-    const treePane = page.locator(".research-tree-pane");
+    const treePane = page.locator(".field-notes-tree-pane");
     expect(await treePane.count()).toBe(0);
 
     await page.screenshot({

@@ -1,7 +1,7 @@
 /**
- * research-view.spec.ts
+ * field-notes-view.spec.ts
  *
- * Desktop (1280×800) tests for the Research View. Verifies the view mounts
+ * Desktop (1280×800) tests for the Field Notes. Verifies the view mounts
  * and renders its tree pane shell. The deeper "tree row populated from
  * fixture" and "click file → reader title" assertions are skipped because
  * the production component currently crashes its tree-row effect with a
@@ -12,7 +12,7 @@
  * Once the upstream effect is fixed (separate the row-order derivation
  * from the row-index reset), the skipped assertions can be re-enabled.
  *
- * All `/v1/research/*` routes are intercepted via the shared helper so
+ * All `/v1/fieldnotes/*` routes are intercepted via the shared helper so
  * no daemon is required.
  */
 
@@ -26,7 +26,7 @@ import {
   openFirstProject,
   TREE_FIXTURE,
   FILE_FIXTURE,
-} from "./helpers/research-mocks";
+} from "./helpers/field-notes-mocks";
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const SHOT_DIR = path.resolve(__dir, "screenshots/research");
@@ -35,7 +35,7 @@ const DESKTOP = { width: 1280, height: 800 };
 const SECTION_LABEL = TREE_FIXTURE.sections[0].label; // "Technologies"
 const FILE_TITLE = (FILE_FIXTURE.frontmatter as { title: string }).title; // "SQLite-Vec Notes"
 
-test.describe("Research View — desktop", () => {
+test.describe("Field Notes View — desktop", () => {
   test.use({ viewport: DESKTOP });
   test.setTimeout(30000);
 
@@ -47,7 +47,7 @@ test.describe("Research View — desktop", () => {
     await installCommonMocks(page);
   });
 
-  test("Research View mounts with tree pane shell", async ({ page }) => {
+  test("Field Notes View mounts with tree pane shell", async ({ page }) => {
     await loadAppShell(page);
     const opened = await openFirstProject(page);
     if (!opened) {
@@ -55,10 +55,10 @@ test.describe("Research View — desktop", () => {
       return;
     }
 
-    await page.getByRole("button", { name: "Research", exact: true }).click();
+    await page.getByRole("button", { name: "Field Notes", exact: true }).click();
 
     // Top-level view container.
-    await expect(page.locator('[data-testid="research-view"]')).toBeVisible({
+    await expect(page.locator('[data-testid="field-notes-view"]')).toBeVisible({
       timeout: 10000,
     });
 
@@ -66,7 +66,7 @@ test.describe("Research View — desktop", () => {
     // only stable DOM the pane shows before the tree resolves; deeper
     // content depends on the upstream reactivity bug).
     await expect(page.locator(".tree-pane")).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('[data-research-search]')).toBeVisible();
+    await expect(page.locator('[data-field-notes-search]')).toBeVisible();
 
     // Reader pane defaults to the empty state until a file is opened.
     await expect(page.locator(".reader-pane")).toBeVisible();
@@ -82,7 +82,7 @@ test.describe("Research View — desktop", () => {
   }) => {
     await loadAppShell(page);
     await openFirstProject(page);
-    await page.getByRole("button", { name: "Research", exact: true }).click();
+    await page.getByRole("button", { name: "Field Notes", exact: true }).click();
 
     await expect(
       page.getByText(SECTION_LABEL, { exact: false }).first(),
@@ -97,7 +97,7 @@ test.describe("Research View — desktop", () => {
   }) => {
     await loadAppShell(page);
     await openFirstProject(page);
-    await page.getByRole("button", { name: "Research", exact: true }).click();
+    await page.getByRole("button", { name: "Field Notes", exact: true }).click();
 
     const fileRow = page.locator(".file-row", { hasText: FILE_TITLE }).first();
     await expect(fileRow).toBeVisible({ timeout: 10000 });

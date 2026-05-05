@@ -12,7 +12,7 @@
           "tags": ["sqlite"],
           "confidence": "high",
           "updated": "2026-05-03T10:00:00Z",
-          "research_link": "research://_/02-tech/sqlite-vec.md"
+          "fieldnotes_link": "fieldnotes://_/02-tech/sqlite-vec.md"
         }
       ]
     }

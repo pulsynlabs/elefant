@@ -1,9 +1,9 @@
 /**
- * research-keyboard.spec.ts — Wave 5, Task 5.3
+ * field-notes-keyboard.spec.ts — Wave 5, Task 5.3
  *
- * Keyboard navigation tests for the Research View at 1280×800.
+ * Keyboard navigation tests for the Field Notes at 1280×800.
  *
- * Mocks /v1/research/* routes. Verifies j/k navigation, / search focus,
+ * Mocks /v1/fieldnotes/* routes. Verifies j/k navigation, / search focus,
  * Escape clearing, and g r sequence for reader focus.
  */
 
@@ -32,7 +32,7 @@ const TREE_RESPONSE = {
           tags: ["sqlite"],
           confidence: "high",
           updated: "2026-05-01T10:00:00Z",
-          research_link: "research://project-1/01-domain/sqlite-vec-notes.md",
+          fieldnotes_link: "fieldnotes://project-1/01-domain/sqlite-vec-notes.md",
         },
         {
           name: "pi-analysis.md",
@@ -42,7 +42,7 @@ const TREE_RESPONSE = {
           tags: ["pi", "agent"],
           confidence: "medium",
           updated: "2026-05-02T08:00:00Z",
-          research_link: "research://project-1/01-domain/pi-analysis.md",
+          fieldnotes_link: "fieldnotes://project-1/01-domain/pi-analysis.md",
         },
       ],
     },
@@ -58,7 +58,7 @@ const TREE_RESPONSE = {
           tags: ["opencode"],
           confidence: "high",
           updated: "2026-05-02T14:30:00Z",
-          research_link: "research://project-1/02-tech/opencode-analysis.md",
+          fieldnotes_link: "fieldnotes://project-1/02-tech/opencode-analysis.md",
         },
       ],
     },
@@ -76,9 +76,9 @@ const FILE_RESPONSE = {
     updated: "2026-05-01T10:00:00Z",
     author_agent: "researcher",
   },
-  html: `<h1 id="sqlite-vec-notes" class="research-heading">SQLite-Vec Notes</h1><p>Content here.</p>`,
+  html: `<h1 id="sqlite-vec-notes" class="field-notes-heading">SQLite-Vec Notes</h1><p>Content here.</p>`,
   rawBody: "# SQLite-Vec Notes\n\n...",
-  research_link: "research://project-1/01-domain/sqlite-vec-notes.md",
+  fieldnotes_link: "fieldnotes://project-1/01-domain/sqlite-vec-notes.md",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ async function openProject(page: Page): Promise<void> {
   }
 }
 
-async function setupResearchView(page: Page): Promise<void> {
+async function setupFieldNotesView(page: Page): Promise<void> {
   await page.route(/v1\/research\/tree/, async (route) => {
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(TREE_RESPONSE) });
   });
@@ -106,13 +106,13 @@ async function setupResearchView(page: Page): Promise<void> {
 
   await openProject(page);
 
-  await page.getByRole("button", { name: "Research", exact: true }).click();
+  await page.getByRole("button", { name: "Field Notes", exact: true }).click();
   await page.waitForTimeout(600);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
-test.describe("Research Keyboard Navigation — 1280×800", () => {
+test.describe("Field Notes Keyboard Navigation — 1280×800", () => {
   test.use({ viewport: DESKTOP });
   test.setTimeout(30000);
 
@@ -121,7 +121,7 @@ test.describe("Research Keyboard Navigation — 1280×800", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await setupResearchView(page);
+    await setupFieldNotesView(page);
   });
 
   test("j key advances tree focus to next item", async ({ page }) => {
@@ -133,9 +133,9 @@ test.describe("Research Keyboard Navigation — 1280×800", () => {
     await page.keyboard.press("j");
     await page.waitForTimeout(200);
 
-    // The first row should now have a focus style (data-research-tree-row highlighted)
+    // The first row should now have a focus style (data-field-notes-tree-row highlighted)
     // Since the store advances treeRowIndex, the first file row should be "active"
-    const firstRow = page.locator('[data-research-tree-row]').first();
+    const firstRow = page.locator('[data-field-notes-tree-row]').first();
     await expect(firstRow).toBeVisible();
   });
 
@@ -152,15 +152,15 @@ test.describe("Research Keyboard Navigation — 1280×800", () => {
     await page.waitForTimeout(200);
 
     // Should still have a focused row
-    const rows = page.locator('[data-research-tree-row]');
+    const rows = page.locator('[data-field-notes-tree-row]');
     await expect(rows.first()).toBeVisible();
   });
 
   test("/ key focuses search input", async ({ page }) => {
     // Ensure focus is NOT on the search input
-    const searchInput = page.locator('[data-research-search"]');
+    const searchInput = page.locator('[data-field-notes-search"]');
     // Click elsewhere first
-    await page.locator(".research-tree-pane").click();
+    await page.locator(".field-notes-tree-pane").click();
     await page.waitForTimeout(100);
 
     // Press / — should focus search
@@ -168,7 +168,7 @@ test.describe("Research Keyboard Navigation — 1280×800", () => {
     await page.waitForTimeout(200);
 
     // Search input should be focused
-    const focusedEl = await page.evaluate(() => document.activeElement?.getAttribute("data-research-search"));
+    const focusedEl = await page.evaluate(() => document.activeElement?.getAttribute("data-field-notes-search"));
     expect(focusedEl).toBe("research-search");
   });
 
@@ -177,7 +177,7 @@ test.describe("Research Keyboard Navigation — 1280×800", () => {
     await page.keyboard.press("/");
     await page.waitForTimeout(200);
 
-    const searchInput = page.locator('[data-research-search"]');
+    const searchInput = page.locator('[data-field-notes-search"]');
     await searchInput.waitFor({ state: "focused", timeout: 2000 });
 
     // Type a search query
@@ -204,9 +204,9 @@ test.describe("Research Keyboard Navigation — 1280×800", () => {
     await page.waitForTimeout(200);
 
     // The reader pane should have focus
-    const readerPane = page.locator("[data-research-reader]");
-    const focused = await page.evaluate(() => document.activeElement?.getAttribute("data-research-reader"));
-    expect(focused).toBe("research-reader");
+    const readerPane = page.locator("[data-field-notes-reader]");
+    const focused = await page.evaluate(() => document.activeElement?.getAttribute("data-field-notes-reader"));
+    expect(focused).toBe("field-notes-reader");
   });
 
   test("keyboard navigation is suppressed when search input is focused", async ({ page }) => {
@@ -219,7 +219,7 @@ test.describe("Research Keyboard Navigation — 1280×800", () => {
     await page.waitForTimeout(200);
 
     // The j should appear in the search input, not navigate
-    const searchValue = await page.locator('[data-research-search"]').inputValue();
+    const searchValue = await page.locator('[data-field-notes-search"]').inputValue();
     expect(searchValue).toContain("j");
   });
 
@@ -231,7 +231,7 @@ test.describe("Research Keyboard Navigation — 1280×800", () => {
     await page.keyboard.press("ArrowDown");
     await page.waitForTimeout(200);
 
-    const rows = page.locator('[data-research-tree-row]');
+    const rows = page.locator('[data-field-notes-tree-row]');
     await expect(rows.first()).toBeVisible();
 
     // Press ArrowUp — same as k

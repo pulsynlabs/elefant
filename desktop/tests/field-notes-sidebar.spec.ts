@@ -1,5 +1,5 @@
 /**
- * research-sidebar.spec.ts
+ * field-notes-sidebar.spec.ts
  *
  * Verifies the Research entry exists in the sidebar once a project is open.
  * The Research nav item lives in `projectNavItems` (Sidebar.svelte) and is
@@ -18,13 +18,13 @@ import {
   PROJECT_FIXTURE,
   loadAppShell,
   openFirstProject,
-} from "./helpers/research-mocks";
+} from "./helpers/field-notes-mocks";
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const SHOT_DIR = path.resolve(__dir, "screenshots/research");
 const DESKTOP = { width: 1280, height: 800 };
 
-test.describe("Research Sidebar Entry", () => {
+test.describe("Field Notes Sidebar Entry", () => {
   test.use({ viewport: DESKTOP });
   test.setTimeout(30000);
 
@@ -36,7 +36,7 @@ test.describe("Research Sidebar Entry", () => {
     await installCommonMocks(page);
   });
 
-  test("Research entry appears after a project is opened", async ({ page }) => {
+  test("Field Notes entry appears after a project is opened", async ({ page }) => {
     await loadAppShell(page);
     const opened = await openFirstProject(page);
 
@@ -46,9 +46,9 @@ test.describe("Research Sidebar Entry", () => {
     }
 
     // After a project is active, the Research nav button must render in the
-    // sidebar. The button uses the project nav item label "Research" with
+    // sidebar. The button uses the project nav item label "Field Notes" with
     // matching aria-label (see Sidebar.svelte projectNavItems).
-    const researchBtn = page.getByRole("button", { name: "Research", exact: true });
+    const researchBtn = page.getByRole("button", { name: "Field Notes", exact: true });
     await expect(researchBtn).toBeVisible({ timeout: 10000 });
 
     await page.screenshot({
@@ -66,11 +66,11 @@ test.describe("Research Sidebar Entry", () => {
       return;
     }
 
-    await page.getByRole("button", { name: "Research", exact: true }).click();
+    await page.getByRole("button", { name: "Field Notes", exact: true }).click();
     await page.waitForTimeout(500);
 
-    // ResearchView marks its root with data-testid="research-view"
-    await expect(page.locator('[data-testid="research-view"]')).toBeVisible({
+    // ResearchView marks its root with data-testid="field-notes-view"
+    await expect(page.locator('[data-testid="field-notes-view"]')).toBeVisible({
       timeout: 10000,
     });
   });

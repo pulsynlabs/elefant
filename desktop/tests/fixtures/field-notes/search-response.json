@@ -11,7 +11,7 @@
       "tags": ["opencode", "architecture"],
       "confidence": "high"
     },
-    "research_link": "research://project-1/02-tech/opencode-analysis.md"
+    "fieldnotes_link": "fieldnotes://project-1/02-tech/opencode-analysis.md"
   },
   {
     "path": "02-tech/goopspec-research.md",
@@ -25,6 +25,6 @@
       "tags": ["goopspec", "plugin"],
       "confidence": "medium"
     },
-    "research_link": "research://project-1/02-tech/goopspec-research.md"
+    "fieldnotes_link": "fieldnotes://project-1/02-tech/goopspec-research.md"
   }
 ]

@@ -15,5 +15,5 @@
   },
   "html": "<h2 id=\"overview\">Overview</h2><p>sqlite-vec is a vector extension for SQLite.</p>",
   "rawBody": "## Overview\n\nsqlite-vec is a vector extension for SQLite.",
-  "research_link": "research://_/02-tech/sqlite-vec.md"
+  "fieldnotes_link": "fieldnotes://_/02-tech/sqlite-vec.md"
 }

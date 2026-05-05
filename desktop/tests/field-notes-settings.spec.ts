@@ -1,11 +1,11 @@
 /**
- * research-settings.spec.ts
+ * field-notes-settings.spec.ts
  *
  * Verifies the Settings → Research Base tab is reachable and shows its core
  * content. Uses shared mocks so no daemon is required.
  *
  * Scope is intentionally narrow — only the entry point and a single visible
- * marker from ResearchBaseTab. Deeper behaviour (toggles, providers, hardware
+ * marker from FieldNotesTab. Deeper behaviour (toggles, providers, hardware
  * stats) is covered by component-level tests; spec hygiene says we should
  * avoid coupling e2e to that surface area.
  */
@@ -18,13 +18,13 @@ import {
   installCommonMocks,
   loadAppShell,
   openFirstProject,
-} from "./helpers/research-mocks";
+} from "./helpers/field-notes-mocks";
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const SHOT_DIR = path.resolve(__dir, "screenshots/research");
 const DESKTOP = { width: 1280, height: 800 };
 
-test.describe("Research Base settings tab", () => {
+test.describe("Field Notes Base settings tab", () => {
   test.use({ viewport: DESKTOP });
   test.setTimeout(30000);
 
@@ -36,7 +36,7 @@ test.describe("Research Base settings tab", () => {
     await installCommonMocks(page);
   });
 
-  test("Research Base tab is visible and renders content", async ({ page }) => {
+  test("Field Notes Base tab is visible and renders content", async ({ page }) => {
     await loadAppShell(page);
     // Open a project first so per-project research stats can resolve.
     await openFirstProject(page);
@@ -55,20 +55,20 @@ test.describe("Research Base settings tab", () => {
 
     // Activate the Research Base tab. The label exactly matches the entry
     // registered in SettingsView.svelte's `sections` array.
-    const researchTab = page.getByRole("button", { name: "Research Base", exact: true });
+    const researchTab = page.getByRole("button", { name: "Field Notes Base", exact: true });
     await expect(researchTab).toBeVisible();
     await researchTab.click();
     await page.waitForTimeout(400);
 
     // Vector Index card heading is the first stable element rendered by
-    // ResearchBaseTab. Use the heading role to avoid colliding with the
+    // FieldNotesTab. Use the heading role to avoid colliding with the
     // tab label or the "Vector Index" toggle copy.
     await expect(
       page.getByRole("heading", { name: "Vector Index", exact: true }),
     ).toBeVisible();
 
     await page.screenshot({
-      path: path.join(SHOT_DIR, "settings-research-base.png"),
+      path: path.join(SHOT_DIR, "settings-field-notes.png"),
       fullPage: false,
     });
   });

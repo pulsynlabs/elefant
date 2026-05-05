@@ -2,7 +2,7 @@
  * Shared route mocks and navigation helpers for the Research Base spec suite.
  *
  * The desktop app talks to a daemon over HTTP. The Vite dev server proxies
- * `/api/*`, `/health`, `/v1/research/*` to the daemon at localhost:1337.
+ * `/api/*`, `/health`, `/v1/fieldnotes/*` to the daemon at localhost:1337.
  * For e2e tests we don't run the daemon — instead each spec installs route
  * fulfillers via page.route() so the UI sees a coherent project + config.
  *
@@ -13,9 +13,9 @@
  *   - /api/projects       → array of one project (note: NOT wrapped — the
  *                           store reads `Project[]` directly)
  *   - /api/projects/:id/sessions → []
- *   - /v1/research/tree   → fixture
- *   - /v1/research/file   → fixture
- *   - /v1/research/status → fixture
+ *   - /v1/fieldnotes/tree   → fixture
+ *   - /v1/fieldnotes/file   → fixture
+ *   - /v1/fieldnotes/status → fixture
  */
 
 import { fileURLToPath } from "node:url";
@@ -65,14 +65,14 @@ function readFixture(file: string): unknown {
   return JSON.parse(raw);
 }
 
-export const TREE_FIXTURE = readFixture("research-tree.json") as {
+export const TREE_FIXTURE = readFixture("field-notes-tree.json") as {
   sections: Array<{ name: string; label: string; files: Array<unknown> }>;
 };
-export const FILE_FIXTURE = readFixture("research-file.json") as Record<
+export const FILE_FIXTURE = readFixture("field-notes-file.json") as Record<
   string,
   unknown
 >;
-export const STATUS_FIXTURE = readFixture("research-status.json") as Record<
+export const STATUS_FIXTURE = readFixture("field-notes-status.json") as Record<
   string,
   unknown
 >;
@@ -139,12 +139,12 @@ export async function installCommonMocks(page: Page): Promise<void> {
   // we don't have multiple overlapping handlers fighting each other.
   //
   // Note: registered on the BrowserContext (not the page) because the
-  // research-client's `fetch()` for /v1/research/* is dispatched in a
+  // research-client's `fetch()` for /v1/fieldnotes/* is dispatched in a
   // way `page.route` doesn't always intercept (service-worker boundary).
   // `context.route` covers the page plus any worker-initiated requests.
   await page.context().route(/\/v1\/research\//, async (route) => {
     const url = route.request().url();
-    if (url.includes("/v1/research/tree")) {
+    if (url.includes("/v1/fieldnotes/tree")) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -152,7 +152,7 @@ export async function installCommonMocks(page: Page): Promise<void> {
       });
       return;
     }
-    if (url.includes("/v1/research/file")) {
+    if (url.includes("/v1/fieldnotes/file")) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -160,7 +160,7 @@ export async function installCommonMocks(page: Page): Promise<void> {
       });
       return;
     }
-    if (url.includes("/v1/research/status")) {
+    if (url.includes("/v1/fieldnotes/status")) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",

@@ -1,11 +1,11 @@
 /**
- * research-chip.spec.ts — Wave 5, Task 5.3
+ * field-notes-chip.spec.ts — Wave 5, Task 5.3
  *
- * Tests research:// chip rendering and navigation in the chat context.
+ * Tests fieldnotes:// chip rendering and navigation in the chat context.
  *
- * We mock GET /v1/research/file?meta=true&... to return just frontmatter,
+ * We mock GET /v1/fieldnotes/file?meta=true&... to return just frontmatter,
  * simulating what happens when a ResearchChip component loads its preview
- * data. We then simulate clicking the chip and verify the Research View
+ * data. We then simulate clicking the chip and verify the Field Notes
  * opens with the correct file.
  */
 
@@ -32,7 +32,7 @@ const FILE_META_RESPONSE = {
   },
   html: "",
   rawBody: "",
-  research_link: "research://project-1/02-tech/sqlite-vec-notes.md",
+  fieldnotes_link: "fieldnotes://project-1/02-tech/sqlite-vec-notes.md",
 };
 
 const TREE_RESPONSE = {
@@ -49,7 +49,7 @@ const TREE_RESPONSE = {
           tags: ["sqlite", "vector-search"],
           confidence: "high",
           updated: "2026-05-01T10:00:00Z",
-          research_link: "research://project-1/02-tech/sqlite-vec-notes.md",
+          fieldnotes_link: "fieldnotes://project-1/02-tech/sqlite-vec-notes.md",
         },
       ],
     },
@@ -68,9 +68,9 @@ const FILE_CONTENT_RESPONSE = {
     updated: "2026-05-01T10:00:00Z",
     author_agent: "researcher",
   },
-  html: `<h1 id="sqlite-vec-notes" class="research-heading">SQLite-Vec Notes</h1><p>Notes on integrating sqlite-vec for vector search.</p>`,
+  html: `<h1 id="sqlite-vec-notes" class="field-notes-heading">SQLite-Vec Notes</h1><p>Notes on integrating sqlite-vec for vector search.</p>`,
   rawBody: "# SQLite-Vec Notes\n\n...",
-  research_link: "research://project-1/02-tech/sqlite-vec-notes.md",
+  fieldnotes_link: "fieldnotes://project-1/02-tech/sqlite-vec-notes.md",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ async function setup(page: Page): Promise<void> {
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
-test.describe("Research Chip — 1280×800", () => {
+test.describe("Field Notes Chip — 1280×800", () => {
   test.use({ viewport: DESKTOP });
   test.setTimeout(30000);
 
@@ -120,7 +120,7 @@ test.describe("Research Chip — 1280×800", () => {
 
   test("chip renders with correct title from frontmatter", async ({ page }) => {
     // Navigate to Research view
-    await page.getByRole("button", { name: "Research", exact: true }).click();
+    await page.getByRole("button", { name: "Field Notes", exact: true }).click();
     await page.waitForTimeout(600);
 
     // Simulate a rendered chip by opening the file directly
@@ -141,9 +141,9 @@ test.describe("Research Chip — 1280×800", () => {
     expect(["sqlite", "vector-search", "integration"]).toContain(firstTag?.trim());
   });
 
-  test("clicking chip navigates to Research View with correct file path", async ({ page }) => {
+  test("clicking chip navigates to Field Notes with correct file path", async ({ page }) => {
     // Navigate to Research view
-    await page.getByRole("button", { name: "Research", exact: true }).click();
+    await page.getByRole("button", { name: "Field Notes", exact: true }).click();
     await page.waitForTimeout(600);
 
     // Select a different file
@@ -155,14 +155,14 @@ test.describe("Research Chip — 1280×800", () => {
     await expect(breadcrumbs).toContainText("Tech");
     await expect(breadcrumbs).toContainText("SQLite-Vec Notes");
 
-    // The file content should be loaded (research_link matches)
+    // The file content should be loaded (fieldnotes_link matches)
     await expect(page.locator(".reader-title")).toContainText("SQLite-Vec Notes");
   });
 
   test("meta=true route returns frontmatter without body", async ({ page }) => {
     // Directly test the API route by navigating to a file and
     // verifying the frontmatter is loaded correctly
-    await page.getByRole("button", { name: "Research", exact: true }).click();
+    await page.getByRole("button", { name: "Field Notes", exact: true }).click();
     await page.waitForTimeout(600);
 
     // Intercept all file requests to track which was called
