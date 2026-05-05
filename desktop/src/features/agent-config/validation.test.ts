@@ -7,64 +7,22 @@
 
 import { describe, expect, it } from 'bun:test';
 import {
-	validateLimits,
 	validateGeneration,
 	validateToolPolicy,
 	isValidToolName,
 	parseToolList,
 	hasErrors,
-	LIMITS_BOUNDS,
-	BEHAVIOR_BOUNDS,
 } from './validation.js';
-
-describe('validateLimits', () => {
-	const validLimits = { maxIterations: 50, timeoutMs: 60_000, maxConcurrency: 3 };
-
-	it('accepts a fully valid limits block', () => {
-		expect(validateLimits(validLimits)).toEqual({});
-	});
-
-	it('rejects maxIterations below the minimum', () => {
-		const errors = validateLimits({ ...validLimits, maxIterations: 0 });
-		expect(errors.maxIterations).toContain(String(LIMITS_BOUNDS.maxIterations.min));
-	});
-
-	it('rejects maxIterations above the maximum', () => {
-		const errors = validateLimits({ ...validLimits, maxIterations: 10_000 });
-		expect(errors.maxIterations).toBeDefined();
-	});
-
-	it('rejects non-integer maxIterations', () => {
-		const errors = validateLimits({ ...validLimits, maxIterations: 2.5 });
-		expect(errors.maxIterations).toBeDefined();
-	});
-
-	it('rejects timeoutMs below 1000', () => {
-		const errors = validateLimits({ ...validLimits, timeoutMs: 500 });
-		expect(errors.timeoutMs).toBeDefined();
-	});
-
-	it('rejects timeoutMs above 600000', () => {
-		const errors = validateLimits({ ...validLimits, timeoutMs: 600_001 });
-		expect(errors.timeoutMs).toBeDefined();
-	});
-
-	it('rejects maxConcurrency outside 1–10', () => {
-		expect(validateLimits({ ...validLimits, maxConcurrency: 0 }).maxConcurrency).toBeDefined();
-		expect(validateLimits({ ...validLimits, maxConcurrency: 11 }).maxConcurrency).toBeDefined();
-	});
-});
 
 describe('validateGeneration', () => {
 	it('accepts an empty behavior object (all fields optional)', () => {
 		expect(validateGeneration({})).toEqual({});
 	});
 
-	it('accepts valid temperature, topP, maxTokens', () => {
+	it('accepts valid temperature and topP', () => {
 		const errors = validateGeneration({
 			temperature: 0.7,
 			topP: 0.9,
-			maxTokens: 4096,
 		});
 		expect(errors).toEqual({});
 	});
@@ -77,20 +35,6 @@ describe('validateGeneration', () => {
 	it('rejects topP outside 0–1', () => {
 		expect(validateGeneration({ topP: -0.1 }).topP).toBeDefined();
 		expect(validateGeneration({ topP: 1.1 }).topP).toBeDefined();
-	});
-
-	it('rejects non-integer maxTokens', () => {
-		expect(validateGeneration({ maxTokens: 10.5 }).maxTokens).toBeDefined();
-	});
-
-	it('rejects zero or negative maxTokens', () => {
-		expect(validateGeneration({ maxTokens: 0 }).maxTokens).toBeDefined();
-		expect(validateGeneration({ maxTokens: -5 }).maxTokens).toBeDefined();
-	});
-
-	it('upper bound on maxTokens is surfaced', () => {
-		const over = BEHAVIOR_BOUNDS.maxTokens.max + 1;
-		expect(validateGeneration({ maxTokens: over }).maxTokens).toBeDefined();
 	});
 });
 
@@ -146,22 +90,12 @@ describe('parseToolList', () => {
 });
 
 describe('validateToolPolicy', () => {
-	it('accepts each valid tool mode', () => {
-		expect(validateToolPolicy({ mode: 'auto' })).toEqual({});
-		expect(validateToolPolicy({ mode: 'manual' })).toEqual({});
-		expect(validateToolPolicy({ mode: 'deny_all' })).toEqual({});
-	});
-
-	it('rejects an unknown tool mode', () => {
-		const errors = validateToolPolicy({
-			mode: 'anarchy' as unknown as 'auto',
-		});
-		expect(errors.mode).toBeDefined();
+	it('accepts an empty policy', () => {
+		expect(validateToolPolicy({})).toEqual({});
 	});
 
 	it('accepts clean allow / deny lists', () => {
 		const errors = validateToolPolicy({
-			mode: 'auto',
 			allowedTools: ['read_file', 'bash'],
 			deniedTools: ['delete_file'],
 		});
@@ -170,7 +104,6 @@ describe('validateToolPolicy', () => {
 
 	it('rejects invalid entries in allow list', () => {
 		const errors = validateToolPolicy({
-			mode: 'auto',
 			allowedTools: ['read_file', '1invalid'],
 		});
 		expect(errors.allowedTools).toBeDefined();
@@ -178,7 +111,6 @@ describe('validateToolPolicy', () => {
 
 	it('rejects invalid entries in deny list', () => {
 		const errors = validateToolPolicy({
-			mode: 'auto',
 			deniedTools: ['read_file', 'bad name'],
 		});
 		expect(errors.deniedTools).toBeDefined();
@@ -191,6 +123,6 @@ describe('hasErrors', () => {
 	});
 
 	it('returns true when any key is present', () => {
-		expect(hasErrors({ maxIterations: 'bad' })).toBe(true);
+		expect(hasErrors({ temperature: 'bad' })).toBe(true);
 	});
 });
