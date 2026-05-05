@@ -141,9 +141,11 @@
 	.tab {
 		display: inline-flex;
 		align-items: center;
-		gap: var(--space-2);
+		justify-content: center;
+		gap: 6px;
 		padding: 0 var(--space-3);
 		height: 100%;
+		flex: 1 1 0;
 		min-width: 0;
 		font-family: inherit;
 		font-size: 12px;
@@ -180,8 +182,6 @@
 
 	.tab-label {
 		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 
 	.tab-close {
