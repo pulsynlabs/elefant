@@ -33,6 +33,7 @@ import { createToolListTool } from './tool_list/index.js';
 import { createToolSearchTool, type SkillCatalogEntry } from './tool_search/index.js';
 import { webfetchTool } from './webfetch.js';
 import { websearchTool } from './websearch.js';
+import { getDatetimeTool } from './get_datetime/index.js';
 import { writeTool, createWriteTool } from './write.js';
 import { createResearchSearchTool } from './research_search/index.js';
 import { researchGrepTool } from './research_grep/index.js';
@@ -445,6 +446,7 @@ export function createToolRegistry(hookRegistry: HookRegistry): ToolRegistry {
 	registry.register(applyPatchTool);
 	registry.register(webfetchTool);
 	registry.register(websearchTool);
+	registry.register(getDatetimeTool);
 	registry.register(todowriteTool);
 	registry.register(todoreadTool);
 	// Interactive tools (always registered regardless of session mode)
@@ -533,6 +535,7 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	registry.register(bashTool)
 	registry.register(webfetchTool)
 	registry.register(websearchTool)
+	registry.register(getDatetimeTool)
 	registry.register(todowriteTool)
 	registry.register(todoreadTool)
 	// Interactive tools (always registered regardless of session mode)
