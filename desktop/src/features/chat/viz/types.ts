@@ -11,7 +11,7 @@ export type VizType =
 	| 'table'
 	| 'stat-grid'
 	| 'code'
-	| 'research-card'
+	| 'field-notes-card'
 	| 'loading'
 	| 'comparison';
 

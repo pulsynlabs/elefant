@@ -26,7 +26,7 @@ const ALL_TYPES: VizType[] = [
 	'table',
 	'stat-grid',
 	'code',
-	'research-card',
+	'field-notes-card',
 	'loading',
 	'comparison',
 ];

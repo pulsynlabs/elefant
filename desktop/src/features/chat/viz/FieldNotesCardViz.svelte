@@ -1,13 +1,13 @@
 <script lang="ts">
-	// Research card viz renderer.
+	// Field notes card viz renderer.
 	//
-	// Premium bento grid for research-style results: each card carries
+	// Premium bento grid for field-notes-style results: each card carries
 	// a title, a summary clamped to three lines, an optional confidence
 	// pill (high/med/low — derived from a 0–1 score), an optional tag
 	// row truncated to four chips with a "+N" overflow marker, and an
-	// optional source. `research://` sources mount the existing
-	// `ResearchChip` so the chip resolves the file's frontmatter title
-	// and routes to the Research View on click; everything else falls
+	// optional source. `fieldnotes://` sources mount the existing
+	// `FieldNotesChip` so the chip resolves the file's frontmatter title
+	// and routes to the Field Notes View on click; everything else falls
 	// back to a plain external anchor with rel=noopener.
 	//
 	// Layout uses CSS grid `auto-fit, minmax(240px, 1fr)` so the bento
@@ -15,17 +15,17 @@
 	// on narrow transcripts (mobile). Tokens only — zero hex.
 
 	import type { VizRendererProps } from './types.js';
-	import ResearchChip from '../ResearchChip.svelte';
+	import FieldNotesChip from '../FieldNotesChip.svelte';
 	import {
 		confidenceColorToken,
 		formatConfidence,
-		isResearchUri,
+		isFieldNotesUri,
 		truncateTags,
-	} from './research-card-state.js';
+	} from './fieldnotes-card-state.js';
 
 	let { envelope }: VizRendererProps = $props();
 
-	interface ResearchCard {
+	interface FieldNotesCard {
 		title: string;
 		summary: string;
 		url?: string;
@@ -37,7 +37,7 @@
 	// the cast surfaces the typed shape and the `?? []` keeps a
 	// malformed envelope from crashing the transcript.
 	const cards = $derived(
-		(envelope.data as { cards?: ResearchCard[] }).cards ?? [],
+		(envelope.data as { cards?: FieldNotesCard[] }).cards ?? [],
 	);
 
 	const TAG_LIMIT = 4;
@@ -84,8 +84,8 @@
 
 			{#if card.url}
 				<footer class="rc-footer">
-					{#if isResearchUri(card.url)}
-						<ResearchChip uri={card.url} />
+					{#if isFieldNotesUri(card.url)}
+						<FieldNotesChip uri={card.url} />
 					{:else}
 						<a
 							class="rc-link"

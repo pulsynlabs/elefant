@@ -1,4 +1,4 @@
-// Unit tests for the research-card viz helpers.
+// Unit tests for the field-notes-card viz helpers.
 //
 // Cover every branch of each helper — the renderer trusts these
 // functions to be total, so the test suite has to keep them so.
@@ -7,9 +7,9 @@ import { describe, expect, it } from 'bun:test';
 import {
 	confidenceColorToken,
 	formatConfidence,
-	isResearchUri,
+	isFieldNotesUri,
 	truncateTags,
-} from './research-card-state.js';
+} from './fieldnotes-card-state.js';
 
 describe('formatConfidence', () => {
 	it('returns "high" for scores at or above 0.8', () => {
@@ -80,24 +80,24 @@ describe('truncateTags', () => {
 	});
 });
 
-describe('isResearchUri', () => {
-	it('returns true for research:// URIs', () => {
-		expect(isResearchUri('research://feat-x/02-tech/foo.md')).toBe(true);
-		expect(isResearchUri('research://_/01-domain/bar.md#anchor')).toBe(true);
+describe('isFieldNotesUri', () => {
+	it('returns true for fieldnotes:// URIs', () => {
+		expect(isFieldNotesUri('fieldnotes://feat-x/02-tech/foo.md')).toBe(true);
+		expect(isFieldNotesUri('fieldnotes://_/01-domain/bar.md#anchor')).toBe(true);
 	});
 
 	it('returns false for http/https URLs', () => {
-		expect(isResearchUri('http://example.com')).toBe(false);
-		expect(isResearchUri('https://example.com/page')).toBe(false);
+		expect(isFieldNotesUri('http://example.com')).toBe(false);
+		expect(isFieldNotesUri('https://example.com/page')).toBe(false);
 	});
 
 	it('returns false for relative paths', () => {
-		expect(isResearchUri('./foo.md')).toBe(false);
-		expect(isResearchUri('docs/bar.md')).toBe(false);
+		expect(isFieldNotesUri('./foo.md')).toBe(false);
+		expect(isFieldNotesUri('docs/bar.md')).toBe(false);
 	});
 
 	it('returns false for undefined or empty string', () => {
-		expect(isResearchUri(undefined)).toBe(false);
-		expect(isResearchUri('')).toBe(false);
+		expect(isFieldNotesUri(undefined)).toBe(false);
+		expect(isFieldNotesUri('')).toBe(false);
 	});
 });

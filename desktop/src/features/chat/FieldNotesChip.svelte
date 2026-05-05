@@ -1,30 +1,30 @@
 <!--
 @component
-ResearchChip — inline chip that renders a `research://` URI or
-`.elefant/markdown-db/**.md` reference inside chat output.
+FieldNotesChip — inline chip that renders a `fieldnotes://` URI or
+`.elefant/field-notes/**.md` reference inside chat output.
 
-Lazy-fetches the file's frontmatter title via the research client and
+Lazy-fetches the file's frontmatter title via the field-notes client and
 swaps the placeholder text in once it lands. Click navigates to the
-Research View, opens the file, and (if the URI carries a `#anchor`)
+Field Notes View, opens the file, and (if the URI carries a `#anchor`)
 scrolls the reader to that heading slug.
 
 Designed to be mounted as a normal Svelte component — not via
 {@html} — so it gets full reactive lifecycle and onclick wiring. The
-`MarkdownRenderer` link snippet detects research URIs by href and
+`MarkdownRenderer` link snippet detects field-notes URIs by href and
 emits this component instead of a plain anchor.
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { HugeiconsIcon, ResearchIcon } from '$lib/icons/index.js';
-	import { researchClient } from '$lib/daemon/research-client.js';
-	import { researchStore } from '../research/research-store.svelte.js';
+	import { HugeiconsIcon, FieldNotesIcon } from '$lib/icons/index.js';
+	import { fieldNotesClient } from '$lib/daemon/fieldnotes-client.js';
+	import { fieldNotesStore } from '../fieldnotes/fieldnotes-store.svelte.js';
 	import { navigationStore } from '$lib/stores/navigation.svelte.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
-	import { parseResearchLink } from '../../../../src/research/link.js';
+	import { parseFieldNotesLink } from '../../../../src/fieldnotes/link.js';
 
 	type Props = {
-		/** The full URI as it appeared in the chat — `research://...` or
-		 * a `.elefant/markdown-db/...` relative path. Always non-empty. */
+		/** The full URI as it appeared in the chat — `fieldnotes://...` or
+		 * a `.elefant/field-notes/...` relative path. Always non-empty. */
 		uri: string;
 		/** Optional override label. When omitted, the chip starts with a
 		 * shortened URI and replaces it with the file title once the
@@ -34,7 +34,7 @@ emits this component instead of a plain anchor.
 
 	let { uri, label }: Props = $props();
 
-	const parsed = $derived(parseResearchLink(uri));
+	const parsed = $derived(parseFieldNotesLink(uri));
 
 	// Display text falls back through three tiers:
 	//   1. explicit `label` prop (highest priority — author intent)
@@ -59,7 +59,7 @@ emits this component instead of a plain anchor.
 		// the assignment to `resolvedTitle` is harmless because Svelte
 		// drops state mutations on unmounted components.
 		isLoading = true;
-		researchClient
+		fieldNotesClient
 			.getFile(projectId, parsed.data.path, true)
 			.then((file) => {
 				resolvedTitle = file.frontmatter.title ?? null;
@@ -89,8 +89,8 @@ emits this component instead of a plain anchor.
 		const projectId = projectsStore.activeProjectId;
 		if (!projectId) return;
 
-		navigationStore.goToResearch();
-		void researchStore.openFile(
+		navigationStore.goToFieldNotes();
+		void fieldNotesStore.openFile(
 			projectId,
 			parsed.data.path,
 			parsed.data.anchor ?? undefined,
@@ -113,15 +113,15 @@ emits this component instead of a plain anchor.
      like an inline link so it still reads as navigational. -->
 <button
 	type="button"
-	class="research-chip"
+	class="field-notes-chip"
 	class:loading={isLoading}
 	class:error={hasError}
 	title={titleAttr}
 	onclick={handleClick}
-	data-research-uri={uri}
+	data-field-notes-uri={uri}
 >
 	<span class="chip-icon" aria-hidden="true">
-		<HugeiconsIcon icon={ResearchIcon} size={12} strokeWidth={1.75} />
+		<HugeiconsIcon icon={FieldNotesIcon} size={12} strokeWidth={1.75} />
 	</span>
 	<span class="chip-text">{displayText}</span>
 	{#if resolvedSection}
@@ -135,7 +135,7 @@ emits this component instead of a plain anchor.
 	 * button. Hairline border, primary-subtle wash, gently lifts on
 	 * hover without changing color saturation enough to distract.
 	 */
-	.research-chip {
+	.field-notes-chip {
 		/* Reset native button chrome before re-styling as an inline chip. */
 		appearance: none;
 		font: inherit;
@@ -165,7 +165,7 @@ emits this component instead of a plain anchor.
 			transform var(--transition-fast);
 	}
 
-	.research-chip:hover {
+	.field-notes-chip:hover {
 		background-color: color-mix(
 			in oklch,
 			var(--color-primary) 18%,
@@ -176,16 +176,16 @@ emits this component instead of a plain anchor.
 		transform: translateY(-1px);
 	}
 
-	.research-chip:focus-visible {
+	.field-notes-chip:focus-visible {
 		outline: none;
 		box-shadow: var(--glow-focus);
 	}
 
-	.research-chip.loading {
+	.field-notes-chip.loading {
 		opacity: 0.75;
 	}
 
-	.research-chip.error {
+	.field-notes-chip.error {
 		color: var(--color-error);
 		border-color: color-mix(in oklch, var(--color-error) 35%, transparent);
 		background-color: color-mix(in oklch, var(--color-error) 8%, transparent);
@@ -227,11 +227,11 @@ emits this component instead of a plain anchor.
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.research-chip {
+		.field-notes-chip {
 			transition: none;
 		}
 
-		.research-chip:hover {
+		.field-notes-chip:hover {
 			transform: none;
 		}
 	}

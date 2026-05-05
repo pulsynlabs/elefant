@@ -132,7 +132,7 @@ describe('isVizToolCall', () => {
 		expect(isVizToolCall('bash')).toBe(false);
 		expect(isVizToolCall('read')).toBe(false);
 		expect(isVizToolCall('task')).toBe(false);
-		expect(isVizToolCall('research_search')).toBe(false);
+		expect(isVizToolCall('field_notes_search')).toBe(false);
 	});
 
 	it('returns false for empty string', () => {

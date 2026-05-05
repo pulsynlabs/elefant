@@ -1,4 +1,4 @@
-// Pure helpers for `ResearchCardViz.svelte`.
+// Pure helpers for `FieldNotesCardViz.svelte`.
 //
 // The renderer is intentionally logic-light — formatting, threshold
 // classification, tag truncation, and URI sniffing all live here so
@@ -9,9 +9,9 @@
 
 /**
  * Three-tier confidence label derived from a 0–1 score. Mirrors the
- * `'high' | 'medium' | 'low'` band used by Research Base frontmatter
- * so a card built from `research_search` reads consistently with one
- * built from `research_index`. Returns the empty string for a missing
+ * `'high' | 'medium' | 'low'` band used by Field Notes frontmatter
+ * so a card built from `field_notes_search` reads consistently with one
+ * built from `field_notes_index`. Returns the empty string for a missing
  * score so the renderer can omit the chip entirely.
  *
  * Thresholds: ≥0.8 high, ≥0.5 med, otherwise low.
@@ -49,12 +49,12 @@ export function truncateTags(tags: string[] | undefined, max: number): string[] 
 }
 
 /**
- * `true` when the supplied URL is an internal `research://` link and
- * should be rendered via `ResearchChip` (which lazy-loads the file's
+ * `true` when the supplied URL is an internal `fieldnotes://` link and
+ * should be rendered via `FieldNotesChip` (which lazy-loads the file's
  * frontmatter title and routes via the navigation store) rather than
  * a plain external anchor. Defensive against `undefined` because
  * `card.url` is optional in the schema.
  */
-export function isResearchUri(s: string | undefined): boolean {
-	return typeof s === 'string' && s.startsWith('research://');
+export function isFieldNotesUri(s: string | undefined): boolean {
+	return typeof s === 'string' && s.startsWith('fieldnotes://');
 }
