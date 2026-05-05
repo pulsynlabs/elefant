@@ -6,21 +6,21 @@ import type { Elysia } from 'elysia';
 import type { Database } from '../db/database.ts';
 import { getProjectById } from '../db/repo/projects.ts';
 import { FIELD_NOTES_SECTIONS, fieldNotesDir } from '../project/paths.ts';
-import { assertInsideResearchBase } from '../research/membership.ts';
-import { parseFrontmatter, type Frontmatter } from '../research/frontmatter.ts';
-import { serializeResearchLink } from '../research/link.ts';
-import { createDisabledProvider } from '../research/embeddings/disabled.ts';
-import { ResearchStore } from '../research/store.ts';
-import { getResearchStatus, type ResearchStatus } from '../research/status.ts';
-import { IndexerService, type BulkIndexSummary } from '../research/indexer.ts';
-import { ProgressEmitter } from '../research/progress.ts';
-import { createResearchSearchTool, type ResearchSearchOutput, type SearchResult } from '../tools/research_search/index.ts';
-import { launchEditor } from '../research/editor-launch.ts';
-import { routesLog } from '../research/log.ts';
+import { assertInsideFieldNotes } from '../fieldnotes/membership.ts';
+import { parseFrontmatter, type Frontmatter } from '../fieldnotes/frontmatter.ts';
+import { serializeFieldNotesLink } from '../fieldnotes/link.ts';
+import { createDisabledProvider } from '../fieldnotes/embeddings/disabled.ts';
+import { FieldNotesStore } from '../fieldnotes/store.ts';
+import { getFieldNotesStatus, type FieldNotesStatus } from '../fieldnotes/status.ts';
+import { IndexerService, type BulkIndexSummary } from '../fieldnotes/indexer.ts';
+import { ProgressEmitter } from '../fieldnotes/progress.ts';
+import { createFieldNotesSearchTool, type FieldNotesSearchOutput, type SearchResult } from '../tools/field_notes_search/index.ts';
+import { launchEditor } from '../fieldnotes/editor-launch.ts';
+import { routesLog } from '../fieldnotes/log.ts';
 
 type ProjectContext = { projectId: string; projectPath: string };
 
-export interface ResearchTreeFile {
+export interface FieldNotesTreeFile {
   name: string;
   path: string;
   title: string;
@@ -28,19 +28,19 @@ export interface ResearchTreeFile {
   tags: string[];
   confidence: string;
   updated: string;
-  research_link: string;
+  fieldnotes_link: string;
 }
 
-export interface ResearchTreeSection {
+export interface FieldNotesTreeSection {
   name: string;
   label: string;
-  files: ResearchTreeFile[];
+  files: FieldNotesTreeFile[];
 }
 
-export interface ResearchRoutesDeps {
+export interface FieldNotesRoutesDeps {
   launchEditor?: typeof launchEditor;
-  search?: (ctx: ProjectContext, input: ResearchSearchBody) => Promise<SearchResult[] | ResearchSearchOutput>;
-  getStatus?: (ctx: ProjectContext) => Promise<ResearchStatus>;
+  search?: (ctx: ProjectContext, input: FieldNotesSearchBody) => Promise<SearchResult[] | FieldNotesSearchOutput>;
+  getStatus?: (ctx: ProjectContext) => Promise<FieldNotesStatus>;
   createIndexer?: (ctx: ProjectContext) => IndexerServiceLike;
   progressEmitter?: (projectId: string) => ProgressEmitter;
 }
@@ -68,7 +68,7 @@ const searchBodySchema = z.object({
   minScore: z.number().optional(),
 }).strict();
 
-export type ResearchSearchBody = z.infer<typeof searchBodySchema>;
+export type FieldNotesSearchBody = z.infer<typeof searchBodySchema>;
 
 const projectBodySchema = z.object({ projectId: z.string().min(1) }).strict();
 const openInEditorBodySchema = z.object({ projectId: z.string().min(1), path: z.string().min(1) }).strict();
@@ -102,13 +102,13 @@ function projectContext(db: Database, projectId: string): { status: number; body
   return { status: 200, ctx: { projectId, projectPath: project.data.path } };
 }
 
-function researchRelativePath(projectPath: string, absolutePath: string): string {
+function fieldNotesRelativePath(projectPath: string, absolutePath: string): string {
   return relative(fieldNotesDir(projectPath), absolutePath).split(sep).join('/');
 }
 
-function resolveResearchPath(projectPath: string, relativePath: string): { status: number; body?: unknown; absolutePath?: string; relativePath?: string } {
+function resolveFieldNotesPath(projectPath: string, relativePath: string): { status: number; body?: unknown; absolutePath?: string; relativePath?: string } {
   const absoluteCandidate = resolve(fieldNotesDir(projectPath), relativePath);
-  const membership = assertInsideResearchBase(projectPath, absoluteCandidate, { requireMarkdown: true });
+  const membership = assertInsideFieldNotes(projectPath, absoluteCandidate, { requireMarkdown: true });
   if (!membership.ok) {
     const status = mapErrorStatus(membership.error.code);
     return { status, body: errorBody(membership.error.code, membership.error.message, membership.error.details) };
@@ -117,7 +117,7 @@ function resolveResearchPath(projectPath: string, relativePath: string): { statu
   return {
     status: 200,
     absolutePath: membership.data,
-    relativePath: researchRelativePath(projectPath, membership.data),
+    relativePath: fieldNotesRelativePath(projectPath, membership.data),
   };
 }
 
@@ -125,8 +125,8 @@ function fallbackTitle(fileName: string): string {
   return basename(fileName, extname(fileName)).replace(/[-_]+/g, ' ');
 }
 
-function researchLink(workflow: string | null | undefined, path: string): string {
-  return serializeResearchLink({ kind: 'research-uri', workflow: workflow ?? '_', path, anchor: null });
+function fieldNotesLink(workflow: string | null | undefined, path: string): string {
+  return serializeFieldNotesLink({ kind: 'fieldnotes-uri', workflow: workflow ?? '_', path, anchor: null });
 }
 
 function parseFrontmatterBestEffort(raw: string, path: string): { frontmatter: Partial<Frontmatter>; body: string } {
@@ -166,7 +166,7 @@ function isTreeMarkdownFile(name: string): boolean {
   return name.endsWith('.md') && name !== 'README.md' && name !== 'INDEX.md';
 }
 
-function buildResearchTree(projectPath: string): { sections: ResearchTreeSection[]; lastRefreshed: string } {
+function buildFieldNotesTree(projectPath: string): { sections: FieldNotesTreeSection[]; lastRefreshed: string } {
   const base = fieldNotesDir(projectPath);
   const sectionSet = new Set(FIELD_NOTES_SECTIONS);
   const presentSections = existsSync(base)
@@ -176,11 +176,11 @@ function buildResearchTree(projectPath: string): { sections: ResearchTreeSection
   const sections = presentSections
     .filter((section) => sectionSet.has(section))
     .sort((left, right) => FIELD_NOTES_SECTIONS.indexOf(left) - FIELD_NOTES_SECTIONS.indexOf(right))
-    .map((section): ResearchTreeSection => {
+    .map((section): FieldNotesTreeSection => {
       const sectionDir = join(base, section);
       const files = readdirSync(sectionDir, { withFileTypes: true })
         .filter((entry) => entry.isFile() && isTreeMarkdownFile(entry.name))
-        .map((entry): ResearchTreeFile => {
+        .map((entry): FieldNotesTreeFile => {
           const relativePath = `${section}/${entry.name}`;
           const raw = readFileSync(join(sectionDir, entry.name), 'utf8');
           const parsed = parseFrontmatterBestEffort(raw, relativePath);
@@ -192,7 +192,7 @@ function buildResearchTree(projectPath: string): { sections: ResearchTreeSection
             tags: parsed.frontmatter.tags ?? [],
             confidence: parsed.frontmatter.confidence ?? '',
             updated: parsed.frontmatter.updated ?? '',
-            research_link: researchLink(parsed.frontmatter.workflow, relativePath),
+            fieldnotes_link: fieldNotesLink(parsed.frontmatter.workflow, relativePath),
           };
         })
         .sort((left, right) => left.name.localeCompare(right.name));
@@ -319,18 +319,18 @@ function defaultIndexer(ctx: ProjectContext): IndexerService {
   return new IndexerService({ projectId: ctx.projectId, projectPath: ctx.projectPath, provider: createDisabledProvider() });
 }
 
-async function defaultSearch(ctx: ProjectContext, input: ResearchSearchBody): Promise<ResearchSearchOutput> {
-  const tool = createResearchSearchTool({ projectPath: ctx.projectPath, embeddingProvider: createDisabledProvider() });
+async function defaultSearch(ctx: ProjectContext, input: FieldNotesSearchBody): Promise<FieldNotesSearchOutput> {
+  const tool = createFieldNotesSearchTool({ projectPath: ctx.projectPath, embeddingProvider: createDisabledProvider() });
   const result = await tool.execute(input);
   if (!result.ok) throw result.error;
   return result.data;
 }
 
-async function defaultStatus(ctx: ProjectContext): Promise<ResearchStatus> {
-  const storeResult = ResearchStore.open(ctx.projectPath);
+async function defaultStatus(ctx: ProjectContext): Promise<FieldNotesStatus> {
+  const storeResult = FieldNotesStore.open(ctx.projectPath);
   const store = storeResult.ok ? storeResult.data : null;
   try {
-    const result = await getResearchStatus({ projectId: ctx.projectId, projectPath: ctx.projectPath, store, provider: createDisabledProvider() });
+    const result = await getFieldNotesStatus({ projectId: ctx.projectId, projectPath: ctx.projectPath, store, provider: createDisabledProvider() });
     if (!result.ok) throw result.error;
     return result.data;
   } finally {
@@ -373,14 +373,14 @@ function sseResponse(projectId: string, emitter: ProgressEmitter, signal: AbortS
   });
 }
 
-export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRoutesDeps = {}): Elysia {
+export function mountFieldNotesRoutes(app: Elysia, db: Database, deps: FieldNotesRoutesDeps = {}): Elysia {
   const editorLauncher = deps.launchEditor ?? launchEditor;
   const search = deps.search ?? defaultSearch;
   const getStatus = deps.getStatus ?? defaultStatus;
   const createIndexer = deps.createIndexer ?? defaultIndexer;
   const progressEmitter = deps.progressEmitter ?? getSharedProgressEmitter;
 
-  app.get('/v1/research/tree', ({ query, set }) => {
+  app.get('/v1/fieldnotes/tree', ({ query, set }) => {
     const parsed = projectIdQuerySchema.safeParse(query);
     if (!parsed.success) {
       set.status = 400;
@@ -391,11 +391,11 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
-    routesLog.info('GET /v1/research/tree', { projectId: parsed.data.projectId });
-    return buildResearchTree(project.ctx.projectPath);
+    routesLog.info('GET /v1/fieldnotes/tree', { projectId: parsed.data.projectId });
+    return buildFieldNotesTree(project.ctx.projectPath);
   });
 
-  app.get('/v1/research/file', ({ query, set }) => {
+  app.get('/v1/fieldnotes/file', ({ query, set }) => {
     const parsed = fileQuerySchema.safeParse(query);
     if (!parsed.success) {
       set.status = 400;
@@ -406,17 +406,17 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
-    const resolved = resolveResearchPath(project.ctx.projectPath, parsed.data.path);
+    const resolved = resolveFieldNotesPath(project.ctx.projectPath, parsed.data.path);
     if (!resolved.absolutePath || !resolved.relativePath) {
       set.status = resolved.status;
       return resolved.body;
     }
     if (!existsSync(resolved.absolutePath)) {
       set.status = 404;
-      return errorBody('FILE_NOT_FOUND', `Research file not found: ${parsed.data.path}`);
+      return errorBody('FILE_NOT_FOUND', `Field Notes file not found: ${parsed.data.path}`);
     }
 
-    routesLog.info('GET /v1/research/file', { projectId: parsed.data.projectId, path: parsed.data.path });
+    routesLog.info('GET /v1/fieldnotes/file', { projectId: parsed.data.projectId, path: parsed.data.path });
     const raw = readFileSync(resolved.absolutePath, 'utf8');
     const parsedFile = parseFrontmatter(raw);
     if (!parsedFile.ok) {
@@ -429,12 +429,12 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       frontmatter: parsedFile.data.frontmatter,
       html: parsed.data.meta === 'true' ? '' : renderMarkdown(parsedFile.data.body),
       rawBody: parsedFile.data.body,
-      research_link: researchLink(parsedFile.data.frontmatter.workflow, resolved.relativePath),
+      fieldnotes_link: fieldNotesLink(parsedFile.data.frontmatter.workflow, resolved.relativePath),
     };
     return payload;
   });
 
-  app.post('/v1/research/search', async ({ body, set }) => {
+  app.post('/v1/fieldnotes/search', async ({ body, set }) => {
     const parsed = searchBodySchema.safeParse(body);
     if (!parsed.success) {
       set.status = 400;
@@ -445,7 +445,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
-    routesLog.info('POST /v1/research/search', { projectId: parsed.data.projectId, query: parsed.data.query, mode: parsed.data.mode ?? 'hybrid' });
+    routesLog.info('POST /v1/fieldnotes/search', { projectId: parsed.data.projectId, query: parsed.data.query, mode: parsed.data.mode ?? 'hybrid' });
     try {
       const result = await search(project.ctx, parsed.data);
       return Array.isArray(result) ? result : result.results;
@@ -455,7 +455,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
     }
   });
 
-  app.get('/v1/research/status', async ({ query, set }) => {
+  app.get('/v1/fieldnotes/status', async ({ query, set }) => {
     const parsed = projectIdQuerySchema.safeParse(query);
     if (!parsed.success) {
       set.status = 400;
@@ -466,7 +466,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
-    routesLog.info('GET /v1/research/status', { projectId: parsed.data.projectId });
+    routesLog.info('GET /v1/fieldnotes/status', { projectId: parsed.data.projectId });
     const status = await getStatus(project.ctx);
     if (!status) {
       set.status = 500;
@@ -475,7 +475,7 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
     return status;
   });
 
-  app.post('/v1/research/reindex', async ({ body, set }) => {
+  app.post('/v1/fieldnotes/reindex', async ({ body, set }) => {
     const parsed = projectBodySchema.safeParse(body);
     if (!parsed.success) {
       set.status = 400;
@@ -486,14 +486,14 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
-    routesLog.info('POST /v1/research/reindex', { projectId: parsed.data.projectId });
+    routesLog.info('POST /v1/fieldnotes/reindex', { projectId: parsed.data.projectId });
     const indexer = createIndexer(project.ctx);
     const unsubscribe = pipeIndexerProgress(indexer, progressEmitter(project.ctx.projectId));
     void Promise.resolve(indexer.bulkIndex() as Promise<BulkIndexSummary>).finally(unsubscribe);
     return { started: true };
   });
 
-  app.get('/v1/research/index/progress', ({ query, request, set }) => {
+  app.get('/v1/fieldnotes/index/progress', ({ query, request, set }) => {
     const parsed = projectIdQuerySchema.safeParse(query);
     if (!parsed.success) {
       set.status = 400;
@@ -504,11 +504,11 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
-    routesLog.info('GET /v1/research/index/progress (SSE)', { projectId: parsed.data.projectId });
+    routesLog.info('GET /v1/fieldnotes/index/progress (SSE)', { projectId: parsed.data.projectId });
     return sseResponse(project.ctx.projectId, progressEmitter(project.ctx.projectId), request.signal);
   });
 
-  app.post('/v1/research/open-in-editor', async ({ body, set }) => {
+  app.post('/v1/fieldnotes/open-in-editor', async ({ body, set }) => {
     const parsed = openInEditorBodySchema.safeParse(body);
     if (!parsed.success) {
       set.status = 400;
@@ -519,12 +519,12 @@ export function mountResearchRoutes(app: Elysia, db: Database, deps: ResearchRou
       set.status = project.status;
       return project.body;
     }
-    const resolved = resolveResearchPath(project.ctx.projectPath, parsed.data.path);
+    const resolved = resolveFieldNotesPath(project.ctx.projectPath, parsed.data.path);
     if (!resolved.absolutePath) {
       set.status = resolved.status;
       return resolved.body;
     }
-    routesLog.info('POST /v1/research/open-in-editor', { projectId: parsed.data.projectId, path: parsed.data.path });
+    routesLog.info('POST /v1/fieldnotes/open-in-editor', { projectId: parsed.data.projectId, path: parsed.data.path });
     const launched = await editorLauncher(resolved.absolutePath);
     return launched;
   });

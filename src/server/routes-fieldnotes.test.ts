@@ -6,10 +6,10 @@ import { Elysia } from 'elysia';
 
 import { Database } from '../db/database.ts';
 import { insertProject } from '../db/repo/projects.ts';
-import { researchBaseDir } from '../project/paths.ts';
-import { ProgressEmitter } from '../research/progress.ts';
-import type { SearchResult } from '../tools/research_search/index.ts';
-import { mountResearchRoutes } from './routes-research.ts';
+import { fieldNotesDir } from '../project/paths.ts';
+import { ProgressEmitter } from '../fieldnotes/progress.ts';
+import type { SearchResult } from '../tools/field_notes_search/index.ts';
+import { mountFieldNotesRoutes } from './routes-fieldnotes.ts';
 import { RESEARCH_WS_EVENT_TYPES, isRegisteredWsEventType } from './routes-ws.ts';
 
 const frontmatter = `---
@@ -36,7 +36,7 @@ This **document** verifies *markdown* rendering and \`inline code\`.
 
 | Key | Value |
 | --- | --- |
-| route | /v1/research |
+| route | /v1/fieldnotes |
 `;
 
 interface TestAppOptions {
@@ -44,7 +44,7 @@ interface TestAppOptions {
   openResult?: { editor: string; launched: boolean };
 }
 
-describe('mountResearchRoutes', () => {
+describe('mountFieldNotesRoutes', () => {
   let db: Database;
   let app: Elysia;
   let tempRoot: string;
@@ -55,9 +55,9 @@ describe('mountResearchRoutes', () => {
   let reindexCalls: number;
 
   async function createResearchFile(): Promise<void> {
-    await mkdir(join(researchBaseDir(projectPath), '02-tech'), { recursive: true });
-    await writeFile(join(researchBaseDir(projectPath), '02-tech', 'routing.md'), frontmatter);
-    await writeFile(join(researchBaseDir(projectPath), '02-tech', 'README.md'), '# Ignore me');
+    await mkdir(join(fieldNotesDir(projectPath), '02-tech'), { recursive: true });
+    await writeFile(join(fieldNotesDir(projectPath), '02-tech', 'routing.md'), frontmatter);
+    await writeFile(join(fieldNotesDir(projectPath), '02-tech', 'README.md'), '# Ignore me');
   }
 
   function createApp(options: TestAppOptions = {}): Elysia {
@@ -85,11 +85,11 @@ describe('mountResearchRoutes', () => {
         workflow: 'research-base-system',
         summary: 'Notes about research route wiring.',
       },
-      research_link: 'research://research-base-system/02-tech/routing.md',
+      fieldnotes_link: 'fieldnotes://research-base-system/02-tech/routing.md',
     }];
 
     const testApp = new Elysia();
-    mountResearchRoutes(testApp, db, {
+    mountFieldNotesRoutes(testApp, db, {
       search: async (_ctx, input) => {
         searchCalls.push(input);
         return result;
@@ -143,8 +143,8 @@ describe('mountResearchRoutes', () => {
     await rm(tempRoot, { recursive: true, force: true });
   });
 
-  it('GET /v1/research/tree returns sections and skips index files', async () => {
-    const response = await app.handle(new Request(`http://localhost/v1/research/tree?projectId=${projectId}`));
+  it('GET /v1/fieldnotes/tree returns sections and skips index files', async () => {
+    const response = await app.handle(new Request(`http://localhost/v1/fieldnotes/tree?projectId=${projectId}`));
     const body = (await response.json()) as { sections: { name: string; files: { path: string; title: string }[] }[]; lastRefreshed: string };
 
     expect(response.status).toBe(200);
@@ -154,17 +154,17 @@ describe('mountResearchRoutes', () => {
     expect(body.sections[0].files[0]).toMatchObject({ path: '02-tech/routing.md', title: 'Research Routing Notes' });
   });
 
-  it('GET /v1/research/tree returns 404 for an unknown project', async () => {
-    const response = await app.handle(new Request('http://localhost/v1/research/tree?projectId=missing'));
+  it('GET /v1/fieldnotes/tree returns 404 for an unknown project', async () => {
+    const response = await app.handle(new Request('http://localhost/v1/fieldnotes/tree?projectId=missing'));
     const body = (await response.json()) as { code: string };
 
     expect(response.status).toBe(404);
     expect(body.code).toBe('FILE_NOT_FOUND');
   });
 
-  it('GET /v1/research/file returns html, raw body, frontmatter, and research link', async () => {
-    const response = await app.handle(new Request(`http://localhost/v1/research/file?projectId=${projectId}&path=02-tech/routing.md`));
-    const body = (await response.json()) as { html: string; rawBody: string; frontmatter: { title: string }; research_link: string };
+  it('GET /v1/fieldnotes/file returns html, raw body, frontmatter, and fieldnotes link', async () => {
+    const response = await app.handle(new Request(`http://localhost/v1/fieldnotes/file?projectId=${projectId}&path=02-tech/routing.md`));
+    const body = (await response.json()) as { html: string; rawBody: string; frontmatter: { title: string }; fieldnotes_link: string };
 
     expect(response.status).toBe(200);
     expect(body.frontmatter.title).toBe('Research Routing Notes');
@@ -172,11 +172,11 @@ describe('mountResearchRoutes', () => {
     expect(body.html).toContain('<h1>Routing</h1>');
     expect(body.html).toContain('<strong>document</strong>');
     expect(body.html).not.toContain('<script>');
-    expect(body.research_link).toBe('research://research-base-system/02-tech/routing.md');
+    expect(body.fieldnotes_link).toBe('fieldnotes://research-base-system/02-tech/routing.md');
   });
 
-  it('GET /v1/research/file meta=true skips html render and returns raw body', async () => {
-    const response = await app.handle(new Request(`http://localhost/v1/research/file?projectId=${projectId}&path=02-tech/routing.md&meta=true`));
+  it('GET /v1/fieldnotes/file meta=true skips html render and returns raw body', async () => {
+    const response = await app.handle(new Request(`http://localhost/v1/fieldnotes/file?projectId=${projectId}&path=02-tech/routing.md&meta=true`));
     const body = (await response.json()) as { html: string; rawBody: string };
 
     expect(response.status).toBe(200);
@@ -184,16 +184,16 @@ describe('mountResearchRoutes', () => {
     expect(body.rawBody).toContain('markdown');
   });
 
-  it('GET /v1/research/file rejects traversal paths with a validation error', async () => {
-    const response = await app.handle(new Request(`http://localhost/v1/research/file?projectId=${projectId}&path=${encodeURIComponent('../../etc/passwd')}`));
+  it('GET /v1/fieldnotes/file rejects traversal paths with a validation error', async () => {
+    const response = await app.handle(new Request(`http://localhost/v1/fieldnotes/file?projectId=${projectId}&path=${encodeURIComponent('../../etc/passwd')}`));
     const body = (await response.json()) as { code: string };
 
     expect(response.status).toBe(400);
     expect(body.code).toBe('PERMISSION_DENIED');
   });
 
-  it('POST /v1/research/search delegates and returns search results', async () => {
-    const response = await app.handle(new Request('http://localhost/v1/research/search', {
+  it('POST /v1/fieldnotes/search delegates and returns search results', async () => {
+    const response = await app.handle(new Request('http://localhost/v1/fieldnotes/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId, query: 'routing', k: 3, section: '02-tech', tags: ['routes'], mode: 'keyword' }),
@@ -207,8 +207,8 @@ describe('mountResearchRoutes', () => {
     expect(body[0].title).toBe('Research Routing Notes');
   });
 
-  it('GET /v1/research/status returns status fields', async () => {
-    const response = await app.handle(new Request(`http://localhost/v1/research/status?projectId=${projectId}`));
+  it('GET /v1/fieldnotes/status returns status fields', async () => {
+    const response = await app.handle(new Request(`http://localhost/v1/fieldnotes/status?projectId=${projectId}`));
     const body = (await response.json()) as { provider: string; totalDocs: number; totalChunks: number; diskSizeBytes: number };
 
     expect(response.status).toBe(200);
@@ -218,8 +218,8 @@ describe('mountResearchRoutes', () => {
     expect(body.diskSizeBytes).toBe(1234);
   });
 
-  it('POST /v1/research/reindex starts indexing in the background', async () => {
-    const response = await app.handle(new Request('http://localhost/v1/research/reindex', {
+  it('POST /v1/fieldnotes/reindex starts indexing in the background', async () => {
+    const response = await app.handle(new Request('http://localhost/v1/fieldnotes/reindex', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId }),
@@ -232,16 +232,16 @@ describe('mountResearchRoutes', () => {
     expect(reindexCalls).toBe(1);
   });
 
-  it('GET /v1/research/index/progress returns an SSE stream', async () => {
-    const response = await app.handle(new Request(`http://localhost/v1/research/index/progress?projectId=${projectId}`));
+  it('GET /v1/fieldnotes/index/progress returns an SSE stream', async () => {
+    const response = await app.handle(new Request(`http://localhost/v1/fieldnotes/index/progress?projectId=${projectId}`));
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     await response.body?.cancel();
   });
 
-  it('POST /v1/research/open-in-editor validates path and launches editor', async () => {
-    const response = await app.handle(new Request('http://localhost/v1/research/open-in-editor', {
+  it('POST /v1/fieldnotes/open-in-editor validates path and launches editor', async () => {
+    const response = await app.handle(new Request('http://localhost/v1/fieldnotes/open-in-editor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId, path: '02-tech/routing.md' }),
@@ -251,11 +251,11 @@ describe('mountResearchRoutes', () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({ launched: true, editor: 'mock-editor' });
     expect(openCalls).toHaveLength(1);
-    expect(openCalls[0]).toEndWith(join('.elefant', 'markdown-db', '02-tech', 'routing.md'));
+    expect(openCalls[0]).toEndWith(join('.elefant', 'field-notes', '02-tech', 'routing.md'));
   });
 
-  it('requires valid project membership on write-like research endpoints', async () => {
-    const response = await app.handle(new Request('http://localhost/v1/research/open-in-editor', {
+  it('requires valid project membership on write-like field notes endpoints', async () => {
+    const response = await app.handle(new Request('http://localhost/v1/fieldnotes/open-in-editor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId: 'wrong-project', path: '02-tech/routing.md' }),
