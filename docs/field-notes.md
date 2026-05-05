@@ -1,12 +1,12 @@
-# Research Base
+# Field Notes
 
 ## Overview
 
-Every Elefant project has a **Research Base** — a structured, versionable, agent-curated knowledge garden at `.elefant/markdown-db/`. It is a long-form artifact store separate from the SQLite memory system (which holds ephemeral decision logs). The Research Base holds citable, human-browsable findings, comparisons, and reference notes authored primarily by researcher, writer, and librarian agents.
+Every Elefant project has a **Field Notes** — a structured, versionable, agent-curated knowledge garden at `.elefant/field-notes/`. It is a long-form artifact store separate from the SQLite memory system (which holds ephemeral decision logs). The Field Notes holds citable, human-browsable findings, comparisons, and reference notes authored primarily by researcher, writer, and librarian agents.
 
-The Research Base is indexed by a self-hosted vector store (SQLite + `sqlite-vec` with `Xenova/all-MiniLM-L6-v2` embeddings by default), searchable by agents through five tools (`research_search`, `research_grep`, `research_read`, `research_write`, `research_index`), and browsable by users through a dedicated **Research View** in the desktop client. Findings are linked from chat output via `research://` URIs that render as clickable chips.
+The Field Notes is indexed by a self-hosted vector store (SQLite + `sqlite-vec` with `Xenova/all-MiniLM-L6-v2` embeddings by default), searchable by agents through five tools (`field_notes_search`, `field_notes_grep`, `field_notes_read`, `field_notes_write`, `field_notes_index`), and browsable by users through a dedicated **Field Notes** in the desktop client. Findings are linked from chat output via `fieldnotes://` URIs that render as clickable chips.
 
-For the architecture decision rationale (why SQLite + transformers.js, rejected alternatives, fallback strategies), see [ADR-0006](adr/0006-research-base.md).
+For the architecture decision rationale (why SQLite + transformers.js, rejected alternatives, fallback strategies), see [ADR-0006](adr/0006-field-notes.md).
 
 ---
 
@@ -14,12 +14,12 @@ For the architecture decision rationale (why SQLite + transformers.js, rejected 
 
 ### Storage Layout
 
-The Research Base lives at `<projectRoot>/.elefant/markdown-db/` (per-project, lazily created on first write). It is never stored under `.goopspec/`.
+The Field Notes lives at `<projectRoot>/.elefant/field-notes/` (per-project, lazily created on first write). It is never stored under `.goopspec/`.
 
 **Default section structure** (created on first init):
 
 ```
-.elefant/markdown-db/
+.elefant/field-notes/
 ├── 00-index/              Index and changelog
 │   ├── INDEX.md           Master index (auto-maintained by writer agent)
 │   └── CHANGELOG.md       Single-line entries per wave
@@ -39,11 +39,11 @@ The Research Base lives at `<projectRoot>/.elefant/markdown-db/` (per-project, l
     └── README.md          Section index
 ```
 
-Each section's `README.md` is auto-maintained by the writer agent and lists all files in that section with title, summary, confidence, tags, and `research://` links.
+Each section's `README.md` is auto-maintained by the writer agent and lists all files in that section with title, summary, confidence, tags, and `fieldnotes://` links.
 
 ### Frontmatter Schema
 
-Every file in the Research Base (except `99-scratch/`) must include YAML frontmatter with these fields:
+Every file in the Field Notes (except `99-scratch/`) must include YAML frontmatter with these fields:
 
 | Field | Type | Required | Description | Example |
 |-------|------|----------|-------------|---------|
@@ -51,13 +51,13 @@ Every file in the Research Base (except `99-scratch/`) must include YAML frontma
 | `title` | string | Yes | Human-readable title (1–200 chars) | `SQLite + sqlite-vec for vector storage` |
 | `section` | enum | Yes | One of: `00-index`, `01-domain`, `02-tech`, `03-decisions`, `04-comparisons`, `05-references`, `06-synthesis`, `99-scratch` | `02-tech` |
 | `tags` | array | No | Searchable tags (default: `[]`) | `["sqlite", "vector-db", "embeddings"]` |
-| `sources` | array | No | URLs or file paths cited (default: `[]`) | `["https://github.com/asg017/sqlite-vec", "docs/adr/0006-research-base.md"]` |
+| `sources` | array | No | URLs or file paths cited (default: `[]`) | `["https://github.com/asg017/sqlite-vec", "docs/adr/0006-field-notes.md"]` |
 | `confidence` | enum | No | `high` (primary source), `medium` (multiple secondaries), `low` (inference). Default: `medium` | `high` |
-| `created` | ISO 8601 | Yes | Creation timestamp (auto-filled by `research_write`) | `2026-05-03T14:22:00Z` |
-| `updated` | ISO 8601 | Yes | Last update timestamp (auto-filled by `research_write`) | `2026-05-03T14:22:00Z` |
+| `created` | ISO 8601 | Yes | Creation timestamp (auto-filled by `field_notes_write`) | `2026-05-03T14:22:00Z` |
+| `updated` | ISO 8601 | Yes | Last update timestamp (auto-filled by `field_notes_write`) | `2026-05-03T14:22:00Z` |
 | `author_agent` | enum | Yes | Agent that created/last edited the file | `researcher`, `writer`, `librarian`, `orchestrator`, `user`, etc. |
-| `workflow` | string or null | No | Workflow ID if created during a spec-mode task (default: `null`) | `research-base-system` |
-| `summary` | string | Yes | 1–3 sentence TL;DR (1–500 chars) | `SQLite with the sqlite-vec extension provides a local, single-file vector store suitable for per-project Research Bases.` |
+| `workflow` | string or null | No | Workflow ID if created during a spec-mode task (default: `null`) | `field-notes-system` |
+| `summary` | string | Yes | 1–3 sentence TL;DR (1–500 chars) | `SQLite with the sqlite-vec extension provides a local, single-file vector store suitable for per-project Field Notess.` |
 
 **Example frontmatter:**
 
@@ -72,13 +72,13 @@ tags:
   - embeddings
 sources:
   - https://github.com/asg017/sqlite-vec
-  - docs/adr/0006-research-base.md
+  - docs/adr/0006-field-notes.md
 confidence: high
 created: 2026-05-03T14:22:00Z
 updated: 2026-05-03T14:22:00Z
 author_agent: researcher
-workflow: research-base-system
-summary: SQLite with the sqlite-vec extension provides a local, single-file vector store suitable for per-project Research Bases.
+workflow: field-notes-system
+summary: SQLite with the sqlite-vec extension provides a local, single-file vector store suitable for per-project Field Notess.
 ---
 
 # SQLite + sqlite-vec for vector storage
@@ -86,34 +86,34 @@ summary: SQLite with the sqlite-vec extension provides a local, single-file vect
 [Your markdown content here...]
 ```
 
-### URI Scheme: `research://`
+### URI Scheme: `fieldnotes://`
 
-Files in the Research Base can be linked using the `research://` URI scheme:
+Files in the Field Notes can be linked using the `fieldnotes://` URI scheme:
 
 ```
-research://<workflow>/<section>/<filename>.md[#anchor]
+fieldnotes://<workflow>/<section>/<filename>.md[#anchor]
 ```
 
 | Component | Description | Example |
 |-----------|-------------|---------|
-| `<workflow>` | Workflow ID or `_` for project-wide scope | `research-base-system` or `_` |
+| `<workflow>` | Workflow ID or `_` for project-wide scope | `field-notes-system` or `_` |
 | `<section>` | Section directory name | `02-tech` |
 | `<filename>` | Filename without `.md` extension | `sqlite-vec` |
 | `[#anchor]` | Optional heading anchor (optional) | `#architecture` |
 
 **Examples:**
 
-- `research://_/02-tech/sqlite-vec.md` — Project-wide reference to the sqlite-vec file
-- `research://research-base-system/03-decisions/provider-switching.md#r7-mitigation` — Workflow-specific reference with anchor
-- `research://_/06-synthesis/MASTER-SYNTHESIS.md` — Link to synthesis document
+- `fieldnotes://_/02-tech/sqlite-vec.md` — Project-wide reference to the sqlite-vec file
+- `fieldnotes://field-notes-system/03-decisions/provider-switching.md#r7-mitigation` — Workflow-specific reference with anchor
+- `fieldnotes://_/06-synthesis/MASTER-SYNTHESIS.md` — Link to synthesis document
 
-Agents emit `research://` links in handoff envelopes and chat output. The desktop client renders these as clickable chips that navigate to the Research View with the file open and optional anchor scrolled.
+Agents emit `fieldnotes://` links in handoff envelopes and chat output. The desktop client renders these as clickable chips that navigate to the Field Notes with the file open and optional anchor scrolled.
 
 ### Vector Index & Embedding Providers
 
 #### Default Stack
 
-The default vector index is **SQLite + `sqlite-vec`** at `.elefant/research-index.sqlite`. The default embedder is **`bundled-cpu`** — `Xenova/all-MiniLM-L6-v2` (384 dimensions) via `@xenova/transformers`, running on CPU by default with WebGPU acceleration where available.
+The default vector index is **SQLite + `sqlite-vec`** at `.elefant/field-notes-index.sqlite`. The default embedder is **`bundled-cpu`** — `Xenova/all-MiniLM-L6-v2` (384 dimensions) via `@xenova/transformers`, running on CPU by default with WebGPU acceleration where available.
 
 #### Hardware Auto-Scaling
 
@@ -123,7 +123,7 @@ On first run, Elefant profiles the host machine (RAM, GPU, NPU) and **recommends
 - **`bundled-gpu`**: `Xenova/all-MiniLM-L6-v2` (384-dim) with WebGPU acceleration, recommended if GPU detected
 - **`bundled-large`**: `bge-base-en-v1.5` (768-dim), recommended if ≥16 GB RAM and GPU/NPU detected; higher quality but slower
 
-Users can pin a provider in **Settings → Research Base** to override the recommendation.
+Users can pin a provider in **Settings → Field Notes** to override the recommendation.
 
 #### Supported Providers
 
@@ -149,7 +149,7 @@ Switching embedding providers is **non-destructive**:
 1. Each chunk records its embedding dimension
 2. If the new provider has a different dimension, Elefant triggers a forced reindex
 3. Source markdown files are never modified; only derived chunks and embeddings are rebuilt
-4. A `research:provider-changed` WebSocket event is emitted so the UI can request user confirmation
+4. A `fieldnotes:provider-changed` WebSocket event is emitted so the UI can request user confirmation
 5. Reindexing runs in the background with progress streamed via SSE
 
 #### Fallback: Keyword-Only Mode
@@ -159,7 +159,7 @@ If the vector index is disabled or unavailable, agent search transparently degra
 - **ripgrep** for pattern matching across all files
 - **BM25-style scoring** for relevance ranking
 - **Snippet extraction** from matched files
-- Same tool interface (`research_search` with `mode: 'keyword'`)
+- Same tool interface (`field_notes_search` with `mode: 'keyword'`)
 
 ---
 
@@ -167,7 +167,7 @@ If the vector index is disabled or unavailable, agent search transparently degra
 
 ### File Watcher
 
-A file watcher monitors `.elefant/markdown-db/` per active project with a 500 ms debounce. When files are created, modified, or deleted, the indexer is triggered for incremental re-indexing.
+A file watcher monitors `.elefant/field-notes/` per active project with a 500 ms debounce. When files are created, modified, or deleted, the indexer is triggered for incremental re-indexing.
 
 ### Chunking Strategy
 
@@ -185,7 +185,7 @@ Each chunk in the vector index has this structure:
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | UUID | Unique chunk identifier |
-| `file_path` | string | Relative path within `.elefant/markdown-db/` |
+| `file_path` | string | Relative path within `.elefant/field-notes/` |
 | `section` | string | Section directory (e.g., `02-tech`) |
 | `title` | string | Chunk title (from heading or file title) |
 | `chunk_index` | integer | Position within the file (0-indexed) |
@@ -200,7 +200,7 @@ Each chunk in the vector index has this structure:
 
 **Initial bulk index** (on first run or after provider switch):
 - Runs in a worker thread to avoid blocking the daemon
-- Progress streamed via SSE on `/v1/research/index/progress`
+- Progress streamed via SSE on `/v1/fieldnotes/index/progress`
 - Typical performance: 1000 files indexed in ≤30 seconds on `bundled-cpu`
 
 **Incremental index** (on file changes):
@@ -210,7 +210,7 @@ Each chunk in the vector index has this structure:
 
 ### Index Health
 
-The `/v1/research/status` endpoint reports:
+The `/v1/fieldnotes/status` endpoint reports:
 
 - Total documents
 - Total chunks
@@ -218,7 +218,7 @@ The `/v1/research/status` endpoint reports:
 - Current embedding provider
 - Hardware tier recommendation
 - Drift count (chunks with mismatched dimensions after provider switch)
-- Disk size of `.elefant/research-index.sqlite`
+- Disk size of `.elefant/field-notes-index.sqlite`
 
 ---
 
@@ -226,9 +226,9 @@ The `/v1/research/status` endpoint reports:
 
 All research tools are registered in `src/tools/registry.ts` and allow-listed per-agent in YAML configs.
 
-### `research_search`
+### `field_notes_search`
 
-**Description:** Semantic, keyword, or hybrid search across the Research Base.
+**Description:** Semantic, keyword, or hybrid search across the Field Notes.
 
 **Parameters:**
 
@@ -247,14 +247,14 @@ All research tools are registered in `src/tools/registry.ts` and allow-listed pe
 {
   results: [
     {
-      path: string;              // Relative path in .elefant/markdown-db/
+      path: string;              // Relative path in .elefant/field-notes/
       section: string;           // Section directory
       title: string;             // Chunk title
       summary: string;           // File summary from frontmatter
       score: number;             // Relevance score (0–1)
       snippet: string;           // Excerpt from chunk
       frontmatter: Frontmatter;   // Full frontmatter object
-      research_link: string;      // research:// URI for the file
+      fieldnotes_link: string;      // fieldnotes:// URI for the file
     }
   ];
   total: number;                 // Total matches (may exceed k)
@@ -266,7 +266,7 @@ All research tools are registered in `src/tools/registry.ts` and allow-listed pe
 **Example:**
 
 ```
-research_search({
+field_notes_search({
   query: "vector database comparison",
   k: 5,
   section: "02-tech",
@@ -274,9 +274,9 @@ research_search({
 })
 ```
 
-### `research_grep`
+### `field_notes_grep`
 
-**Description:** Ripgrep-based pattern search scoped to `.elefant/markdown-db/`.
+**Description:** Ripgrep-based pattern search scoped to `.elefant/field-notes/`.
 
 **Parameters:**
 
@@ -307,9 +307,9 @@ research_search({
 
 **Who can use:** All agents (read-only).
 
-### `research_read`
+### `field_notes_read`
 
-**Description:** Read a file by ID, path, or `research://` link.
+**Description:** Read a file by ID, path, or `fieldnotes://` link.
 
 **Parameters:**
 
@@ -317,7 +317,7 @@ research_search({
 |------|------|----------|-------------|
 | `id` | UUID | No | File UUID from frontmatter |
 | `path` | string | No | Relative path (e.g., `02-tech/sqlite-vec.md`) |
-| `link` | string | No | `research://` URI with optional `#anchor` |
+| `link` | string | No | `fieldnotes://` URI with optional `#anchor` |
 
 **Returns:**
 
@@ -332,9 +332,9 @@ research_search({
 
 **Who can use:** All agents (read-only).
 
-### `research_write`
+### `field_notes_write`
 
-**Description:** Write or append to a file in the Research Base. Enforces frontmatter schema and triggers per-file reindex.
+**Description:** Write or append to a file in the Field Notes. Enforces frontmatter schema and triggers per-file reindex.
 
 **Parameters:**
 
@@ -369,11 +369,11 @@ research_search({
 - Validates `section` against the enum
 - Appends to `99-scratch/` without strict frontmatter validation
 - Triggers per-file reindex in background
-- Emits `research:indexed` WebSocket event on completion
+- Emits `fieldnotes:indexed` WebSocket event on completion
 
-### `research_index`
+### `field_notes_index`
 
-**Description:** List and browse the Research Base structure by section, tag, or recency.
+**Description:** List and browse the Field Notes structure by section, tag, or recency.
 
 **Parameters:**
 
@@ -400,7 +400,7 @@ research_search({
           tags: string[];
           confidence: string;
           updated: string;
-          research_link: string;
+          fieldnotes_link: string;
         }
       ];
     }
@@ -422,7 +422,7 @@ research_search({
       tags: string[];
       confidence: string;
       updated: string;
-      research_link: string;
+      fieldnotes_link: string;
     }
   ];
 }
@@ -432,22 +432,22 @@ research_search({
 
 ---
 
-## Research View (Desktop UI)
+## Field Notes (Desktop UI)
 
 ### Navigation
 
-The Research View is accessible via a new **"Research"** entry in the left sidebar (between sessions and pinned settings). The entry shows a book icon (Hugeicons) and is labeled "Research" in expanded mode; icon-only in collapsed mode (≤900 px).
+The Field Notes is accessible via a new **"Field Notes"** entry in the left sidebar (between sessions and pinned settings). The entry shows a book icon (Hugeicons) and is labeled "Field Notes" in expanded mode; icon-only in collapsed mode (≤900 px).
 
 ### Layout
 
-The Research View uses a **two-pane layout**:
+The Field Notes uses a **two-pane layout**:
 
 **Left pane (Tree):**
 - Hierarchical section tree with expand/collapse
 - Section icons (folder icons per section type)
 - Recency badges (e.g., "Updated 2h ago")
 - Tag chips (clickable to filter)
-- Search input (queries via `/v1/research/search`)
+- Search input (queries via `/v1/fieldnotes/search`)
 - Keyboard shortcuts: `j`/`k` to navigate, `/` to focus search
 
 **Right pane (Reader):**
@@ -457,9 +457,9 @@ The Research View uses a **two-pane layout**:
 - Sticky header with breadcrumbs
 - Syntax-highlighted code blocks
 - GitHub-style tables
-- Clickable internal links (both `research://` URIs and relative `.elefant/markdown-db/**/*.md` paths)
+- Clickable internal links (both `fieldnotes://` URIs and relative `.elefant/field-notes/**/*.md` paths)
 - Copy-link-per-heading button
-- Prominent **"Open in editor"** button (→ `POST /v1/research/open-in-editor`)
+- Prominent **"Open in editor"** button (→ `POST /v1/fieldnotes/open-in-editor`)
 
 ### Mobile Responsiveness
 
@@ -482,17 +482,17 @@ At ≤640 px (mobile breakpoint):
 
 ### Chat Integration
 
-When agents emit `research://` links in chat output, they render as **clickable chips**:
+When agents emit `fieldnotes://` links in chat output, they render as **clickable chips**:
 
 ```
-Found relevant research: [research://_/02-tech/sqlite-vec.md](chip)
+Found relevant research: [fieldnotes://_/02-tech/sqlite-vec.md](chip)
 ```
 
-Clicking a chip navigates to the Research View with the file open and optional `#anchor` scrolled into view.
+Clicking a chip navigates to the Field Notes with the file open and optional `#anchor` scrolled into view.
 
 ### Settings Tab
 
-**Settings → "Research Base"** includes:
+**Settings → "Field Notes"** includes:
 
 - **Embedding provider dropdown** — select from supported providers
 - **Provider-specific config fields** — e.g., `baseUrl` for Ollama, `apiKey` for OpenAI
@@ -501,23 +501,23 @@ Clicking a chip navigates to the Research View with the file open and optional `
 - **Reindex button** — manually trigger full reindex
 - **Last-indexed timestamp** — when the index was last updated
 - **Chunk count** — total chunks in the index
-- **"Open Research folder in OS file manager"** — opens `.elefant/markdown-db/` in Finder/Explorer/Nautilus
+- **"Open Research folder in OS file manager"** — opens `.elefant/field-notes/` in Finder/Explorer/Nautilus
 - **Editor binary override** — specify custom editor (default: `$EDITOR` → VS Code → system default)
 
 ---
 
 ## For Agents: How to Contribute
 
-### When to Write to the Research Base
+### When to Write to the Field Notes
 
-Write to the Research Base when you have:
+Write to the Field Notes when you have:
 
 - **Primary-source findings** — research results, API documentation, source code analysis
 - **Comparative analyses** — technology comparisons, trade-off evaluations
 - **Decision records** — architecture decisions, design rationale
 - **Reference summaries** — curated citations, external resource summaries
 
-**Do NOT write to the Research Base for:**
+**Do NOT write to the Field Notes for:**
 
 - Ephemeral session notes → use the memory system instead
 - Temporary debugging logs → use memory or local notes
@@ -525,10 +525,10 @@ Write to the Research Base when you have:
 
 ### How to Write
 
-Use the `research_write` tool:
+Use the `field_notes_write` tool:
 
 ```typescript
-research_write({
+field_notes_write({
   section: "02-tech",
   filename: "sqlite-vec-evaluation",
   title: "SQLite + sqlite-vec for vector storage",
@@ -548,10 +548,10 @@ SQLite with the sqlite-vec extension provides...
   tags: ["sqlite", "vector-db", "embeddings"],
   sources: [
     "https://github.com/asg017/sqlite-vec",
-    "docs/adr/0006-research-base.md"
+    "docs/adr/0006-field-notes.md"
   ],
   confidence: "high",
-  summary: "SQLite with sqlite-vec is a viable local vector store for per-project Research Bases."
+  summary: "SQLite with sqlite-vec is a viable local vector store for per-project Field Notess."
 })
 ```
 
@@ -559,10 +559,10 @@ The tool auto-fills `id`, `created`, `updated`, `author_agent`, and `workflow` f
 
 ### How to Search
 
-Use `research_search` for semantic/hybrid search:
+Use `field_notes_search` for semantic/hybrid search:
 
 ```typescript
-research_search({
+field_notes_search({
   query: "vector database comparison",
   k: 5,
   section: "02-tech",
@@ -570,64 +570,64 @@ research_search({
 })
 ```
 
-Use `research_grep` for pattern matching:
+Use `field_notes_grep` for pattern matching:
 
 ```typescript
-research_grep({
+field_notes_grep({
   pattern: "sqlite-vec|hnswlib",
   section: "02-tech"
 })
 ```
 
-Use `research_read` to read a specific file:
+Use `field_notes_read` to read a specific file:
 
 ```typescript
-research_read({
-  link: "research://_/02-tech/sqlite-vec.md#architecture"
+field_notes_read({
+  link: "fieldnotes://_/02-tech/sqlite-vec.md#architecture"
 })
 ```
 
 ### How to Cite
 
-When referencing a finding in your response or handoff, emit a `research://` link:
+When referencing a finding in your response or handoff, emit a `fieldnotes://` link:
 
 ```
-Found relevant research: research://_/02-tech/sqlite-vec.md
+Found relevant research: fieldnotes://_/02-tech/sqlite-vec.md
 
-Based on research://_/03-decisions/provider-switching.md#r7-mitigation,
+Based on fieldnotes://_/03-decisions/provider-switching.md#r7-mitigation,
 we should implement dimension-mismatch reindexing.
 ```
 
-These links are clickable in the Elefant client and navigate to the Research View.
+These links are clickable in the Elefant client and navigate to the Field Notes.
 
 ### Writer Agent Responsibilities
 
-The **writer agent** owns the Research Base indexes:
+The **writer agent** owns the Field Notes indexes:
 
-- Runs `research_index` after each wave
-- Rewrites `.elefant/markdown-db/INDEX.md` with all files, summaries, and links
+- Runs `field_notes_index` after each wave
+- Rewrites `.elefant/field-notes/INDEX.md` with all files, summaries, and links
 - Rewrites each section `README.md` with section-specific index
-- Appends single-line entry to `.elefant/markdown-db/00-index/CHANGELOG.md` per wave
+- Appends single-line entry to `.elefant/field-notes/00-index/CHANGELOG.md` per wave
 - Never manually edit `INDEX.md` or section `README.md`s unless you are the writer agent
 
 ---
 
-## Migration from Legacy `markdown-db/`
+## Migration from Legacy `field-notes/`
 
-The Elefant monorepo's own `markdown-db/` at the repository root is kept as the **project's research seed** (legacy, read-only reference). New Elefant projects use `.elefant/markdown-db/` by default.
+The Elefant monorepo's own `field-notes/` at the repository root is kept as the **project's research seed** (legacy, read-only reference). New Elefant projects use `.elefant/field-notes/` by default.
 
 ### Migration Script
 
 To migrate in-repo references from the legacy location to the new location:
 
 ```bash
-bun run scripts/migrate-markdown-db.ts --dry-run
+bun run scripts/migrate-field-notes.ts --dry-run
 ```
 
 This script:
 
 - Updates agent prompts, ADRs, README, and AGENTS.md
-- Rewrites prescriptive references from `markdown-db/` → `.elefant/markdown-db/` for references about *other* projects
+- Rewrites prescriptive references from `field-notes/` → `.elefant/field-notes/` for references about *other* projects
 - Keeps the Elefant-monorepo seed intact (no file moves, no data loss)
 - Emits a summary of changes
 
@@ -635,16 +635,16 @@ Run without `--dry-run` to apply changes.
 
 ### Legacy Seed
 
-The top-level `markdown-db/` gets a soft-alias README:
+The top-level `field-notes/` gets a soft-alias README:
 
 ```markdown
 # Legacy Research Seed
 
 This folder is the Elefant monorepo's own research database (kept for reference).
 
-**New content lives in `.elefant/markdown-db/`** per project.
+**New content lives in `.elefant/field-notes/`** per project.
 
-If you are working on a new Elefant project, use `.elefant/markdown-db/` instead.
+If you are working on a new Elefant project, use `.elefant/field-notes/` instead.
 ```
 
 ---
@@ -659,7 +659,7 @@ If you are working on a new Elefant project, use `.elefant/markdown-db/` instead
 
 ### Disk Footprint
 
-- `.elefant/research-index.sqlite` grows with corpus size
+- `.elefant/field-notes-index.sqlite` grows with corpus size
 - Periodic `VACUUM` keeps disk usage reasonable
 - Status endpoint reports disk size; users can cap chunk count in settings
 
@@ -675,12 +675,12 @@ If you are working on a new Elefant project, use `.elefant/markdown-db/` instead
 
 ### Vector Index Not Updating
 
-**Symptom:** Files added to `.elefant/markdown-db/` but not appearing in search results.
+**Symptom:** Files added to `.elefant/field-notes/` but not appearing in search results.
 
 **Solution:**
-1. Check **Settings → Research Base** → "Last-indexed timestamp"
+1. Check **Settings → Field Notes** → "Last-indexed timestamp"
 2. Click **"Reindex"** button to manually trigger full reindex
-3. Monitor progress via SSE on `/v1/research/index/progress`
+3. Monitor progress via SSE on `/v1/fieldnotes/index/progress`
 
 ### Provider Switch Fails
 
@@ -694,12 +694,12 @@ If you are working on a new Elefant project, use `.elefant/markdown-db/` instead
 
 ### Search Returns No Results
 
-**Symptom:** `research_search` returns empty results even for files that exist.
+**Symptom:** `field_notes_search` returns empty results even for files that exist.
 
 **Solution:**
-1. Verify files have valid frontmatter (use `research_read` to check)
-2. Try `research_grep` with a simple pattern to confirm files are indexed
-3. Check **Settings → Research Base** → "Chunk count" (should be > 0)
+1. Verify files have valid frontmatter (use `field_notes_read` to check)
+2. Try `field_notes_grep` with a simple pattern to confirm files are indexed
+3. Check **Settings → Field Notes** → "Chunk count" (should be > 0)
 4. If vector index is disabled, search falls back to keyword-only mode
 
 ### "Open in Editor" Does Not Work
@@ -707,7 +707,7 @@ If you are working on a new Elefant project, use `.elefant/markdown-db/` instead
 **Symptom:** Clicking "Open in editor" button does not open the file.
 
 **Solution:**
-1. Check **Settings → Research Base** → "Editor binary override"
+1. Check **Settings → Field Notes** → "Editor binary override"
 2. Verify `$EDITOR` environment variable is set (or override in Settings)
 3. Ensure the editor binary is in `$PATH`
 4. Try opening the folder directly: **Settings → "Open Research folder in OS file manager"**
@@ -716,7 +716,7 @@ If you are working on a new Elefant project, use `.elefant/markdown-db/` instead
 
 ## See Also
 
-- [ADR-0006: Research Base storage and embeddings](adr/0006-research-base.md) — Architecture decision rationale
-- [Research Base Protocol](../src/agents/prompts/_shared/research-base-protocol.md) — Agent protocol for contributing to the Research Base
-- [Spec Mode](spec-mode/README.md) — How Spec Mode uses the Research Base for findings
-- [Memory System](memory.md) — Ephemeral decision logs (separate from Research Base)
+- [ADR-0006: Field Notes storage and embeddings](adr/0006-field-notes.md) — Architecture decision rationale
+- [Field Notes Protocol](../src/agents/prompts/_shared/field-notes-protocol.md) — Agent protocol for contributing to the Field Notes
+- [Spec Mode](spec-mode/README.md) — How Spec Mode uses the Field Notes for findings
+- [Memory System](memory.md) — Ephemeral decision logs (separate from Field Notes)
