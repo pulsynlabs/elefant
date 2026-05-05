@@ -18,6 +18,7 @@ import { createApp } from '../server/app.ts'
 import { StateManager } from '../state/manager.ts'
 import { createToolRegistry } from '../tools/registry.ts'
 import { createPhaseAllowListFromSpecTools, createSpecPhaseGateHandler } from '../hooks/wf-phase-gate.ts'
+import { createDatetimeContextTransformHandler } from '../hooks/datetime-context-transform.ts'
 import { createPkbContextTransformHandler } from '../hooks/pkb-context-transform.ts'
 import { instantiateSpecTools } from '../tools/workflow/index.ts'
 import { sessionManager } from '../tools/shell/index.js'
@@ -86,6 +87,11 @@ export async function createDaemon(config: ElefantConfig): Promise<Result<Elefan
 			createPhaseAllowListFromSpecTools(instantiateSpecTools()),
 		),
 		{ priority: 10 },
+	)
+	hookRegistry.on(
+		'context:transform',
+		createDatetimeContextTransformHandler(),
+		{ priority: 5 },
 	)
 	hookRegistry.on(
 		'context:transform',

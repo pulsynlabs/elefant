@@ -23,6 +23,7 @@ export { ToolRegistry, createToolRegistry, createToolRegistryForRun, type ToolRe
 export { applyPatchTool, createApplyPatchTool, type ApplyPatchParams, type ApplyPatchToolDeps } from './apply_patch/index.js';
 export { webfetchTool, type WebfetchParams } from './webfetch.js';
 export { websearchTool, type WebsearchParams } from './websearch.js';
+export { getDatetimeTool, type GetDatetimeParams } from './get_datetime/index.js';
 export {
 	todowriteTool,
 	todoreadTool,
