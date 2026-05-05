@@ -60,14 +60,14 @@ This reads `.references/models.dev-dev/providers/` and generates 100+ provider e
 
 ## Field Notes System
 
-Every Elefant project has a **Field Notes** at `.elefant/markdown-db/` — a structured, agent-curated knowledge garden for long-form findings, comparisons, and reference notes. This is separate from the SQLite memory system (which holds ephemeral decision logs).
+Every Elefant project has a **Field Notes** at `.elefant/field-notes/` — a structured, agent-curated knowledge garden for long-form findings, comparisons, and reference notes. This is separate from the SQLite memory system (which holds ephemeral decision logs).
 
 ### Structure
 
 The Field Notes is organized into 8 sections:
 
 ```
-.elefant/markdown-db/
+.elefant/field-notes/
 ├── 00-index/              Index and changelog (auto-maintained by writer agent)
 ├── 01-domain/             Domain-specific findings
 ├── 02-tech/               Technology research and comparisons

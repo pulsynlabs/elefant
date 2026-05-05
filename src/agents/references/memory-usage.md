@@ -113,7 +113,7 @@ concepts: ["authentication", "jwt", "session-management", "middleware"]
 **Good concept tags:**
 - `"reference-tool"`, `"resolver"`, `"frontmatter"`
 - `"task-execution"`, `"wave-delegation"`, `"spec-mode"`
-- `"research-base"`, `"markdown-db"`, `"search-patterns"`
+- `"field-notes"`, `"field-notes"`, `"search-patterns"`
 
 **Bad concept tags:**
 - `"stuff"`, `"misc"`, `"other"` (too vague)

@@ -93,7 +93,7 @@ filtering, and section extraction.
   and section extraction by heading
 - Register tool in both static and per-run tool registries
 - Add 16 bundled reference markdown files covering orchestrator protocols,
-  agent guidance, spec-mode formats, git workflow, and Research Base usage
+  agent guidance, spec-mode formats, git workflow, and Field Notes usage
 - Add comprehensive test suites across all modules (80+ tests)
 
 ## Testing
