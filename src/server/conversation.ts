@@ -40,6 +40,7 @@ const chatRequestSchema = z.object({
 	sessionId: z.string().min(1).optional(),
 	projectId: z.string().min(1).optional(),
 	provider: z.string().min(1).optional(),
+	model: z.string().min(1).optional(),
 	maxIterations: z.number().int().positive().max(200).optional(),
 	maxTokens: z.number().int().positive().optional(),
 	temperature: z.number().min(0).max(2).optional(),
@@ -266,15 +267,16 @@ function createSSEStream(
 						}
 					}
 
-					const agentLoop = runAgentLoop(providerRouter, activeRegistry, {
-						messages: toMessageArray(request.messages),
-						tools: activeRegistry.getAll(),
-						provider: request.provider,
-						maxIterations: request.maxIterations,
-						maxTokens: request.maxTokens,
-						temperature: request.temperature,
-						topP: request.topP,
-						timeoutMs: request.timeoutMs,
+				const agentLoop = runAgentLoop(providerRouter, activeRegistry, {
+					messages: toMessageArray(request.messages),
+					tools: activeRegistry.getAll(),
+					provider: request.provider,
+					model: request.model,
+					maxIterations: request.maxIterations,
+					maxTokens: request.maxTokens,
+					temperature: request.temperature,
+					topP: request.topP,
+					timeoutMs: request.timeoutMs,
 						hookRegistry,
 						runContext: loopRunContext,
 						questionEmitter,

@@ -175,7 +175,7 @@ export class OpenAIAdapter implements ProviderAdapter {
 		const endpoint = buildOpenAIEndpoint(this.config.baseURL)
 		const openAITools = toOpenAITools(tools)
 		const requestBody: Record<string, unknown> = {
-			model: this.config.model,
+			model: options?.model || this.config.model,
 			messages: toOpenAIMessages(messages),
 			stream: true,
 			stream_options: { include_usage: true },

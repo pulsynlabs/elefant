@@ -41,6 +41,7 @@ export interface AgentLoopOptions {
 	tools: ToolDefinition[]
 	state?: unknown
 	provider?: string
+	model?: string
 	maxIterations?: number
 	contextWindowTokens?: number
 	maxTokens?: number
@@ -514,6 +515,7 @@ export async function* runAgentLoop(
 		for await (const event of adapterResult.data.sendMessage(outgoingMessages, effectiveToolSet, {
 			signal: options.runContext.signal,
 			provider: options.provider,
+			model: options.model,
 			maxTokens: options.maxTokens,
 			temperature: options.temperature,
 			topP: options.topP,

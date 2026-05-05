@@ -1,11 +1,19 @@
 import type { ChatMessage, ContentBlock, ForkBranch, SideContext, ToolCallDisplay } from './types.js';
-import type { QuestionEvent } from '$lib/daemon/types.js';
+import type { QuestionEvent, ProviderEntry } from '$lib/daemon/types.js';
 import type { AgentRunOverride } from '$lib/types/agent-config.js';
 import { getDaemonClient } from '$lib/daemon/client.js';
 import {
 	saveSessionHistory,
 	loadSessionHistory as loadFromStore,
 } from '$lib/services/chat-history.js';
+
+/** A model entry in the selector: which provider it belongs to + its id/name. */
+export interface ModelEntry {
+	provider: string;   // matches ProviderEntry.name
+	id: string;         // model id sent to the API
+	name: string;       // display name
+	iconSvg?: string;   // provider icon SVG markup (from registry)
+}
 
 function generateId(): string {
 	return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -31,6 +39,12 @@ let timeoutMs = $state(60000);
 // Available providers (populated from config)
 let availableProviders = $state<string[]>([]);
 let defaultProvider = $state<string | null>(null);
+
+// Model selection: the full flat list of (provider, model) pairs and the selected entry.
+// Models are loaded once from each provider's live /models endpoint and cached.
+let availableModels = $state<ModelEntry[]>([]);
+let selectedModel = $state<ModelEntry | null>(null);
+let modelsLoading = $state(false);
 
 // Extended-thinking toggle state. The toggle lives in the chat input
 // (UnifiedChatInput) and is reset to false on session change so that a
@@ -109,6 +123,54 @@ export function setAvailableProviders(providers: string[], def: string | null): 
 	defaultProvider = def;
 	if (!selectedProvider && def) {
 		selectedProvider = def;
+	}
+}
+
+/**
+ * Load models for all configured providers and populate `availableModels`.
+ * Uses the daemon's /api/providers/all-models endpoint so the daemon reads
+ * its own config with real (unmasked) API keys — the frontend config API
+ * returns masked keys which would fail auth against the provider.
+ */
+export async function loadAvailableModels(_providerEntries: ProviderEntry[]): Promise<void> {
+	if (modelsLoading) return;
+	modelsLoading = true;
+
+	const client = getDaemonClient();
+
+	try {
+		// Fetch models and registry in parallel; registry gives us provider icons.
+		const [rawModels, registry] = await Promise.all([
+			client.fetchAllProviderModels(),
+			client.fetchProviderRegistry().catch(() => []),
+		]);
+
+		// Build a name→iconSvg map from the registry.
+		// Registry ids are lowercase (e.g. "ollama-cloud"); provider names in
+		// config can be mixed-case (e.g. "Ollama Cloud"). Normalise both sides.
+		const iconByName = new Map<string, string>();
+		for (const reg of registry) {
+			if (reg.iconSvg) {
+				iconByName.set(reg.id.toLowerCase(), reg.iconSvg);
+				iconByName.set(reg.name.toLowerCase(), reg.iconSvg);
+			}
+		}
+
+		const results: ModelEntry[] = rawModels.map((m) => ({
+			...m,
+			iconSvg: iconByName.get(m.provider.toLowerCase()),
+		}));
+
+		availableModels = results;
+
+		// Auto-select first model if nothing is selected yet
+		if (!selectedModel && results.length > 0) {
+			selectedModel = results[0];
+		}
+	} catch {
+		// Silently fail — models stay empty, user can still type manually
+	} finally {
+		modelsLoading = false;
 	}
 }
 
@@ -597,13 +659,17 @@ export function buildChatRequestFields(sessionId?: string | null, projectId?: st
 	sessionId?: string;
 	projectId?: string;
 	provider?: string;
+	model?: string;
 	maxIterations: number;
 	maxTokens?: number;
 	temperature: number;
 	topP: number;
 	timeoutMs: number;
 } {
-	const provider = agentOverride.provider ?? selectedProvider ?? undefined;
+	// Provider: agent override wins, then the selected model's provider, then the selected provider pill.
+	const resolvedModel = selectedModel;
+	const provider = agentOverride.provider ?? resolvedModel?.provider ?? selectedProvider ?? undefined;
+	const model = resolvedModel?.id ?? undefined;
 
 	const resolvedMaxTokens =
 		agentOverride.maxTokens !== undefined
@@ -616,6 +682,7 @@ export function buildChatRequestFields(sessionId?: string | null, projectId?: st
 		...(sessionId ? { sessionId } : {}),
 		...(projectId ? { projectId } : {}),
 		provider,
+		...(model ? { model } : {}),
 		maxIterations: agentOverride.maxIterations ?? maxIterations,
 		maxTokens: resolvedMaxTokens,
 		temperature: agentOverride.temperature ?? temperature,
@@ -686,6 +753,15 @@ export const chatStore = {
 	get defaultProvider() {
 		return defaultProvider;
 	},
+	get availableModels() {
+		return availableModels;
+	},
+	get selectedModel() {
+		return selectedModel;
+	},
+	get modelsLoading() {
+		return modelsLoading;
+	},
 	get agentOverride() {
 		return agentOverride;
 	},
@@ -733,6 +809,11 @@ export const chatStore = {
 	setProvider: (p: string | null) => {
 		selectedProvider = p;
 	},
+	setModel: (m: ModelEntry | null) => {
+		selectedModel = m;
+		if (m) selectedProvider = m.provider;
+	},
+	loadAvailableModels,
 	setMaxIterations: (n: number) => {
 		maxIterations = n;
 	},

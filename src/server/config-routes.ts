@@ -359,6 +359,43 @@ export function createConfigRoutes<TApp extends Elysia>(
 		return { providers };
 	});
 
+	// Fetch models for ALL configured providers using the real stored API keys.
+	// The desktop cannot do this itself because GET /api/config masks keys as '••••••••'.
+	app.get('/api/providers/all-models', async () => {
+		let config: ElefantConfig;
+		try {
+			const raw = await Bun.file(CONFIG_PATH).json() as unknown;
+			const parsed = configSchema.safeParse(raw);
+			if (!parsed.success) return { ok: true, models: [] };
+			config = parsed.data;
+		} catch {
+			return { ok: true, models: [] };
+		}
+
+		type ModelEntry = { provider: string; id: string; name: string };
+		const allModels: ModelEntry[] = [];
+
+		await Promise.allSettled(
+			config.providers.map(async (provider) => {
+				if (!provider.apiKey || !provider.baseURL) return;
+				try {
+					const models = await fetchProviderModels(
+						provider.baseURL,
+						provider.apiKey,
+						provider.format as 'openai' | 'anthropic' | 'anthropic-compatible',
+					);
+					for (const m of models) {
+						allModels.push({ provider: provider.name, id: m.id, name: m.name || m.id });
+					}
+				} catch {
+					// Provider unreachable — skip silently
+				}
+			}),
+		);
+
+		return { ok: true, models: allModels };
+	});
+
 	app.post('/api/providers/models', async ({ body, set }) => {
 		const { baseURL, apiKey, format } = body as {
 			baseURL?: string;
