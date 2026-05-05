@@ -31,7 +31,7 @@ const ListRunsQuerySchema = z.object({
 })
 
 const ChildrenPathParamsSchema = z.object({
-	id: z.string().min(1),
+	projectId: z.string().min(1),
 	sessionId: z.string().min(1),
 	runId: z.string().min(1),
 })
@@ -49,7 +49,7 @@ export function mountAgentRunRoutes(
 		mcpManager?: MCPManager
 	},
 ): Elysia {
-	app.post('/api/projects/:id/sessions/:sessionId/agent-runs', ({ params, body, set }) => {
+	app.post('/api/projects/:projectId/sessions/:sessionId/agent-runs', ({ params, body, set }) => {
 		const parsedBody = SpawnRunBodySchema.safeParse(body)
 		if (!parsedBody.success) {
 			set.status = 400
@@ -63,7 +63,7 @@ export function mountAgentRunRoutes(
 		}
 
 		const session = getSessionById(deps.db, params.sessionId)
-		if (!session.ok || session.data.project_id !== params.id) {
+		if (!session.ok || session.data.project_id !== params.projectId) {
 			set.status = 404
 			return {
 				ok: false,
@@ -78,7 +78,7 @@ export function mountAgentRunRoutes(
 		const createResult = createRun(deps.db, {
 			run_id: runId,
 			session_id: params.sessionId,
-			project_id: params.id,
+			project_id: params.projectId,
 			parent_run_id: parsedBody.data.parentRunId ?? null,
 			agent_type: parsedBody.data.agentType,
 			title: parsedBody.data.title,
@@ -106,7 +106,7 @@ export function mountAgentRunRoutes(
 			agentType: parsedBody.data.agentType,
 			title: parsedBody.data.title,
 			sessionId: params.sessionId,
-			projectId: params.id,
+			projectId: params.projectId,
 			signal: controller.signal,
 		})
 
@@ -238,7 +238,7 @@ export function mountAgentRunRoutes(
 		}
 	})
 
-	app.get('/api/projects/:id/sessions/:sessionId/runs/:runId/children', ({ params, query, set }) => {
+	app.get('/api/projects/:projectId/sessions/:sessionId/runs/:runId/children', ({ params, query, set }) => {
 		const parsedParams = ChildrenPathParamsSchema.safeParse(params)
 		if (!parsedParams.success) {
 			set.status = 400
@@ -263,9 +263,9 @@ export function mountAgentRunRoutes(
 			}
 		}
 
-		const { id, sessionId, runId } = parsedParams.data
+		const { projectId, sessionId, runId } = parsedParams.data
 		const session = getSessionById(deps.db, sessionId)
-		if (!session.ok || session.data.project_id !== id) {
+		if (!session.ok || session.data.project_id !== projectId) {
 			set.status = 404
 			return {
 				ok: false,
@@ -418,7 +418,7 @@ export function mountAgentRunRoutes(
 		}
 	})
 
-	app.get('/api/projects/:id/runs/:runId/messages', ({ params, set }) => {
+	app.get('/api/projects/:projectId/runs/:runId/messages', ({ params, set }) => {
 		const run = getRun(deps.db, params.runId)
 		if (!run.ok) {
 			set.status = 404
@@ -431,7 +431,7 @@ export function mountAgentRunRoutes(
 			}
 		}
 
-		if (run.data.project_id !== params.id) {
+		if (run.data.project_id !== params.projectId) {
 			set.status = 404
 			return {
 				ok: false,

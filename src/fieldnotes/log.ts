@@ -60,3 +60,6 @@ export const providerSwitchLog = createLogger('fieldnotes:provider-switch');
 
 /** Routes-specific logger */
 export const fieldNotesRoutesLog = createLogger('fieldnotes:routes');
+
+/** Alias used by routes-fieldnotes.ts */
+export const routesLog = fieldNotesRoutesLog;
