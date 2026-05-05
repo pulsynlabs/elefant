@@ -5,7 +5,7 @@ import type { ToolDefinition } from '../types/tools.ts'
 import { createToolRegistry, createToolRegistryForRun, filterToolsForAgent, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all 25 tools including research_* and tool_search', () => {
+	it('registers all 25 tools including field_notes_* and tool_search', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
@@ -20,11 +20,11 @@ describe('ToolRegistry', () => {
 			'question',
 			'read',
 			'reference',
-			'research_grep',
-			'research_index',
-			'research_read',
-			'research_search',
-			'research_write',
+			'field_notes_grep',
+			'field_notes_index',
+			'field_notes_read',
+			'field_notes_search',
+			'field_notes_write',
 			'skill',
 			'slider',
 			'todoread',
@@ -450,7 +450,7 @@ describe('ToolRegistry', () => {
 		}
 	})
 
-	it('registers all 5 research_* tools in createToolRegistryForRun', () => {
+	it('registers all 5 field_notes_* tools in createToolRegistryForRun', () => {
 		const database = {
 			db: {
 				query() {
@@ -477,16 +477,16 @@ describe('ToolRegistry', () => {
 		})
 
 		const names = registry.getAll().map((t) => t.name)
-		expect(names).toContain('research_search')
-		expect(names).toContain('research_grep')
-		expect(names).toContain('research_read')
-		expect(names).toContain('research_write')
-		expect(names).toContain('research_index')
+		expect(names).toContain('field_notes_search')
+		expect(names).toContain('field_notes_grep')
+		expect(names).toContain('field_notes_read')
+		expect(names).toContain('field_notes_write')
+		expect(names).toContain('field_notes_index')
 	})
 
-	it('research_write lists allowedAgents for researcher/writer/librarian only', () => {
+	it('field_notes_write lists allowedAgents for researcher/writer/librarian only', () => {
 		const registry = createToolRegistry(new HookRegistry())
-		const tool = registry.get('research_write')
+		const tool = registry.get('field_notes_write')
 		expect(tool.ok).toBe(true)
 		if (tool.ok) {
 			expect(tool.data.allowedAgents).toEqual(['researcher', 'writer', 'librarian'])

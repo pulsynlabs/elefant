@@ -1,10 +1,10 @@
 /**
- * Tests for research_index tool.
+ * Tests for field_notes_index tool.
  */
 
 import { describe, it, expect } from 'bun:test';
 import {
-	createResearchIndexTool,
+	createFieldNotesIndexTool,
 	type ResearchIndexParams,
 	type ResearchIndexStore,
 	type TreeOutput,
@@ -90,7 +90,7 @@ function mockStoreWithSection(
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe('research_index tool', () => {
+describe('field_notes_index tool', () => {
 	// ── tree output ───────────────────────────────────────────────────────
 
 	describe('tree output', () => {
@@ -119,7 +119,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'tree',
 			} as ResearchIndexParams);
@@ -132,7 +132,7 @@ describe('research_index tool', () => {
 			expect(data.sections).toHaveLength(2);
 			expect(data.total).toBe(3);
 
-			// Section ordering follows RESEARCH_SECTIONS
+			// Section ordering follows FIELD_NOTES_SECTIONS
 			const section2 = data.sections[0]!;
 			expect(section2.section).toBe('02-tech');
 			expect(section2.label).toBe('Technologies');
@@ -153,7 +153,7 @@ describe('research_index tool', () => {
 				makeDoc({ id: 'd1', section: '02-tech', filePath: '02-tech/a.md' }),
 			];
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'tree',
 			} as ResearchIndexParams);
@@ -164,22 +164,22 @@ describe('research_index tool', () => {
 			expect(data.sections).toHaveLength(1);
 		});
 
-		it('includes research_link on each file', async () => {
+		it('includes fieldnotes_link on each file', async () => {
 			const doc = makeDoc({
 				id: 'd1',
 				filePath: '02-tech/vector-dbs.md',
 				workflow: 'research-base',
 			});
 
-			const tool = createResearchIndexTool(mockStore([doc]));
+			const tool = createFieldNotesIndexTool(mockStore([doc]));
 			const result = await tool.execute({
 				output: 'tree',
 			} as ResearchIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = treeData(unwrapOk(result));
-			expect(data.sections[0]!.files[0]!.research_link).toBe(
-				'research://research-base/02-tech/vector-dbs.md',
+			expect(data.sections[0]!.files[0]!.fieldnotes_link).toBe(
+				'fieldnotes://research-base/02-tech/vector-dbs.md',
 			);
 		});
 
@@ -190,15 +190,15 @@ describe('research_index tool', () => {
 				workflow: null,
 			});
 
-			const tool = createResearchIndexTool(mockStore([doc]));
+			const tool = createFieldNotesIndexTool(mockStore([doc]));
 			const result = await tool.execute({
 				output: 'tree',
 			} as ResearchIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = treeData(unwrapOk(result));
-			expect(data.sections[0]!.files[0]!.research_link).toBe(
-				'research://_/02-tech/foo.md',
+			expect(data.sections[0]!.files[0]!.fieldnotes_link).toBe(
+				'fieldnotes://_/02-tech/foo.md',
 			);
 		});
 	});
@@ -228,7 +228,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'flat',
 			} as ResearchIndexParams);
@@ -243,7 +243,7 @@ describe('research_index tool', () => {
 			expect(data.files[2]!.title).toBe('Oldest');
 		});
 
-		it('includes section and research_link on each file', async () => {
+		it('includes section and fieldnotes_link on each file', async () => {
 			const doc = makeDoc({
 				id: 'd1',
 				section: '02-tech',
@@ -251,7 +251,7 @@ describe('research_index tool', () => {
 				workflow: 'wf',
 			});
 
-			const tool = createResearchIndexTool(mockStore([doc]));
+			const tool = createFieldNotesIndexTool(mockStore([doc]));
 			const result = await tool.execute({
 				output: 'flat',
 			} as ResearchIndexParams);
@@ -259,8 +259,8 @@ describe('research_index tool', () => {
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
 			expect(data.files[0]!.section).toBe('02-tech');
-			expect(data.files[0]!.research_link).toBe(
-				'research://wf/02-tech/foo.md',
+			expect(data.files[0]!.fieldnotes_link).toBe(
+				'fieldnotes://wf/02-tech/foo.md',
 			);
 		});
 	});
@@ -284,7 +284,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(
+			const tool = createFieldNotesIndexTool(
 				mockStoreWithSection(docs),
 			);
 			const result = await tool.execute({
@@ -299,7 +299,7 @@ describe('research_index tool', () => {
 		});
 
 		it('returns empty result for invalid section name', async () => {
-			const tool = createResearchIndexTool(mockStore([]));
+			const tool = createFieldNotesIndexTool(mockStore([]));
 			const result = await tool.execute({
 				output: 'tree',
 				section: 'nonexistent',
@@ -312,7 +312,7 @@ describe('research_index tool', () => {
 		});
 
 		it('returns empty flat result for invalid section name', async () => {
-			const tool = createResearchIndexTool(mockStore([]));
+			const tool = createFieldNotesIndexTool(mockStore([]));
 			const result = await tool.execute({
 				output: 'flat',
 				section: 'nonexistent',
@@ -350,7 +350,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'flat',
 				tag: 'embeddings',
@@ -368,7 +368,7 @@ describe('research_index tool', () => {
 				makeDoc({ id: 'd1', tags: ['other'], filePath: '02-tech/a.md' }),
 			];
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'flat',
 				tag: 'embeddings',
@@ -406,7 +406,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'flat',
 				recencyDays: 7,
@@ -432,7 +432,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'flat',
 				recencyDays: 5,
@@ -459,7 +459,7 @@ describe('research_index tool', () => {
 				}),
 			);
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'flat',
 				limit: 3,
@@ -503,7 +503,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'tree',
 				limit: 3,
@@ -533,7 +533,7 @@ describe('research_index tool', () => {
 
 	describe('empty corpus', () => {
 		it('tree output: no sections', async () => {
-			const tool = createResearchIndexTool(mockStore([]));
+			const tool = createFieldNotesIndexTool(mockStore([]));
 			const result = await tool.execute({
 				output: 'tree',
 			} as ResearchIndexParams);
@@ -545,7 +545,7 @@ describe('research_index tool', () => {
 		});
 
 		it('flat output: empty files array', async () => {
-			const tool = createResearchIndexTool(mockStore([]));
+			const tool = createFieldNotesIndexTool(mockStore([]));
 			const result = await tool.execute({
 				output: 'flat',
 			} as ResearchIndexParams);
@@ -561,7 +561,7 @@ describe('research_index tool', () => {
 
 	describe('invalid parameters', () => {
 		it('rejects invalid output value', async () => {
-			const tool = createResearchIndexTool(mockStore([]));
+			const tool = createFieldNotesIndexTool(mockStore([]));
 			const result = await tool.execute({
 				output: 'invalid' as 'tree',
 			} as ResearchIndexParams);
@@ -606,7 +606,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(mockStore(docs));
+			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'flat',
 				tag: 'embeddings',
@@ -637,7 +637,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(
+			const tool = createFieldNotesIndexTool(
 				mockStoreWithSection(docs),
 			);
 			const result = await tool.execute({
@@ -685,7 +685,7 @@ describe('research_index tool', () => {
 				}),
 			];
 
-			const tool = createResearchIndexTool(
+			const tool = createFieldNotesIndexTool(
 				mockStoreWithSection(docs),
 			);
 			const result = await tool.execute({
@@ -716,7 +716,7 @@ describe('research_index tool', () => {
 				}),
 			};
 
-			const tool = createResearchIndexTool(store);
+			const tool = createFieldNotesIndexTool(store);
 			const result = await tool.execute({} as ResearchIndexParams);
 
 			expect(result.ok).toBe(false);

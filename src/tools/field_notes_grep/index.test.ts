@@ -1,5 +1,5 @@
 /**
- * research_grep tool tests — coverage for grouping, section scoping,
+ * field_notes_grep tool tests — coverage for grouping, section scoping,
  * invalid regex, path traversal, and maxFiles cap.
  */
 
@@ -79,7 +79,7 @@ function buildResearchDoc(opts: {
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
-describe('research_grep', () => {
+describe('field_notes_grep', () => {
 	let layout: TempLayout;
 	let prevCwd: string;
 
@@ -132,12 +132,12 @@ describe('research_grep', () => {
 
 		expect(elephants!.title).toBe('Elephant Conservation in Africa');
 		expect(elephants!.section).toBe('02-tech');
-		expect(elephants!.research_link).toBe('research://_/02-tech/elephants.md');
+		expect(elephants!.fieldnotes_link).toBe('fieldnotes://_/02-tech/elephants.md');
 		expect(elephants!.matches.length).toBeGreaterThanOrEqual(1);
 		expect(elephants!.matchCount).toBe(elephants!.matches.length);
 
 		expect(zoology!.title).toBe('General Zoology');
-		expect(zoology!.research_link).toBe('research://_/02-tech/zoology.md');
+		expect(zoology!.fieldnotes_link).toBe('fieldnotes://_/02-tech/zoology.md');
 	});
 
 	// ── No matches ──────────────────────────────────────────────────────
@@ -310,7 +310,7 @@ describe('research_grep', () => {
 
 		expect(data.files).toHaveLength(1);
 		expect(data.files[0].title).toBe('notes.md');
-		expect(data.files[0].research_link).toBe('research://_/99-scratch/notes.md');
+		expect(data.files[0].fieldnotes_link).toBe('fieldnotes://_/99-scratch/notes.md');
 	});
 
 	// ── Uncovered decodeField edge cases ──────────────────────────────

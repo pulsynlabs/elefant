@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import type { EmbeddingProvider } from '../../research/embeddings/provider.ts';
-import type { Frontmatter } from '../../research/frontmatter.ts';
+import type { EmbeddingProvider } from '../../fieldnotes/embeddings/provider.ts';
+import type { Frontmatter } from '../../fieldnotes/frontmatter.ts';
 import { err, ok } from '../../types/result.ts';
-import { createResearchSearchTool, type ResearchSearchStore } from './index.ts';
+import { createFieldNotesSearchTool, type FieldNotesSearchStore } from './index.ts';
 
 function frontmatter(overrides: Partial<Frontmatter> = {}): Frontmatter {
   return {
@@ -21,7 +21,7 @@ function frontmatter(overrides: Partial<Frontmatter> = {}): Frontmatter {
   };
 }
 
-type SearchRow = Parameters<ResearchSearchStore['searchKeyword']>[1] extends never ? never : {
+type SearchRow = Parameters<FieldNotesSearchStore['searchKeyword']>[1] extends never ? never : {
   id: number;
   documentId: string;
   chunkIndex: number;
@@ -80,7 +80,7 @@ function createMockStore(input: {
     vector: Array<{ embedding: Float32Array; opts: { k: number; section?: string } }>;
   } = { keyword: [], vector: [] };
 
-  const store: ResearchSearchStore = {
+  const store: FieldNotesSearchStore = {
     searchKeyword(query, opts) {
       calls.keyword.push({ query, opts });
       return ok(input.keywordRows ?? []);
@@ -111,13 +111,13 @@ function createMockStore(input: {
   return { store, calls };
 }
 
-describe('research_search tool', () => {
+describe('field_notes_search tool', () => {
   it('keyword mode returns ranked results from FTS', async () => {
     const { provider } = createMockProvider();
     const { store, calls } = createMockStore({
       keywordRows: [row({ documentId: 'doc-high', score: 9 }), row({ documentId: 'doc-low', score: 3 })],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword' });
 
@@ -133,7 +133,7 @@ describe('research_search tool', () => {
   it('semantic mode embeds query, calls searchVector, and returns ranked results', async () => {
     const { provider, calls: providerCalls } = createMockProvider();
     const { store, calls } = createMockStore({ vectorRows: [row({ documentId: 'doc-vector', score: 0.8 })] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'vector', mode: 'semantic' });
 
@@ -154,7 +154,7 @@ describe('research_search tool', () => {
       keywordRows: [duplicate, row({ id: 2, documentId: 'doc-b', chunkIndex: 0, score: 80 })],
       vectorRows: [duplicate, row({ id: 3, documentId: 'doc-c', chunkIndex: 0, score: 0.95 })],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'hybrid', k: 5 });
 
@@ -174,7 +174,7 @@ describe('research_search tool', () => {
   it('disabled provider with semantic mode uses keyword mode', async () => {
     const { provider, calls: providerCalls } = createMockProvider('disabled');
     const { store, calls } = createMockStore({ keywordRows: [row({ documentId: 'doc-keyword' })] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'fallback', mode: 'semantic' });
 
@@ -189,7 +189,7 @@ describe('research_search tool', () => {
   it('disabled provider with hybrid mode uses keyword mode', async () => {
     const { provider } = createMockProvider('disabled');
     const { store, calls } = createMockStore({ keywordRows: [row({ documentId: 'doc-keyword' })] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'fallback', mode: 'hybrid' });
 
@@ -204,7 +204,7 @@ describe('research_search tool', () => {
     const { provider } = createMockProvider();
     const rows = Array.from({ length: 10 }, (_, index) => row({ id: index + 1, documentId: `doc-${index}`, score: 10 - index }));
     const { store } = createMockStore({ keywordRows: rows });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', k: 3 });
 
@@ -217,7 +217,7 @@ describe('research_search tool', () => {
   it('passes section filter through to the store', async () => {
     const { provider } = createMockProvider();
     const { store, calls } = createMockStore({ keywordRows: [row()] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', section: '02-tech' });
 
@@ -233,7 +233,7 @@ describe('research_search tool', () => {
         row({ documentId: 'doc-drop', tags: ['other'] }),
       ],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', tags: ['agents'] });
 
@@ -247,7 +247,7 @@ describe('research_search tool', () => {
     const { store } = createMockStore({
       keywordRows: [row({ documentId: 'doc-high', score: 10 }), row({ documentId: 'doc-low', score: 2 })],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', minScore: 0.5 });
 
@@ -259,7 +259,7 @@ describe('research_search tool', () => {
   it('returns an empty result set for an empty corpus', async () => {
     const { provider } = createMockProvider();
     const { store } = createMockStore();
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'nothing', mode: 'keyword' });
 
@@ -271,7 +271,7 @@ describe('research_search tool', () => {
   it('returns an error when query embedding fails', async () => {
     const { provider } = createMockProvider('bundled-cpu', { failEmbed: true });
     const { store } = createMockStore();
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'semantic', mode: 'semantic' });
 
@@ -288,13 +288,13 @@ describe('research_search tool', () => {
       keywordRows: [row({ documentId: 'doc-link', text: 'Alpha sentence. Beta sentence. Query term appears here. Gamma follows. Delta closes.' })],
       docs: { 'doc-link': fm },
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'query', mode: 'keyword' });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.results[0]?.research_link).toBe('research://_/02-tech/doc-link.md');
+    expect(result.data.results[0]?.fieldnotes_link).toBe('fieldnotes://_/02-tech/doc-link.md');
     expect(result.data.results[0]?.snippet).toContain('Query term appears here.');
     expect(result.data.results[0]?.snippet).not.toContain('title:');
   });
@@ -304,7 +304,7 @@ describe('research_search tool', () => {
   it('returns VALIDATION_ERROR for invalid mode value', async () => {
     const { provider } = createMockProvider();
     const { store } = createMockStore({ keywordRows: [] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'invalid' as 'semantic' });
 
@@ -315,7 +315,7 @@ describe('research_search tool', () => {
   it('returns VALIDATION_ERROR when tags contains non-string values', async () => {
     const { provider } = createMockProvider();
     const { store } = createMockStore({ keywordRows: [] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', tags: ['valid', 123 as unknown as string] });
 
@@ -326,7 +326,7 @@ describe('research_search tool', () => {
   it('returns VALIDATION_ERROR when minScore is negative', async () => {
     const { provider } = createMockProvider();
     const { store } = createMockStore({ keywordRows: [] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', minScore: -0.1 });
 
@@ -337,7 +337,7 @@ describe('research_search tool', () => {
   it('returns VALIDATION_ERROR when minScore is greater than 1', async () => {
     const { provider } = createMockProvider();
     const { store } = createMockStore({ keywordRows: [] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', minScore: 1.5 });
 
@@ -350,7 +350,7 @@ describe('research_search tool', () => {
   it('clampK returns DEFAULT_K for Infinity', async () => {
     const { provider } = createMockProvider();
     const { store } = createMockStore({ keywordRows: [] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', k: Infinity });
 
@@ -363,7 +363,7 @@ describe('research_search tool', () => {
   it('clampK clamps k below 1 to 1', async () => {
     const { provider } = createMockProvider();
     const { store } = createMockStore({ keywordRows: [] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', k: 0 });
 
@@ -381,7 +381,7 @@ describe('research_search tool', () => {
         row({ id: 2, score: 10 }),
       ],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', k: 5 });
 
@@ -399,7 +399,7 @@ describe('research_search tool', () => {
         row({ id: 2, score: -1 }),
       ],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', k: 5 });
 
@@ -418,7 +418,7 @@ describe('research_search tool', () => {
         row({ id: 2, score: 0 }),
       ],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', k: 5 });
 
@@ -440,7 +440,7 @@ describe('research_search tool', () => {
       },
     };
     const provider = createMockProvider();
-    const tool = createResearchSearchTool({
+    const tool = createFieldNotesSearchTool({
       store: undefined,
       embeddingProvider: provider,
       database: db as any,
@@ -469,7 +469,7 @@ describe('research_search tool', () => {
       async dispose() {},
     };
     const { store } = createMockStore({ vectorRows: [] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'semantic' });
 
@@ -482,7 +482,7 @@ describe('research_search tool', () => {
   it('scorePasses returns true when minScore is undefined', async () => {
     const { provider } = createMockProvider();
     const { store } = createMockStore({ keywordRows: [row({ score: 0.1 })] });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', minScore: undefined });
 
@@ -499,7 +499,7 @@ describe('research_search tool', () => {
         row({ id: 2, documentId: 'above', score: 0.6 }),
       ],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', minScore: 0.5 });
 
@@ -516,7 +516,7 @@ describe('research_search tool', () => {
       keywordRows: [row({ documentId: 'orphan-chunk' })],
       nullDocumentIds: new Set(['orphan-chunk']),
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword' });
 
@@ -530,7 +530,7 @@ describe('research_search tool', () => {
       keywordRows: [row({ documentId: 'doc-error' })],
       getDocumentByIdError: { code: 'TOOL_EXECUTION_FAILED', message: 'Database is locked' },
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword' });
 
@@ -545,7 +545,7 @@ describe('research_search tool', () => {
     const { store } = createMockStore({
       keywordRows: [row({ text: 'A short sentence.' })],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword' });
 
@@ -560,7 +560,7 @@ describe('research_search tool', () => {
     const { store } = createMockStore({
       keywordRows: [row({ text: longText })],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword' });
 
@@ -582,7 +582,7 @@ describe('research_search tool', () => {
         row({ id: 3, documentId: 'doc-b', chunkIndex: 0, score: 0.9 }),
       ],
     });
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'hybrid', k: 5 });
 
@@ -597,7 +597,7 @@ describe('research_search tool', () => {
   it('returns empty results for non-matching section in keyword mode', async () => {
     const { provider } = createMockProvider();
     const { store } = createMockStore({ keywordRows: [] }); // no results for any section
-    const tool = createResearchSearchTool({ store, embeddingProvider: provider });
+    const tool = createFieldNotesSearchTool({ store, embeddingProvider: provider });
 
     const result = await tool.execute({ query: 'search', mode: 'keyword', section: '99-nonexistent' });
 

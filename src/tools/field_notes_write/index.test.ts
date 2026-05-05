@@ -3,11 +3,11 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'bun:test';
-import { parseFrontmatter } from '../../research/frontmatter.ts';
-import { researchBaseDir } from '../../project/paths.ts';
+import { parseFrontmatter } from '../../fieldnotes/frontmatter.ts';
+import { fieldNotesDir } from '../../project/paths.ts';
 import { ok, type Result } from '../../types/result.ts';
 import type { ElefantError } from '../../types/errors.ts';
-import { createResearchWriteTool, type ResearchWriteParams } from './index.ts';
+import { createFieldNotesWriteTool, type FieldNotesWriteParams } from './index.ts';
 
 let tempProjects: string[] = [];
 
@@ -33,11 +33,11 @@ function assertError<T>(result: Result<T, ElefantError>): ElefantError {
 }
 
 async function readWritten(projectPath: string, relativePath: string) {
-  const raw = await readFile(join(researchBaseDir(projectPath), relativePath), 'utf8');
+  const raw = await readFile(join(fieldNotesDir(projectPath), relativePath), 'utf8');
   return assertOk(parseFrontmatter(raw));
 }
 
-function validParams(overrides: Partial<ResearchWriteParams> = {}): ResearchWriteParams {
+function validParams(overrides: Partial<FieldNotesWriteParams> = {}): FieldNotesWriteParams {
   return {
     path: '02-tech/my-notes.md',
     title: 'My Notes',
@@ -52,19 +52,19 @@ function validParams(overrides: Partial<ResearchWriteParams> = {}): ResearchWrit
   };
 }
 
-describe('research_write tool', () => {
+describe('field_notes_write tool', () => {
   it('writes a valid research file with valid frontmatter and returned id', async () => {
     const projectPath = await tempProject();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
 
     const output = assertOk(await tool.execute(validParams()));
     const written = await readWritten(projectPath, '02-tech/my-notes.md');
 
-    expect(existsSync(join(researchBaseDir(projectPath), '02-tech/my-notes.md'))).toBe(true);
+    expect(existsSync(join(fieldNotesDir(projectPath), '02-tech/my-notes.md'))).toBe(true);
     expect(output.path).toBe('02-tech/my-notes.md');
     expect(output.id).toBe(written.frontmatter.id);
     expect(output.created).toBe(true);
-    expect(output.research_link).toBe('research://research-base-system/02-tech/my-notes.md');
+    expect(output.fieldnotes_link).toBe('fieldnotes://research-base-system/02-tech/my-notes.md');
     expect(written.frontmatter.title).toBe('My Notes');
     expect(written.frontmatter.section).toBe('02-tech');
     expect(written.frontmatter.author_agent).toBe('researcher');
@@ -74,7 +74,7 @@ describe('research_write tool', () => {
   it('preserves provided id on update', async () => {
     const projectPath = await tempProject();
     const id = crypto.randomUUID();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'writer' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'writer' } });
 
     const output = assertOk(await tool.execute(validParams({ id, title: 'Updated Title' })));
     const written = await readWritten(projectPath, '02-tech/my-notes.md');
@@ -86,7 +86,7 @@ describe('research_write tool', () => {
 
   it('returns VALIDATION_ERROR when title is missing', async () => {
     const projectPath = await tempProject();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
 
     const error = assertError(await tool.execute({ ...validParams(), title: undefined }));
 
@@ -96,7 +96,7 @@ describe('research_write tool', () => {
 
   it('returns VALIDATION_ERROR for invalid section', async () => {
     const projectPath = await tempProject();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
 
     const error = assertError(await tool.execute(validParams({ section: '07-invalid' })));
 
@@ -106,7 +106,7 @@ describe('research_write tool', () => {
 
   it('returns PERMISSION_DENIED for traversal path', async () => {
     const projectPath = await tempProject();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
 
     const error = assertError(await tool.execute(validParams({ path: '../escape.md' })));
 
@@ -115,7 +115,7 @@ describe('research_write tool', () => {
 
   it('denies disallowed agent writes', async () => {
     const projectPath = await tempProject();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'executor-medium' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'executor-medium' } });
 
     const error = assertError(await tool.execute(validParams()));
 
@@ -124,7 +124,7 @@ describe('research_write tool', () => {
 
   it('allows researcher writes', async () => {
     const projectPath = await tempProject();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
 
     const output = assertOk(await tool.execute(validParams()));
 
@@ -133,7 +133,7 @@ describe('research_write tool', () => {
 
   it('allows degraded/manual calls when no agent context is available', async () => {
     const projectPath = await tempProject();
-    const tool = createResearchWriteTool({ projectPath });
+    const tool = createFieldNotesWriteTool({ projectPath });
 
     const output = assertOk(await tool.execute(validParams()));
     const written = await readWritten(projectPath, '02-tech/my-notes.md');
@@ -144,7 +144,7 @@ describe('research_write tool', () => {
 
   it('supports scratch writes without explicit section or confidence', async () => {
     const projectPath = await tempProject();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'librarian' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'librarian' } });
 
     const output = assertOk(await tool.execute({
       path: '99-scratch/note.md',
@@ -162,7 +162,7 @@ describe('research_write tool', () => {
 
   it('auto-fills id, created, updated, and author_agent', async () => {
     const projectPath = await tempProject();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'researcher' } });
 
     const output = assertOk(await tool.execute(validParams({ id: undefined })));
     const written = await readWritten(projectPath, '02-tech/my-notes.md');
@@ -177,7 +177,7 @@ describe('research_write tool', () => {
   it('updates updated timestamp but preserves created when writing same id twice', async () => {
     const projectPath = await tempProject();
     const id = crypto.randomUUID();
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'writer' } });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'writer' } });
 
     assertOk(await tool.execute(validParams({ id, body: 'first' })));
     const first = await readWritten(projectPath, '02-tech/my-notes.md');
@@ -202,10 +202,10 @@ describe('research_write tool', () => {
         return Promise.resolve(ok(undefined));
       },
     };
-    const tool = createResearchWriteTool({ projectPath, ctx: { agentName: 'researcher' }, indexerService });
+    const tool = createFieldNotesWriteTool({ projectPath, ctx: { agentName: 'researcher' }, indexerService });
 
     assertOk(await tool.execute(validParams()));
 
-    expect(indexed).toEqual([join(researchBaseDir(projectPath), '02-tech/my-notes.md')]);
+    expect(indexed).toEqual([join(fieldNotesDir(projectPath), '02-tech/my-notes.md')]);
   });
 });

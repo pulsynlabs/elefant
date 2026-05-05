@@ -1,5 +1,5 @@
 /**
- * Tests for research_read tool — MR-18.
+ * Tests for field_notes_read tool — MR-18.
  *
  * Uses a temp directory with real files to avoid mocking the filesystem.
  * Only the store is mocked for id-based lookups.
@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
-  createResearchReadTool,
+  createFieldNotesReadTool,
   type ResearchReadDeps,
 } from './index.js';
 
@@ -148,13 +148,13 @@ afterEach(async () => {
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe('research_read', () => {
+describe('field_notes_read', () => {
   // ── Happy paths ────────────────────────────────────────────────────────
 
   describe('read by path', () => {
     it('returns frontmatter + body for a valid file', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ path: '02-tech/foo.md' });
 
@@ -170,7 +170,7 @@ describe('research_read', () => {
       expect(data.body).toContain('# Introduction');
       expect(data.body).toContain('## Architecture Overview');
       expect(data.body).not.toContain('---'); // frontmatter stripped
-      expect(data.research_link).toBe('research://_/02-tech/foo.md');
+      expect(data.fieldnotes_link).toBe('fieldnotes://_/02-tech/foo.md');
       expect(data.wordCount).toBeGreaterThan(0);
       expect(data.anchorBody).toBeUndefined();
     });
@@ -191,7 +191,7 @@ describe('research_read', () => {
         },
       };
 
-      const tool = createResearchReadTool(makeDepsWithStore(projectPath, store));
+      const tool = createFieldNotesReadTool(makeDepsWithStore(projectPath, store));
 
       const result = await tool.execute({ id: 'mock-uuid' });
 
@@ -200,7 +200,7 @@ describe('research_read', () => {
 
       expect(result.data.path).toBe('03-decisions/adr-001.md');
       expect(result.data.frontmatter!.title).toBe('Test Document');
-      expect(result.data.research_link).toBe('research://_/03-decisions/adr-001.md');
+      expect(result.data.fieldnotes_link).toBe('fieldnotes://_/03-decisions/adr-001.md');
     });
 
     it('returns FILE_NOT_FOUND when store returns null', async () => {
@@ -210,7 +210,7 @@ describe('research_read', () => {
         },
       };
 
-      const tool = createResearchReadTool(makeDepsWithStore(projectPath, store));
+      const tool = createFieldNotesReadTool(makeDepsWithStore(projectPath, store));
 
       const result = await tool.execute({ id: 'nonexistent-id' });
 
@@ -221,26 +221,26 @@ describe('research_read', () => {
   });
 
   describe('read by link', () => {
-    it('resolves research:// URI and reads file', async () => {
+    it('resolves fieldnotes:// URI and reads file', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
-      const result = await tool.execute({ link: 'research://_/02-tech/foo.md' });
+      const result = await tool.execute({ link: 'fieldnotes://_/02-tech/foo.md' });
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('unexpected error');
 
       expect(result.data.path).toBe('02-tech/foo.md');
       expect(result.data.frontmatter!.title).toBe('Test Document');
-      expect(result.data.research_link).toBe('research://_/02-tech/foo.md');
+      expect(result.data.fieldnotes_link).toBe('fieldnotes://_/02-tech/foo.md');
     });
 
     it('extracts anchorBody from link anchor', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({
-        link: 'research://_/02-tech/foo.md#architecture-overview',
+        link: 'fieldnotes://_/02-tech/foo.md#architecture-overview',
       });
 
       expect(result.ok).toBe(true);
@@ -253,10 +253,10 @@ describe('research_read', () => {
 
     it('param anchor overrides when link has no anchor', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({
-        link: 'research://_/02-tech/foo.md',
+        link: 'fieldnotes://_/02-tech/foo.md',
         anchor: 'api-reference',
       });
 
@@ -271,7 +271,7 @@ describe('research_read', () => {
   describe('anchor extraction', () => {
     it('returns anchorBody for H2 heading', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({
         path: '02-tech/foo.md',
@@ -289,7 +289,7 @@ describe('research_read', () => {
 
     it('returns anchorBody for H3 heading', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({
         path: '02-tech/foo.md',
@@ -307,7 +307,7 @@ describe('research_read', () => {
 
     it('anchorBody stops at same-level heading', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       // architecture-overview is H2; next H2 is API Reference
       const result = await tool.execute({
@@ -328,7 +328,7 @@ describe('research_read', () => {
 
     it('anchorBody stops at higher-level heading', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       // sub-component is H3; next H2 (higher level) is API Reference
       const result = await tool.execute({
@@ -346,7 +346,7 @@ describe('research_read', () => {
 
     it('returns anchorBody=undefined for non-existent heading, no error', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({
         path: '02-tech/foo.md',
@@ -372,7 +372,7 @@ author_agent: user
 ---`;
 
       await writeResearchFile(projectPath, '02-tech/empty.md', emptyDoc);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ path: '02-tech/empty.md', anchor: 'introduction' });
 
@@ -395,7 +395,7 @@ summary: empty body test
 ---`;
 
       await writeResearchFile(projectPath, '02-tech/empty-body.md', doc);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ path: '02-tech/empty-body.md' });
 
@@ -411,7 +411,7 @@ summary: empty body test
 
   describe('validation errors', () => {
     it('rejects when no resolver param is provided', async () => {
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({});
 
@@ -422,7 +422,7 @@ summary: empty body test
     });
 
     it('rejects when multiple resolver params are provided', async () => {
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({
         path: '02-tech/foo.md',
@@ -436,7 +436,7 @@ summary: empty body test
     });
 
     it('rejects when id is provided but no store is configured', async () => {
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ id: 'some-id' });
 
@@ -449,7 +449,7 @@ summary: empty body test
 
   describe('file not found', () => {
     it('returns FILE_NOT_FOUND for non-existent path', async () => {
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ path: '02-tech/nope.md' });
 
@@ -461,7 +461,7 @@ summary: empty body test
 
   describe('traversal rejection', () => {
     it('returns PERMISSION_DENIED for path with ..', async () => {
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ path: '../outside.md' });
 
@@ -470,11 +470,11 @@ summary: empty body test
       expect(result.error.code).toBe('PERMISSION_DENIED');
     });
 
-    it('returns VALIDATION_ERROR for research:// URI with ..', async () => {
-      const tool = createResearchReadTool(makeDeps(projectPath));
+    it('returns VALIDATION_ERROR for fieldnotes:// URI with ..', async () => {
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({
-        link: 'research://_/../outside.md',
+        link: 'fieldnotes://_/../outside.md',
       });
 
       expect(result.ok).toBe(false);
@@ -489,7 +489,7 @@ summary: empty body test
   describe('lenient frontmatter handling', () => {
     it('reads scratch file with missing required frontmatter fields', async () => {
       await writeResearchFile(projectPath, '99-scratch/notes.md', SCRATCH_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ path: '99-scratch/notes.md' });
 
@@ -504,7 +504,7 @@ summary: empty body test
 
     it('reads file with malformed YAML frontmatter', async () => {
       await writeResearchFile(projectPath, '02-tech/broken.md', MALFORMED_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ path: '02-tech/broken.md' });
 
@@ -520,7 +520,7 @@ summary: empty body test
 
     it('reads file with no frontmatter at all', async () => {
       await writeResearchFile(projectPath, '99-scratch/plain.md', NO_FM_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ path: '99-scratch/plain.md' });
 
@@ -551,7 +551,7 @@ Exactly six words in this sentence.
 Another paragraph here.`;
 
       await writeResearchFile(projectPath, '02-tech/count.md', doc);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({ path: '02-tech/count.md' });
 
@@ -575,7 +575,7 @@ summary: testing special chars
 Content about special characters.`;
 
       await writeResearchFile(projectPath, '02-tech/special.md', doc);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({
         path: '02-tech/special.md',
@@ -589,10 +589,10 @@ Content about special characters.`;
 
     it('link anchor takes precedence over param anchor', async () => {
       await writeResearchFile(projectPath, '02-tech/foo.md', VALID_DOC);
-      const tool = createResearchReadTool(makeDeps(projectPath));
+      const tool = createFieldNotesReadTool(makeDeps(projectPath));
 
       const result = await tool.execute({
-        link: 'research://_/02-tech/foo.md#deployment',
+        link: 'fieldnotes://_/02-tech/foo.md#deployment',
         anchor: 'introduction',
       });
 
