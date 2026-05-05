@@ -30,8 +30,6 @@ let streamingMessageId = $state<string | null>(null);
 let selectedProvider = $state<string | null>(null);
 // Tracked so finalizeMessage can auto-persist without needing an extra param.
 let activeSessionId = $state<string | null>(null);
-let maxIterations = $state(50);
-let maxTokens = $state(4096);
 let temperature = $state(1.0);
 let topP = $state(1.0);
 let timeoutMs = $state(60000);
@@ -660,8 +658,6 @@ export function buildChatRequestFields(sessionId?: string | null, projectId?: st
 	projectId?: string;
 	provider?: string;
 	model?: string;
-	maxIterations: number;
-	maxTokens?: number;
 	temperature: number;
 	topP: number;
 	timeoutMs: number;
@@ -671,23 +667,14 @@ export function buildChatRequestFields(sessionId?: string | null, projectId?: st
 	const provider = agentOverride.provider ?? resolvedModel?.provider ?? selectedProvider ?? undefined;
 	const model = resolvedModel?.id ?? undefined;
 
-	const resolvedMaxTokens =
-		agentOverride.maxTokens !== undefined
-			? agentOverride.maxTokens
-			: maxTokens > 0
-				? maxTokens
-				: undefined;
-
 	return {
 		...(sessionId ? { sessionId } : {}),
 		...(projectId ? { projectId } : {}),
 		provider,
 		...(model ? { model } : {}),
-		maxIterations: agentOverride.maxIterations ?? maxIterations,
-		maxTokens: resolvedMaxTokens,
 		temperature: agentOverride.temperature ?? temperature,
 		topP: agentOverride.topP ?? topP,
-		timeoutMs: agentOverride.timeoutMs ?? timeoutMs,
+		timeoutMs,
 	};
 }
 
@@ -731,12 +718,6 @@ export const chatStore = {
 	},
 	get selectedProvider() {
 		return selectedProvider;
-	},
-	get maxIterations() {
-		return maxIterations;
-	},
-	get maxTokens() {
-		return maxTokens;
 	},
 	get temperature() {
 		return temperature;
@@ -814,12 +795,6 @@ export const chatStore = {
 		if (m) selectedProvider = m.provider;
 	},
 	loadAvailableModels,
-	setMaxIterations: (n: number) => {
-		maxIterations = n;
-	},
-	setMaxTokens: (n: number) => {
-		maxTokens = n;
-	},
 	setTemperature: (n: number) => {
 		temperature = n;
 	},

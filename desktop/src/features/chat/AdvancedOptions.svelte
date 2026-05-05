@@ -6,43 +6,6 @@
 	<h4 class="section-title">Advanced Options</h4>
 	<div class="options-grid">
 		<div class="option-field">
-			<label class="option-label" for="maxIterations">Max iterations</label>
-			<input
-				id="maxIterations"
-				type="number"
-				class="option-input"
-				min="1"
-				max="200"
-				value={chatStore.maxIterations}
-				oninput={(e) =>
-					chatStore.setMaxIterations(
-						parseInt((e.currentTarget as HTMLInputElement).value) || 50,
-					)}
-				aria-describedby="maxIterations-desc"
-			/>
-			<span id="maxIterations-desc" class="option-hint">1–200</span>
-		</div>
-
-		<div class="option-field">
-			<label class="option-label" for="maxTokens">Max tokens</label>
-			<input
-				id="maxTokens"
-				type="number"
-				class="option-input"
-				min="0"
-				max="200000"
-				placeholder="Default"
-				value={chatStore.maxTokens === 0 ? '' : chatStore.maxTokens}
-				oninput={(e) =>
-					chatStore.setMaxTokens(
-						parseInt((e.currentTarget as HTMLInputElement).value) || 0,
-					)}
-				aria-describedby="maxTokens-desc"
-			/>
-			<span id="maxTokens-desc" class="option-hint">0 = default</span>
-		</div>
-
-		<div class="option-field">
 			<label class="option-label" for="temperature">Temperature</label>
 			<div class="range-wrapper">
 				<input
