@@ -1,5 +1,5 @@
 /**
- * Markdown-aware chunker for the Research Base indexer.
+ * Markdown-aware chunker for the Field Notes indexer.
  *
  * Splits markdown body (post-frontmatter) into H2/H3-bounded chunks capped at
  * a configurable token limit.  Oversized sections are sub-divided on sentence

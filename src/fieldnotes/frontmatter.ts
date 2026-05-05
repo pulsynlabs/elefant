@@ -1,5 +1,5 @@
 /**
- * Research Base frontmatter schema and parser.
+ * Field Notes frontmatter schema and parser.
  *
  * Uses a hand-rolled YAML subset parser (~50 lines) instead of a full YAML
  * library to avoid adding a dependency for a narrow contract (Zod-strict
@@ -72,7 +72,7 @@ interface YAMLContext {
 }
 
 /**
- * Parse a minimal YAML subset sufficient for research frontmatter.
+ * Parse a minimal YAML subset sufficient for field notes frontmatter.
  *
  * Handles:
  *  - `key: value` (scalar)

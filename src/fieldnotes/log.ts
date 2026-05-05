@@ -1,13 +1,13 @@
 /**
- * Research Base logging utilities.
+ * Field Notes logging utilities.
  *
- * All research modules log under the `research:` namespace for consistent
+ * All field notes modules log under the `fieldnotes:` namespace for consistent
  * observability. The logger respects the DEBUG environment variable to
- * enable debug-level output when `DEBUG` includes 'research'.
+ * enable debug-level output when `DEBUG` includes 'fieldnotes'.
  */
 
 function isDebugEnabled(): boolean {
-  return Bun.env.DEBUG?.includes('research') ?? false;
+  return Bun.env.DEBUG?.includes('fieldnotes') ?? false;
 }
 
 export interface LogData {
@@ -43,20 +43,20 @@ export function createLogger(namespace: string) {
   };
 }
 
-/** Default research logger for general research base messages */
-export const researchLog = createLogger('research');
+/** Default field notes logger for general field notes messages */
+export const fieldNotesLog = createLogger('fieldnotes');
 
 /** Indexer-specific logger */
-export const indexerLog = createLogger('research:indexer');
+export const indexerLog = createLogger('fieldnotes:indexer');
 
 /** Watcher-specific logger */
-export const watcherLog = createLogger('research:watcher');
+export const watcherLog = createLogger('fieldnotes:watcher');
 
 /** Embeddings-specific logger */
-export const embeddingsLog = createLogger('research:embeddings');
+export const embeddingsLog = createLogger('fieldnotes:embeddings');
 
 /** Provider switch-specific logger */
-export const providerSwitchLog = createLogger('research:provider-switch');
+export const providerSwitchLog = createLogger('fieldnotes:provider-switch');
 
 /** Routes-specific logger */
-export const routesLog = createLogger('research:routes');
+export const fieldNotesRoutesLog = createLogger('fieldnotes:routes');

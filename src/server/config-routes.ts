@@ -7,7 +7,7 @@ import {
 	agentProfileSchema,
 	configSchema,
 	providerSchema,
-	researchConfigSchema,
+	fieldNotesConfigSchema,
 	visualizeModelOverrideSchema,
 	ConfigManager,
 	type AgentProfile,
@@ -219,7 +219,7 @@ export function createConfigRoutes<TApp extends Elysia>(
 				logLevel: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 				compactionThreshold: z.number().min(0.5).max(0.95).optional(),
 				visualizeModelOverride: visualizeModelOverrideSchema.nullable().optional(),
-				research: researchConfigSchema.partial().optional(),
+				research: fieldNotesConfigSchema.partial().optional(),
 			})
 			.strict();
 

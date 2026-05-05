@@ -1,12 +1,12 @@
 import { ok, err, type Result } from '../types/result.ts';
 import type { ElefantError } from '../types/errors.ts';
 import { createEmbeddingProvider, type EmbeddingProvider, type EmbeddingProviderConfig } from './embeddings/provider.ts';
-import type { ResearchStore } from './store.ts';
+import type { FieldNotesStore } from './store.ts';
 import type { IndexerOptions } from './indexer.ts';
 import { IndexerService } from './indexer.ts';
 import { providerSwitchLog } from './log.ts';
 
-export type ProviderSwitchEventType = 'research:provider-changed';
+export type ProviderSwitchEventType = 'fieldnotes:provider-changed';
 
 export interface ProviderSwitchedEvent {
   type: ProviderSwitchEventType;
@@ -26,7 +26,7 @@ function elefantError(error: unknown): ElefantError {
 }
 
 /**
- * Switches the embedding provider for a project's research base.
+ * Switches the embedding provider for a project's field notes.
  *
  * Reads the current chunk embedding dimension from the store, creates and
  * initializes the new provider, then compares dimensions. If dimensions
@@ -39,7 +39,7 @@ function elefantError(error: unknown): ElefantError {
 export async function switchProvider(opts: {
   projectPath: string;
   projectId: string;
-  store: ResearchStore;
+  store: FieldNotesStore;
   currentProviderName: string;
   newConfig: EmbeddingProviderConfig;
   onEvent: (e: ProviderSwitchedEvent) => void;
@@ -69,7 +69,7 @@ export async function switchProvider(opts: {
 
   // 4. Emit the event before mutating state.
   const event: ProviderSwitchedEvent = {
-    type: 'research:provider-changed',
+    type: 'fieldnotes:provider-changed',
     projectId: opts.projectId,
     previousProvider: opts.currentProviderName,
     newProvider: opts.newConfig.name,

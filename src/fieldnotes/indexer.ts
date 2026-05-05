@@ -4,10 +4,10 @@ import { relative, resolve, sep } from 'node:path';
 import type { ElefantError } from '../types/errors.ts';
 import { ok, type Result } from '../types/result.ts';
 import { researchBaseDir } from '../project/paths.ts';
-import { assertInsideResearchBase } from './membership.ts';
+import { assertInsideFieldNotes } from './membership.ts';
 import { parseFrontmatter, type Frontmatter } from './frontmatter.ts';
 import { chunkMarkdown, type Chunk } from './chunker.ts';
-import { ResearchStore, type UpsertChunkInput } from './store.ts';
+import { FieldNotesStore, type UpsertChunkInput } from './store.ts';
 import type { EmbeddingProvider, EmbeddingProviderConfig } from './embeddings/provider.ts';
 import { ProgressEmitter, type IndexProgressEvent } from './progress.ts';
 import { indexerLog } from './log.ts';
@@ -69,7 +69,7 @@ function hashBody(body: string): string {
   return createHash('sha256').update(body).digest('hex');
 }
 
-function toResearchRelativePath(projectPath: string, filePath: string): string {
+function toFieldNotesRelativePath(projectPath: string, filePath: string): string {
   return relative(researchBaseDir(projectPath), filePath).split(sep).join('/');
 }
 
@@ -99,7 +99,7 @@ function walkMarkdownFiles(projectPath: string): string[] {
         continue;
       }
       if (!entry.isFile()) continue;
-      const relativePath = toResearchRelativePath(projectPath, path);
+      const relativePath = toFieldNotesRelativePath(projectPath, path);
       if (!shouldSkipRelative(relativePath)) files.push(path);
     }
   };
@@ -108,11 +108,11 @@ function walkMarkdownFiles(projectPath: string): string[] {
 }
 
 function prepareDocument(projectPath: string, absolutePath: string): Result<PreparedDocument | null, ElefantError> {
-  const membership = assertInsideResearchBase(projectPath, absolutePath, { requireMarkdown: true });
+  const membership = assertInsideFieldNotes(projectPath, absolutePath, { requireMarkdown: true });
   if (!membership.ok) return membership;
 
   const canonicalPath = membership.data;
-  const relativePath = toResearchRelativePath(projectPath, canonicalPath);
+  const relativePath = toFieldNotesRelativePath(projectPath, canonicalPath);
   if (shouldSkipRelative(relativePath)) return ok(null);
 
   const stat = statSync(canonicalPath);
@@ -182,7 +182,7 @@ function toStoreChunks(chunks: Chunk[], embeddings: (Float32Array | null)[]): Up
 
 export async function runPreparedBulkIndex(opts: PreparedBulkIndexOptions): Promise<BulkIndexSummary> {
   const summary: BulkIndexSummary = { indexed: 0, skipped: 0, errors: [] };
-  const storeResult = ResearchStore.open(opts.projectPath);
+  const storeResult = FieldNotesStore.open(opts.projectPath);
   if (!storeResult.ok) return { ...summary, errors: [storeResult.error.message] };
   const store = storeResult.data;
   const startTime = Date.now();
@@ -293,7 +293,7 @@ export class IndexerService {
 
       for (let i = 0; i < files.length; i += 1) {
         const file = files[i];
-        const relativePath = toResearchRelativePath(this.opts.projectPath, file);
+        const relativePath = toFieldNotesRelativePath(this.opts.projectPath, file);
         this.progress.emit({ projectId: this.opts.projectId, phase: 'chunking', current: i + 1, total: files.length, file: relativePath });
         const prepared = prepareDocument(this.opts.projectPath, file);
         if (!prepared.ok) errors.push(`${relativePath}: ${prepared.error.message}`);
@@ -341,7 +341,7 @@ export class IndexerService {
 
     const doc = prepared.data;
     this.progress.emit({ projectId: this.opts.projectId, phase: 'chunking', current: 1, total: 1, file: doc.relativePath });
-    const storeResult = ResearchStore.open(this.opts.projectPath);
+    const storeResult = FieldNotesStore.open(this.opts.projectPath);
     if (!storeResult.ok) return storeResult;
     const store = storeResult.data;
 
@@ -375,8 +375,8 @@ export class IndexerService {
   async removeFile(filePath: string): Promise<Result<void, ElefantError>> {
     indexerLog.info('removeFile', { path: filePath });
     const absolutePath = resolve(filePath);
-    const relativePath = toResearchRelativePath(this.opts.projectPath, absolutePath);
-    const storeResult = ResearchStore.open(this.opts.projectPath);
+    const relativePath = toFieldNotesRelativePath(this.opts.projectPath, absolutePath);
+    const storeResult = FieldNotesStore.open(this.opts.projectPath);
     if (!storeResult.ok) return storeResult;
     const store = storeResult.data;
     try {

@@ -10,7 +10,7 @@ export interface WatcherOptions {
   onRemoved: (filePath: string) => Promise<void>;
 }
 
-export class ResearchWatcher {
+export class FieldNotesWatcher {
   private watcher: FSWatcher | null = null;
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly debounceMs: number;

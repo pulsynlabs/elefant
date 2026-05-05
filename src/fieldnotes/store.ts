@@ -10,13 +10,13 @@ import { ConfidenceSchema, SectionSchema, AuthorAgentSchema, type Frontmatter } 
 type SqliteValue = string | number | null | Uint8Array;
 type SqliteVecModule = { load?: (db: Database) => void; getLoadablePath?: () => string };
 
-// Per ADR-0006 the Research Base index is per-project at
-// `.elefant/research-index.sqlite`, not part of the daemon's main DB. Keeping
+// Per ADR-0006 the Field Notes index is per-project at
+// `.elefant/field-notes-index.sqlite`, not part of the daemon's main DB. Keeping
 // the v1 schema inline avoids a second migration system while remaining
 // idempotent on every open.
 const INIT_SQL = `
 PRAGMA foreign_keys = ON;
-CREATE TABLE IF NOT EXISTS research_documents (
+CREATE TABLE IF NOT EXISTS field_notes_documents (
   id TEXT PRIMARY KEY,
   file_path TEXT NOT NULL UNIQUE,
   section TEXT NOT NULL,
@@ -32,12 +32,12 @@ CREATE TABLE IF NOT EXISTS research_documents (
   frontmatter_json TEXT NOT NULL,
   body_hash TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_research_docs_section ON research_documents(section);
-CREATE INDEX IF NOT EXISTS idx_research_docs_updated ON research_documents(updated);
+CREATE INDEX IF NOT EXISTS idx_field_notes_docs_section ON field_notes_documents(section);
+CREATE INDEX IF NOT EXISTS idx_field_notes_docs_updated ON field_notes_documents(updated);
 
-CREATE TABLE IF NOT EXISTS research_chunks (
+CREATE TABLE IF NOT EXISTS field_notes_chunks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  document_id TEXT NOT NULL REFERENCES research_documents(id) ON DELETE CASCADE,
+  document_id TEXT NOT NULL REFERENCES field_notes_documents(id) ON DELETE CASCADE,
   chunk_index INTEGER NOT NULL,
   heading_slug TEXT,
   text TEXT NOT NULL,
@@ -47,27 +47,27 @@ CREATE TABLE IF NOT EXISTS research_chunks (
   embedding BLOB,
   updated TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_research_chunks_doc ON research_chunks(document_id);
+CREATE INDEX IF NOT EXISTS idx_field_notes_chunks_doc ON field_notes_chunks(document_id);
 
-CREATE VIRTUAL TABLE IF NOT EXISTS research_chunks_fts USING fts5(
+CREATE VIRTUAL TABLE IF NOT EXISTS field_notes_chunks_fts USING fts5(
   text,
-  content='research_chunks',
+  content='field_notes_chunks',
   content_rowid='id'
 );
 
-CREATE TRIGGER IF NOT EXISTS research_chunks_ai AFTER INSERT ON research_chunks BEGIN
-  INSERT INTO research_chunks_fts(rowid, text) VALUES (new.id, new.text);
+CREATE TRIGGER IF NOT EXISTS field_notes_chunks_ai AFTER INSERT ON field_notes_chunks BEGIN
+  INSERT INTO field_notes_chunks_fts(rowid, text) VALUES (new.id, new.text);
 END;
-CREATE TRIGGER IF NOT EXISTS research_chunks_ad AFTER DELETE ON research_chunks BEGIN
-  INSERT INTO research_chunks_fts(research_chunks_fts, rowid, text) VALUES('delete', old.id, old.text);
+CREATE TRIGGER IF NOT EXISTS field_notes_chunks_ad AFTER DELETE ON field_notes_chunks BEGIN
+  INSERT INTO field_notes_chunks_fts(field_notes_chunks_fts, rowid, text) VALUES('delete', old.id, old.text);
 END;
-CREATE TRIGGER IF NOT EXISTS research_chunks_au AFTER UPDATE ON research_chunks BEGIN
-  INSERT INTO research_chunks_fts(research_chunks_fts, rowid, text) VALUES('delete', old.id, old.text);
-  INSERT INTO research_chunks_fts(rowid, text) VALUES (new.id, new.text);
+CREATE TRIGGER IF NOT EXISTS field_notes_chunks_au AFTER UPDATE ON field_notes_chunks BEGIN
+  INSERT INTO field_notes_chunks_fts(field_notes_chunks_fts, rowid, text) VALUES('delete', old.id, old.text);
+  INSERT INTO field_notes_chunks_fts(rowid, text) VALUES (new.id, new.text);
 END;
 `;
 
-export const RESEARCH_STORE_INIT_SQL = INIT_SQL;
+export const FIELD_NOTES_STORE_INIT_SQL = INIT_SQL;
 
 export interface DocumentRow {
   id: string;
@@ -221,20 +221,20 @@ function ftsQuery(input: string): string {
   return input.trim().split(/\s+/).filter(Boolean).map((part) => `"${part.replaceAll('"', '""')}"`).join(' AND ');
 }
 
-export class ResearchStore {
+export class FieldNotesStore {
   private closed = false;
   private sqliteVecLoaded = false;
 
   private constructor(private readonly db: Database, private readonly dbPath: string) {}
 
-  static open(projectPath: string): Result<ResearchStore, ElefantError> {
+  static open(projectPath: string): Result<FieldNotesStore, ElefantError> {
     try {
       const path = researchIndexPath(projectPath);
       mkdirSync(dirname(path), { recursive: true });
       const db = new Database(path, { create: true });
       db.exec(INIT_SQL);
       db.run('PRAGMA foreign_keys = ON');
-      return ok(new ResearchStore(db, path));
+      return ok(new FieldNotesStore(db, path));
     } catch (e) {
       return err(toError(e));
     }
@@ -249,7 +249,7 @@ export class ResearchStore {
         summary: input.summary,
       });
       this.db.run(
-        `INSERT INTO research_documents
+        `INSERT INTO field_notes_documents
         (id, file_path, section, title, summary, confidence, tags_json, sources_json, author_agent, workflow, created, updated, frontmatter_json, body_hash)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET file_path=excluded.file_path, section=excluded.section, title=excluded.title,
@@ -268,21 +268,21 @@ export class ResearchStore {
 
   getDocumentByPath(filePath: string): Result<DocumentRow | null, ElefantError> {
     try {
-      const row = this.db.query('SELECT * FROM research_documents WHERE file_path = ?').get(filePath);
+      const row = this.db.query('SELECT * FROM field_notes_documents WHERE file_path = ?').get(filePath);
       return ok(row ? mapDocument(row) : null);
     } catch (e) { return err(toError(e)); }
   }
 
   getDocumentById(id: string): Result<DocumentRow | null, ElefantError> {
     try {
-      const row = this.db.query('SELECT * FROM research_documents WHERE id = ?').get(id);
+      const row = this.db.query('SELECT * FROM field_notes_documents WHERE id = ?').get(id);
       return ok(row ? mapDocument(row) : null);
     } catch (e) { return err(toError(e)); }
   }
 
   deleteDocument(id: string): Result<void, ElefantError> {
     try {
-      this.db.run('DELETE FROM research_documents WHERE id = ?', [id]);
+      this.db.run('DELETE FROM field_notes_documents WHERE id = ?', [id]);
       return ok(undefined);
     } catch (e) { return err(toError(e)); }
   }
@@ -290,7 +290,7 @@ export class ResearchStore {
   listDocuments(opts?: { section?: string; limit?: number }): Result<DocumentRow[], ElefantError> {
     try {
       const params: SqliteValue[] = [];
-      let sql = 'SELECT * FROM research_documents';
+      let sql = 'SELECT * FROM field_notes_documents';
       if (opts?.section) { sql += ' WHERE section = ?'; params.push(opts.section); }
       sql += ' ORDER BY updated DESC';
       if (opts?.limit) { sql += ' LIMIT ?'; params.push(opts.limit); }
@@ -301,8 +301,8 @@ export class ResearchStore {
   upsertChunks(documentId: string, chunks: UpsertChunkInput[]): Result<void, ElefantError> {
     try {
       this.db.run('BEGIN');
-      this.db.run('DELETE FROM research_chunks WHERE document_id = ?', [documentId]);
-      const stmt = this.db.prepare(`INSERT INTO research_chunks
+      this.db.run('DELETE FROM field_notes_chunks WHERE document_id = ?', [documentId]);
+      const stmt = this.db.prepare(`INSERT INTO field_notes_chunks
         (document_id, chunk_index, heading_slug, text, tokens, tags_json, embedding_dim, embedding, updated)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const chunk of chunks) {
@@ -331,11 +331,11 @@ export class ResearchStore {
       const match = ftsQuery(query);
       if (!match) return ok([]);
       const params: SqliteValue[] = [match];
-      let sql = `SELECT c.*, -bm25(research_chunks_fts) AS score, d.title AS document_title, d.file_path AS document_path
-        FROM research_chunks_fts
-        JOIN research_chunks c ON c.id = research_chunks_fts.rowid
-        JOIN research_documents d ON d.id = c.document_id
-        WHERE research_chunks_fts MATCH ?`;
+      let sql = `SELECT c.*, -bm25(field_notes_chunks_fts) AS score, d.title AS document_title, d.file_path AS document_path
+        FROM field_notes_chunks_fts
+        JOIN field_notes_chunks c ON c.id = field_notes_chunks_fts.rowid
+        JOIN field_notes_documents d ON d.id = c.document_id
+        WHERE field_notes_chunks_fts MATCH ?`;
       if (opts.section) { sql += ' AND d.section = ?'; params.push(opts.section); }
       sql += ' ORDER BY score DESC LIMIT ?'; params.push(opts.k);
       return ok(this.db.query(sql).all(...params).map((row) => ({
@@ -363,7 +363,7 @@ export class ResearchStore {
       // TODO(v2): switch to sqlite-vec vec0 virtual tables when corpus budgets exceed v1 limits.
       const params: SqliteValue[] = [queryEmbedding.length];
       let sql = `SELECT c.*, d.title AS document_title, d.file_path AS document_path
-        FROM research_chunks c JOIN research_documents d ON d.id = c.document_id
+        FROM field_notes_chunks c JOIN field_notes_documents d ON d.id = c.document_id
         WHERE c.embedding IS NOT NULL AND c.embedding_dim = ?`;
       if (opts.section) { sql += ' AND d.section = ?'; params.push(opts.section); }
       const rows = this.db.query(sql).all(...params);
@@ -380,25 +380,25 @@ export class ResearchStore {
     } catch (e) { return err(toError(e)); }
   }
 
-  totalDocs(): number { return Number((this.db.query('SELECT COUNT(*) AS count FROM research_documents').get() as { count: number }).count); }
-  totalChunks(): number { return Number((this.db.query('SELECT COUNT(*) AS count FROM research_chunks').get() as { count: number }).count); }
+  totalDocs(): number { return Number((this.db.query('SELECT COUNT(*) AS count FROM field_notes_documents').get() as { count: number }).count); }
+  totalChunks(): number { return Number((this.db.query('SELECT COUNT(*) AS count FROM field_notes_chunks').get() as { count: number }).count); }
   diskSizeBytes(): number { try { return statSync(this.dbPath).size; } catch { return 0; } }
 
   getMaxEmbeddingDim(): number {
-    const row = this.db.query('SELECT COALESCE(MAX(embedding_dim), 0) AS max_dim FROM research_chunks').get() as { max_dim: number };
+    const row = this.db.query('SELECT COALESCE(MAX(embedding_dim), 0) AS max_dim FROM field_notes_chunks').get() as { max_dim: number };
     return row.max_dim;
   }
 
   deleteAllChunks(): Result<void, ElefantError> {
     try {
-      this.db.run('DELETE FROM research_chunks');
+      this.db.run('DELETE FROM field_notes_chunks');
       return ok(undefined);
     } catch (e) { return err(toError(e)); }
   }
 
   clearAllEmbeddings(): Result<void, ElefantError> {
     try {
-      this.db.run('UPDATE research_chunks SET embedding = NULL');
+      this.db.run('UPDATE field_notes_chunks SET embedding = NULL');
       return ok(undefined);
     } catch (e) { return err(toError(e)); }
   }

@@ -1,7 +1,7 @@
 /**
- * Traversal guard for .elefant/markdown-db/ membership.
+ * Traversal guard for .elefant/field-notes/ membership.
  *
- * Every path that enters or leaves the Research Base must pass through
+ * Every path that enters or leaves the Field Notes must pass through
  * this function — canonicalizing, resolving symlinks, and rejecting escapes.
  */
 
@@ -14,9 +14,9 @@ import type { ElefantError } from '../types/errors.js';
 
 /**
  * Returns ok(canonicalPath) when `candidate` (absolute or relative-to-project)
- * resolves to a path inside `<projectPath>/.elefant/markdown-db/`.
+ * resolves to a path inside `<projectPath>/.elefant/field-notes/`.
  */
-export function assertInsideResearchBase(
+export function assertInsideFieldNotes(
   projectPath: string,
   candidate: string,
   opts?: { requireMarkdown?: boolean },
@@ -67,15 +67,15 @@ export function assertInsideResearchBase(
   if (candidateCanonical === baseCanonical) {
     return err({
       code: 'VALIDATION_ERROR',
-      message: `Path must be inside the research base, not equal to it: ${candidate}`,
+      message: `Path must be inside the field notes, not equal to it: ${candidate}`,
     });
   }
 
-  // Prefix check with separator defeats .elefant/markdown-db-evil/ escapes
+  // Prefix check with separator defeats .elefant/field-notes-evil/ escapes
   if (!candidateCanonical.startsWith(baseCanonical + sep)) {
     return err({
       code: 'PERMISSION_DENIED',
-      message: `Path escapes the research base: ${candidate}`,
+      message: `Path escapes the field notes: ${candidate}`,
     });
   }
 
@@ -84,7 +84,7 @@ export function assertInsideResearchBase(
   if (rel.startsWith('..') || isAbsolute(rel)) {
     return err({
       code: 'PERMISSION_DENIED',
-      message: `Path escapes the research base: ${candidate}`,
+      message: `Path escapes the field notes: ${candidate}`,
     });
   }
 
@@ -96,7 +96,7 @@ export function assertInsideResearchBase(
     if (!inScratch && !rel.endsWith('.md')) {
       return err({
         code: 'VALIDATION_ERROR',
-        message: `Research files outside 99-scratch/ must end in .md: ${candidate}`,
+        message: `Field notes files outside 99-scratch/ must end in .md: ${candidate}`,
       });
     }
   }

@@ -1,19 +1,19 @@
 /**
- * Research link parser and serializer — supports `research://` URIs and
- * `.elefant/markdown-db/` relative paths.
+ * Field notes link parser and serializer — supports `fieldnotes://` URIs and
+ * `.elefant/field-notes/` relative paths.
  */
 
 import type { Result } from '../types/result.js';
 import type { ElefantError } from '../types/errors.js';
 import { ok, err } from '../types/result.js';
 
-// ─── ResearchLink type ─────────────────────────────────────────────────────
+// ─── FieldNotesLink type ─────────────────────────────────────────────────────
 
-export interface ResearchLink {
-  kind: 'research-uri' | 'relative-path';
+export interface FieldNotesLink {
+  kind: 'fieldnotes-uri' | 'relative-path';
   /** Workflow id slug (kebab-case or `'_'`), null for relative-path links */
   workflow: string | null;
-  /** Path relative to `.elefant/markdown-db/`, e.g. `02-tech/foo.md` */
+  /** Path relative to `.elefant/field-notes/`, e.g. `02-tech/foo.md` */
   path: string;
   /** Heading anchor without `#`, or null */
   anchor: string | null;
@@ -62,14 +62,14 @@ function validateAnchor(anchor: string | null): ElefantError | null {
 
 // ─── Parser ────────────────────────────────────────────────────────────────
 
-export function parseResearchLink(
+export function parseFieldNotesLink(
   input: string,
-): Result<ResearchLink, ElefantError> {
+): Result<FieldNotesLink, ElefantError> {
   const trimmed = input.trim();
 
-  // ── research:// URI form ──
-  if (trimmed.startsWith('research://')) {
-    const rest = trimmed.slice('research://'.length);
+  // ── fieldnotes:// URI form ──
+  if (trimmed.startsWith('fieldnotes://')) {
+    const rest = trimmed.slice('fieldnotes://'.length);
 
     const hashIdx = rest.indexOf('#');
     const pathAndWorkflow = hashIdx !== -1 ? rest.slice(0, hashIdx) : rest;
@@ -79,7 +79,7 @@ export function parseResearchLink(
     if (slashIdx === -1) {
       return err({
         code: 'VALIDATION_ERROR',
-        message: `Invalid research:// URI: missing path after workflow`,
+        message: `Invalid fieldnotes:// URI: missing path after workflow`,
       });
     }
 
@@ -105,12 +105,12 @@ export function parseResearchLink(
     const anchorErr = validateAnchor(anchor);
     if (anchorErr) return err(anchorErr);
 
-    return ok({ kind: 'research-uri', workflow, path, anchor });
+    return ok({ kind: 'fieldnotes-uri', workflow, path, anchor });
   }
 
   // ── Relative path form ──
-  if (trimmed.startsWith('.elefant/markdown-db/')) {
-    const rest = trimmed.slice('.elefant/markdown-db/'.length);
+  if (trimmed.startsWith('.elefant/field-notes/')) {
+    const rest = trimmed.slice('.elefant/field-notes/'.length);
 
     const hashIdx = rest.indexOf('#');
     const path = hashIdx !== -1 ? rest.slice(0, hashIdx) : rest;
@@ -133,11 +133,11 @@ export function parseResearchLink(
 
 // ─── Serializer ─────────────────────────────────────────────────────────────
 
-export function serializeResearchLink(link: ResearchLink): string {
+export function serializeFieldNotesLink(link: FieldNotesLink): string {
   const base =
-    link.kind === 'research-uri'
-      ? `research://${link.workflow}/${link.path}`
-      : `.elefant/markdown-db/${link.path}`;
+    link.kind === 'fieldnotes-uri'
+      ? `fieldnotes://${link.workflow}/${link.path}`
+      : `.elefant/field-notes/${link.path}`;
 
   return link.anchor ? `${base}#${link.anchor}` : base;
 }
@@ -145,10 +145,10 @@ export function serializeResearchLink(link: ResearchLink): string {
 // ─── Autolinker regex ──────────────────────────────────────────────────────
 
 /**
- * Regex for detecting research links in chat output text.
+ * Regex for detecting field notes links in chat output text.
  *
- * Matches both `research://` URIs and `.elefant/markdown-db/` relative paths,
- * for use with {@link parseResearchLink} during markdown-to-chip rendering.
+ * Matches both `fieldnotes://` URIs and `.elefant/field-notes/` relative paths,
+ * for use with {@link parseFieldNotesLink} during markdown-to-chip rendering.
  */
-export const RESEARCH_LINK_REGEX =
-  /(?:research:\/\/(?:[a-zA-Z0-9][a-zA-Z0-9_-]*|_)\/[^\s#)\]}"']+\.md(?:#[^\s)\]}"'.]+)?|\.elefant\/markdown-db\/[^\s#)\]}"']+\.md(?:#[^\s)\]}"'.]+)?)/g;
+export const FIELD_NOTES_LINK_REGEX =
+  /(?:fieldnotes:\/\/(?:[a-zA-Z0-9][a-zA-Z0-9_-]*|_)\/[^\s#)\]}"']+\.md(?:#[^\s)\]}"'.]+)?|\.elefant\/field-notes\/[^\s#)\]}"']+\.md(?:#[^\s)\]}"'.]+)?)/g;

@@ -4,12 +4,12 @@ import { join } from 'node:path';
 import { researchIndexPath, researchBaseDir } from '../project/paths.js';
 import { ok, err, type Result } from '../types/result.js';
 import type { ElefantError } from '../types/errors.js';
-import type { ResearchStore } from './store.js';
+import type { FieldNotesStore } from './store.js';
 import type { EmbeddingProvider, EmbeddingProviderName, EmbeddingProviderConfig } from './embeddings/provider.js';
 import type { HardwareProfile, RecommendedTier } from './hardware.js';
-import { researchLog } from './log.js';
+import { fieldNotesLog } from './log.js';
 
-export interface ResearchStatus {
+export interface FieldNotesStatus {
   projectId: string;
   provider: EmbeddingProviderName;
   providerIsLocal: boolean;
@@ -95,15 +95,15 @@ function countDriftedFiles(files: string[], lastIndexedAt: string): number {
 }
 
 /**
- * Get the latest updated timestamp from research_chunks.
+ * Get the latest updated timestamp from field_notes_chunks.
  */
-function getLastIndexedAt(store: ResearchStore): string | null {
+function getLastIndexedAt(store: FieldNotesStore): string | null {
   try {
     // Access the private db through the store instance
     // We need to use a query method on the store
     const result = (store as unknown as { 
       db: { query: (sql: string) => { get: () => unknown } } 
-    }).db.query('SELECT MAX(updated) as latest FROM research_chunks').get();
+    }).db.query('SELECT MAX(updated) as latest FROM field_notes_chunks').get();
     
     if (result && typeof result === 'object' && result !== null) {
       const latest = (result as { latest: string | null }).latest;
@@ -115,13 +115,13 @@ function getLastIndexedAt(store: ResearchStore): string | null {
   }
 }
 
-export async function getResearchStatus(opts: {
+export async function getFieldNotesStatus(opts: {
   projectPath: string;
   projectId: string;
-  store: ResearchStore | null;
+  store: FieldNotesStore | null;
   provider: EmbeddingProvider;
   hardware?: HardwareProfile;
-}): Promise<Result<ResearchStatus, ElefantError>> {
+}): Promise<Result<FieldNotesStatus, ElefantError>> {
   try {
     const { projectPath, projectId, store, provider, hardware } = opts;
 
@@ -145,7 +145,7 @@ export async function getResearchStatus(opts: {
       
       if (exceeded) {
         driftCount = -1;
-        researchLog.warn('Drift scan exceeded max files; returning -1 for driftCount', { maxFiles: DRIFT_SCAN_MAX_FILES });
+        fieldNotesLog.warn('Drift scan exceeded max files; returning -1 for driftCount', { maxFiles: DRIFT_SCAN_MAX_FILES });
       } else {
         driftCount = countDriftedFiles(files, lastIndexedAt);
       }
@@ -162,14 +162,14 @@ export async function getResearchStatus(opts: {
     }
     if (diskSizeBytes > 500_000_000) {
       const mb = Math.round(diskSizeBytes / (1024 * 1024));
-      warnings.push(`Research index is large (${mb}MB) — consider running VACUUM`);
+      warnings.push(`Field notes index is large (${mb}MB) — consider running VACUUM`);
     }
 
     // Determine embedding model ID (for bundled providers, use the default model; for remote, null)
     const embeddingModelId = getEmbeddingModelId(provider);
 
     // Build status object
-    const status: ResearchStatus = {
+    const status: FieldNotesStatus = {
       projectId,
       provider: provider.name,
       providerIsLocal: provider.isLocal,

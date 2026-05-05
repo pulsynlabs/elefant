@@ -46,7 +46,7 @@ function resolveCandidates(absolutePath: string): EditorCandidate[] {
 }
 
 /**
- * Launch a research file in the user's editor.
+ * Launch a field notes file in the user's editor.
  *
  * Editor resolution order is: ELEFANT_EDITOR (Elefant-specific override),
  * EDITOR, VS Code (`code --wait`), then the platform file opener.

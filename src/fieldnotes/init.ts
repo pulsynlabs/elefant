@@ -3,10 +3,10 @@ import { join } from 'node:path';
 import { RESEARCH_SECTIONS, researchBaseDir } from '../project/paths.js';
 import { err, ok, type Result } from '../types/result.js';
 import type { ElefantError } from '../types/errors.js';
-import { assertInsideResearchBase } from './membership.js';
+import { assertInsideFieldNotes } from './membership.js';
 
 const SECTION_DESCRIPTIONS: Record<string, string> = {
-  '00-index': 'Entry points, changelogs, and generated navigation for the Research Base.',
+  '00-index': 'Entry points, changelogs, and generated navigation for the Field Notes.',
   '01-domain': 'Domain context, user workflows, constraints, and problem framing.',
   '02-tech': 'Technical research, implementation notes, libraries, and architecture references.',
   '03-decisions': 'Decision records, rationale, trade-offs, and accepted constraints.',
@@ -30,10 +30,10 @@ function writeIfMissing(path: string, content: string, created: string[], existe
 }
 
 /**
- * Idempotently creates the .elefant/markdown-db/ directory tree with all 8
+ * Idempotently creates the .elefant/field-notes/ directory tree with all 8
  * default sections, section README stubs, and root README/INDEX stubs.
  */
-export function ensureResearchBase(projectPath: string): Result<{ created: string[]; existed: string[] }, ElefantError> {
+export function ensureFieldNotes(projectPath: string): Result<{ created: string[]; existed: string[] }, ElefantError> {
   const created: string[] = [];
   const existed: string[] = [];
   try {
@@ -41,8 +41,8 @@ export function ensureResearchBase(projectPath: string): Result<{ created: strin
     if (existsSync(base)) existed.push(base);
     else { mkdirSync(base, { recursive: true }); created.push(base); }
 
-    writeIfMissing(join(base, 'README.md'), '# Research Base\n\nProject-local markdown knowledge garden.\n\n<!-- managed-by: writer-agent -->\n', created, existed);
-    writeIfMissing(join(base, 'INDEX.md'), '# Research Index\n\nGenerated index of Research Base documents.\n\n<!-- managed-by: writer-agent -->\n', created, existed);
+    writeIfMissing(join(base, 'README.md'), '# Field Notes\n\nProject-local markdown knowledge garden.\n\n<!-- managed-by: writer-agent -->\n', created, existed);
+    writeIfMissing(join(base, 'INDEX.md'), '# Field Notes Index\n\nGenerated index of Field Notes documents.\n\n<!-- managed-by: writer-agent -->\n', created, existed);
 
     for (const section of RESEARCH_SECTIONS) {
       const dir = join(base, section);
@@ -50,7 +50,7 @@ export function ensureResearchBase(projectPath: string): Result<{ created: strin
       else { mkdirSync(dir, { recursive: true }); created.push(dir); }
 
       const readme = join(dir, 'README.md');
-      const guard = assertInsideResearchBase(projectPath, readme, { requireMarkdown: true });
+      const guard = assertInsideFieldNotes(projectPath, readme, { requireMarkdown: true });
       if (guard.ok === false) return err(guard.error);
       writeIfMissing(readme, `# ${section} — ${sectionTitle(section)}\n\n${SECTION_DESCRIPTIONS[section]}\n\n<!-- managed-by: writer-agent -->\n`, created, existed);
     }
