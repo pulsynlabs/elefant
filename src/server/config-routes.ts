@@ -110,6 +110,8 @@ const AgentProfilePatchSchema = z
 			.object({
 				provider: z.string().min(1).optional(),
 				model: z.string().min(1).optional(),
+				temperature: z.number().min(0).max(2).optional(),
+				topP: z.number().min(0).max(1).optional(),
 				permissionMode: z.string().min(1).optional(),
 				workflowMode: z.enum(['quick', 'standard', 'comprehensive', 'milestone']).optional(),
 				workflowDepth: z.enum(['shallow', 'standard', 'deep']).optional(),
@@ -117,20 +119,8 @@ const AgentProfilePatchSchema = z
 			})
 			.strict()
 			.optional(),
-		limits: z
-			.object({
-				maxIterations: z.number().int().min(1).optional(),
-				timeoutMs: z.number().int().min(1).optional(),
-				maxConcurrency: z.number().int().min(1).optional(),
-				maxTokens: z.number().int().min(1).optional(),
-				temperature: z.number().min(0).max(2).optional(),
-				topP: z.number().min(0).max(1).optional(),
-			})
-			.strict()
-			.optional(),
 		tools: z
 			.object({
-				mode: z.enum(['auto', 'manual', 'deny_all']).optional(),
 				allowedTools: z.array(z.string().min(1)).optional(),
 				deniedTools: z.array(z.string().min(1)).optional(),
 				perToolApproval: z.record(z.string(), z.boolean()).optional(),
@@ -602,10 +592,6 @@ export function createConfigRoutes<TApp extends Elysia>(
 				...baseProfile.behavior,
 				...(patchParse.data.behavior ?? {}),
 			},
-			limits: {
-				...baseProfile.limits,
-				...(patchParse.data.limits ?? {}),
-			},
 			tools: {
 				...baseProfile.tools,
 				...(patchParse.data.tools ?? {}),
@@ -682,10 +668,6 @@ export function createConfigRoutes<TApp extends Elysia>(
 			behavior: {
 				...baseProfile.behavior,
 				...(patchParse.data.behavior ?? {}),
-			},
-			limits: {
-				...baseProfile.limits,
-				...(patchParse.data.limits ?? {}),
 			},
 			tools: {
 				...baseProfile.tools,

@@ -3,6 +3,8 @@ import type { ToolCall, ToolDefinition } from '../types/tools.ts'
 import type { ProviderAdapter, SendMessageOptions, StreamEvent } from './types.ts'
 import { parseSseEvents } from './sse.ts'
 
+const INTERNAL_ANTHROPIC_MAX_TOKENS = 16384
+
 interface AnthropicContentBlockStart {
 	index?: number
 	content_block?: {
@@ -240,7 +242,7 @@ export class AnthropicCompatibleAdapter implements ProviderAdapter {
 			messages: normalizedMessages.messages,
 			tools: toAnthropicTools(tools),
 			stream: true,
-			max_tokens: typeof options?.maxTokens === 'number' ? options.maxTokens : 8192,
+			max_tokens: INTERNAL_ANTHROPIC_MAX_TOKENS,
 		}
 
 		if (typeof normalizedMessages.system === 'string' && normalizedMessages.system.length > 0) {

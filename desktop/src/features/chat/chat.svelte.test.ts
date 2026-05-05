@@ -26,8 +26,6 @@ import {
 // The AdvancedOptions controls map to these store setters.
 // Keep this list in sync with AdvancedOptions.svelte.
 const ADVANCED_OPTIONS_FIELDS = [
-	'maxIterations',
-	'maxTokens',
 	'temperature',
 	'topP',
 	'timeoutMs',
@@ -84,8 +82,6 @@ function addPair(userContent: string, assistantContent: string): { user: ChatMes
 function resetStore(): void {
 	// Restore the default values set at module load.
 	chatStore.setProvider(null);
-	chatStore.setMaxIterations(50);
-	chatStore.setMaxTokens(4096);
 	chatStore.setTemperature(1.0);
 	chatStore.setTopP(1.0);
 	chatStore.setTimeoutMs(60_000);
@@ -99,8 +95,6 @@ describe('buildChatRequestFields — AdvancedOptions → payload mapping', () =>
 	beforeEach(resetStore);
 
 	it('every AdvancedOptions field appears in the payload', () => {
-		chatStore.setMaxIterations(75);
-		chatStore.setMaxTokens(8192);
 		chatStore.setTemperature(0.3);
 		chatStore.setTopP(0.85);
 		chatStore.setTimeoutMs(120_000);
@@ -114,17 +108,9 @@ describe('buildChatRequestFields — AdvancedOptions → payload mapping', () =>
 			expect(payload).toHaveProperty(field);
 		}
 
-		expect(payload.maxIterations).toBe(75);
-		expect(payload.maxTokens).toBe(8192);
 		expect(payload.temperature).toBe(0.3);
 		expect(payload.topP).toBe(0.85);
 		expect(payload.timeoutMs).toBe(120_000);
-	});
-
-	it('omits maxTokens when the user leaves it at 0 (provider default)', () => {
-		chatStore.setMaxTokens(0);
-		const payload = buildChatRequestFields();
-		expect(payload.maxTokens).toBeUndefined();
 	});
 
 	it('forwards the selected provider, or undefined when none is chosen', () => {
@@ -149,28 +135,22 @@ describe('buildChatRequestFields — AgentOverride precedence', () => {
 
 	it('override fields win over AdvancedOptions fields', () => {
 		chatStore.setProvider('anthropic');
-		chatStore.setMaxIterations(50);
-		chatStore.setMaxTokens(4096);
 		chatStore.setTemperature(1.0);
 		chatStore.setTopP(1.0);
 		chatStore.setTimeoutMs(60_000);
 
 		setAgentOverride({
 			provider: 'openai',
-			maxIterations: 10,
-			maxTokens: 1024,
 			temperature: 0.1,
 			topP: 0.5,
-			timeoutMs: 30_000,
 		});
 
 		const payload = buildChatRequestFields();
 		expect(payload.provider).toBe('openai');
-		expect(payload.maxIterations).toBe(10);
-		expect(payload.maxTokens).toBe(1024);
 		expect(payload.temperature).toBe(0.1);
 		expect(payload.topP).toBe(0.5);
-		expect(payload.timeoutMs).toBe(30_000);
+		// timeoutMs is no longer overridable per-run; falls through to composer state.
+		expect(payload.timeoutMs).toBe(60_000);
 	});
 
 	it('only-partial override falls through for unset fields', () => {
@@ -182,12 +162,6 @@ describe('buildChatRequestFields — AgentOverride precedence', () => {
 		const payload = buildChatRequestFields();
 		expect(payload.temperature).toBe(0.2);
 		expect(payload.topP).toBe(0.9); // still the AdvancedOptions value
-	});
-
-	it('override maxTokens is respected even when AdvancedOptions maxTokens is 0', () => {
-		chatStore.setMaxTokens(0);
-		setAgentOverride({ maxTokens: 2048 });
-		expect(buildChatRequestFields().maxTokens).toBe(2048);
 	});
 
 	it('hasAgentOverride is false for empty override, true otherwise', () => {
@@ -203,9 +177,6 @@ describe('buildChatRequestFields — AgentOverride precedence', () => {
 		setAgentOverride({
 			temperature: 0.1,
 			topP: 0.2,
-			maxTokens: 100,
-			maxIterations: 5,
-			timeoutMs: 10_000,
 			provider: 'openai',
 			model: 'gpt-5',
 		});

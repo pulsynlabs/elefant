@@ -9,11 +9,8 @@
 
 	import type { AgentRunOverride } from '$lib/types/agent-config.js';
 	import {
-		validateLimits,
 		validateGeneration,
 		BEHAVIOR_BOUNDS,
-		LIMITS_BOUNDS,
-		mergeErrors,
 		hasErrors,
 		type ValidationErrors,
 	} from './validation.js';
@@ -40,21 +37,6 @@
 	let topPDraft = $state(
 		initialOverride.topP !== undefined ? String(initialOverride.topP) : '',
 	);
-	let maxTokensDraft = $state(
-		initialOverride.maxTokens !== undefined
-			? String(initialOverride.maxTokens)
-			: '',
-	);
-	let maxIterationsDraft = $state(
-		initialOverride.maxIterations !== undefined
-			? String(initialOverride.maxIterations)
-			: '',
-	);
-	let timeoutMsDraft = $state(
-		initialOverride.timeoutMs !== undefined
-			? String(initialOverride.timeoutMs)
-			: '',
-	);
 
 	let confirmButtonEl = $state<HTMLButtonElement | null>(null);
 	let submitted = $state(false);
@@ -70,67 +52,31 @@
 		return Number.isFinite(n) ? n : undefined;
 	}
 
-	function parseOptionalInt(raw: string): number | undefined {
-		const trimmed = raw.trim();
-		if (trimmed.length === 0) return undefined;
-		const n = parseInt(trimmed, 10);
-		return Number.isFinite(n) ? n : undefined;
-	}
-
 	const draft = $derived<AgentRunOverride>({
 		provider: providerDraft.trim() || undefined,
 		model: modelDraft.trim() || undefined,
 		temperature: parseOptionalNumber(temperatureDraft),
 		topP: parseOptionalNumber(topPDraft),
-		maxTokens: parseOptionalInt(maxTokensDraft),
-		maxIterations: parseOptionalInt(maxIterationsDraft),
-		timeoutMs: parseOptionalInt(timeoutMsDraft),
 	});
 
 	// Only validate fields that are actually set — leaving everything blank
 	// is a valid "clear the override" state.
 	const errors = $derived<ValidationErrors>(
-		mergeErrors(
-			draft.maxIterations !== undefined ||
-				draft.timeoutMs !== undefined
-				? validateLimits({
-						maxIterations:
-							draft.maxIterations ?? LIMITS_BOUNDS.maxIterations.min,
-						timeoutMs: draft.timeoutMs ?? LIMITS_BOUNDS.timeoutMs.min,
-						maxConcurrency: LIMITS_BOUNDS.maxConcurrency.min,
-					})
-				: {},
-			validateGeneration({
-				temperature: draft.temperature,
-				topP: draft.topP,
-				maxTokens: draft.maxTokens,
-			}),
-		),
+		validateGeneration({
+			temperature: draft.temperature,
+			topP: draft.topP,
+		}),
 	);
-
-	// Scope the limit errors to only the fields actually edited; the
-	// validator above fills in placeholder values for the untouched ones.
-	const scopedErrors = $derived<ValidationErrors>({
-		...(draft.maxIterations !== undefined && errors.maxIterations
-			? { maxIterations: errors.maxIterations }
-			: {}),
-		...(draft.timeoutMs !== undefined && errors.timeoutMs
-			? { timeoutMs: errors.timeoutMs }
-			: {}),
-		...(errors.temperature ? { temperature: errors.temperature } : {}),
-		...(errors.topP ? { topP: errors.topP } : {}),
-		...(errors.maxTokens ? { maxTokens: errors.maxTokens } : {}),
-	});
 
 	function errorFor(field: keyof ValidationErrors): string | null {
 		if (!submitted) return null;
-		return scopedErrors[field] ?? null;
+		return errors[field] ?? null;
 	}
 
 	function handleConfirm(event: Event): void {
 		event.preventDefault();
 		submitted = true;
-		if (hasErrors(scopedErrors)) return;
+		if (hasErrors(errors)) return;
 
 		// Strip undefined keys so the snapshot is minimal. This also
 		// ensures `hasAgentOverride()` returns false when everything is
@@ -140,10 +86,6 @@
 		if (draft.model !== undefined) cleaned.model = draft.model;
 		if (draft.temperature !== undefined) cleaned.temperature = draft.temperature;
 		if (draft.topP !== undefined) cleaned.topP = draft.topP;
-		if (draft.maxTokens !== undefined) cleaned.maxTokens = draft.maxTokens;
-		if (draft.maxIterations !== undefined)
-			cleaned.maxIterations = draft.maxIterations;
-		if (draft.timeoutMs !== undefined) cleaned.timeoutMs = draft.timeoutMs;
 
 		onConfirm(cleaned);
 	}
@@ -153,9 +95,6 @@
 		modelDraft = '';
 		temperatureDraft = '';
 		topPDraft = '';
-		maxTokensDraft = '';
-		maxIterationsDraft = '';
-		timeoutMsDraft = '';
 		submitted = false;
 		onConfirm({});
 	}
@@ -181,7 +120,7 @@
 	onclick={handleBackdropClick}
 >
 	<form
-		class="dialog"
+		class="dialog quire-lg"
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="override-title"
@@ -269,64 +208,6 @@
 					<p class="field-hint error">{errorFor('topP')}</p>
 				{/if}
 			</div>
-
-			<div class="field">
-				<label class="field-label" for="override-max-tokens">Max tokens</label>
-				<input
-					id="override-max-tokens"
-					class="input"
-					class:input-invalid={errorFor('maxTokens')}
-					type="number"
-					min={BEHAVIOR_BOUNDS.maxTokens.min}
-					max={BEHAVIOR_BOUNDS.maxTokens.max}
-					step="1"
-					placeholder="Default"
-					bind:value={maxTokensDraft}
-				/>
-				{#if errorFor('maxTokens')}
-					<p class="field-hint error">{errorFor('maxTokens')}</p>
-				{/if}
-			</div>
-
-			<div class="field">
-				<label class="field-label" for="override-max-iterations">
-					Max iterations
-				</label>
-				<input
-					id="override-max-iterations"
-					class="input"
-					class:input-invalid={errorFor('maxIterations')}
-					type="number"
-					min={LIMITS_BOUNDS.maxIterations.min}
-					max={LIMITS_BOUNDS.maxIterations.max}
-					step="1"
-					placeholder="Default"
-					bind:value={maxIterationsDraft}
-				/>
-				{#if errorFor('maxIterations')}
-					<p class="field-hint error">{errorFor('maxIterations')}</p>
-				{/if}
-			</div>
-
-			<div class="field">
-				<label class="field-label" for="override-timeout">
-					Timeout (ms)
-				</label>
-				<input
-					id="override-timeout"
-					class="input"
-					class:input-invalid={errorFor('timeoutMs')}
-					type="number"
-					min={LIMITS_BOUNDS.timeoutMs.min}
-					max={LIMITS_BOUNDS.timeoutMs.max}
-					step="1000"
-					placeholder="Default"
-					bind:value={timeoutMsDraft}
-				/>
-				{#if errorFor('timeoutMs')}
-					<p class="field-hint error">{errorFor('timeoutMs')}</p>
-				{/if}
-			</div>
 		</div>
 
 		<footer class="dialog-actions">
@@ -349,7 +230,7 @@
 					type="submit"
 					class="button button-primary"
 					bind:this={confirmButtonEl}
-					disabled={hasErrors(scopedErrors)}
+					disabled={hasErrors(errors)}
 				>
 					Apply to next run
 				</button>
@@ -378,8 +259,6 @@
 		flex-direction: column;
 		gap: var(--space-4);
 		padding: var(--space-6);
-		background-color: var(--color-surface-elevated);
-		border: 1px solid var(--color-border);
 		border-radius: var(--radius-xl);
 		box-shadow: var(--shadow-xl);
 		animation: scale-in var(--transition-fast) ease-out;

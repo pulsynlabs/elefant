@@ -42,12 +42,9 @@ export interface AgentLoopOptions {
 	state?: unknown
 	provider?: string
 	model?: string
-	maxIterations?: number
 	contextWindowTokens?: number
-	maxTokens?: number
 	temperature?: number
 	topP?: number
-	timeoutMs?: number
 	hookRegistry: HookRegistry
 	permissions?: PermissionGate
 	compaction?: CompactionManager
@@ -61,6 +58,8 @@ export interface AgentLoopOptions {
 	mcpManager?: MCPManager
 	mcpTokenBudgetPercent?: number
 }
+
+const INTERNAL_ITERATION_CEILING = 200
 
 interface EffectiveMcpTools {
 	tools: ToolDefinition[]
@@ -325,7 +324,6 @@ export async function* runAgentLoop(
 	let tokenCount = estimateMessageTokens(messages)
 	const contextWindow = options.contextWindowTokens ?? 200_000
 	const sessionId = options.runContext.sessionId
-	const maxIterations = options.maxIterations ?? 50
 	const repairCounts = new Map<string, number>()
 	const emitRunEvent = (type: string, data: unknown): void => {
 		if (!options.sseManager) {
@@ -414,7 +412,7 @@ export async function* runAgentLoop(
 		}
 	}
 
-	while (iterations < maxIterations) {
+	while (iterations < INTERNAL_ITERATION_CEILING) {
 		if (options.runContext.signal.aborted) {
 			emitRunEvent('agent_run.cancelled', {
 				reason: 'run aborted before provider call',
@@ -516,10 +514,8 @@ export async function* runAgentLoop(
 			signal: options.runContext.signal,
 			provider: options.provider,
 			model: options.model,
-			maxTokens: options.maxTokens,
 			temperature: options.temperature,
 			topP: options.topP,
-			timeoutMs: options.timeoutMs,
 		})) {
 			if (options.runContext.signal.aborted) {
 				emitRunEvent('agent_run.cancelled', {

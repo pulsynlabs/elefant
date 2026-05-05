@@ -565,22 +565,22 @@ describe('ConfigManager.resolve', () => {
 			globalConfigPath,
 			JSON.stringify({
 				agents: {
-					executor: {
-						...defaultAgentProfiles.executor,
-						limits: {
-							...defaultAgentProfiles.executor.limits,
-							maxIterations: 20,
+					'executor-medium': {
+						...defaultAgentProfiles['executor-medium'],
+						behavior: {
+							...defaultAgentProfiles['executor-medium'].behavior,
+							temperature: 0.45,
 						},
 					},
 				},
 			}),
 		);
 
-		const result = await createManager().resolve('executor', projectId);
+		const result = await createManager().resolve('executor-medium', projectId);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.data.limits.maxIterations).toBe(20);
-			expect(result.data._sources['limits.maxIterations']).toBe('global');
+			expect(result.data.behavior.temperature).toBe(0.45);
+			expect(result.data._sources['behavior.temperature']).toBe('global');
 		}
 	});
 
@@ -589,11 +589,11 @@ describe('ConfigManager.resolve', () => {
 			globalConfigPath,
 			JSON.stringify({
 				agents: {
-					executor: {
-						...defaultAgentProfiles.executor,
-						limits: {
-							...defaultAgentProfiles.executor.limits,
-							maxIterations: 20,
+					'executor-medium': {
+						...defaultAgentProfiles['executor-medium'],
+						behavior: {
+							...defaultAgentProfiles['executor-medium'].behavior,
+							temperature: 0.45,
 						},
 					},
 				},
@@ -604,22 +604,22 @@ describe('ConfigManager.resolve', () => {
 			join(projectPath, '.elefant', 'config.json'),
 			JSON.stringify({
 				agents: {
-					executor: {
-						...defaultAgentProfiles.executor,
-						limits: {
-							...defaultAgentProfiles.executor.limits,
-							maxIterations: 7,
+					'executor-medium': {
+						...defaultAgentProfiles['executor-medium'],
+						behavior: {
+							...defaultAgentProfiles['executor-medium'].behavior,
+							temperature: 0.65,
 						},
 					},
 				},
 			}),
 		);
 
-		const result = await createManager().resolve('executor', projectId);
+		const result = await createManager().resolve('executor-medium', projectId);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.data.limits.maxIterations).toBe(7);
-			expect(result.data._sources['limits.maxIterations']).toBe('project');
+			expect(result.data.behavior.temperature).toBe(0.65);
+			expect(result.data._sources['behavior.temperature']).toBe('project');
 		}
 	});
 
@@ -628,11 +628,11 @@ describe('ConfigManager.resolve', () => {
 			globalConfigPath,
 			JSON.stringify({
 				agents: {
-					executor: {
-						...defaultAgentProfiles.executor,
-						limits: {
-							...defaultAgentProfiles.executor.limits,
-							maxIterations: 20,
+					'executor-medium': {
+						...defaultAgentProfiles['executor-medium'],
+						behavior: {
+							...defaultAgentProfiles['executor-medium'].behavior,
+							temperature: 0.45,
 						},
 					},
 				},
@@ -643,35 +643,35 @@ describe('ConfigManager.resolve', () => {
 			join(projectPath, '.elefant', 'config.json'),
 			JSON.stringify({
 				agents: {
-					executor: {
-						...defaultAgentProfiles.executor,
-						limits: {
-							...defaultAgentProfiles.executor.limits,
-							maxIterations: 7,
+					'executor-medium': {
+						...defaultAgentProfiles['executor-medium'],
+						behavior: {
+							...defaultAgentProfiles['executor-medium'].behavior,
+							temperature: 0.65,
 						},
 					},
 				},
 			}),
 		);
 
-		const result = await createManager().resolve('executor', projectId, {
-			limits: {
-				maxIterations: 3,
+		const result = await createManager().resolve('executor-medium', projectId, {
+			behavior: {
+				temperature: 0.9,
 			},
 		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.data.limits.maxIterations).toBe(3);
-			expect(result.data._sources['limits.maxIterations']).toBe('override');
+			expect(result.data.behavior.temperature).toBe(0.9);
+			expect(result.data._sources['behavior.temperature']).toBe('override');
 		}
 	});
 
 	it('falls back to default for unspecified fields', async () => {
-		const result = await createManager().resolve('executor', projectId);
+		const result = await createManager().resolve('executor-medium', projectId);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.data.tools.mode).toBe(defaultAgentProfiles.executor.tools.mode);
-			expect(result.data._sources['tools.mode']).toBe('default');
+			expect(result.data.tools.allowedTools).toEqual(defaultAgentProfiles['executor-medium'].tools.allowedTools);
+			expect(result.data._sources['tools.allowedTools']).toBe('default');
 		}
 	});
 });
@@ -689,13 +689,13 @@ describe('loadConfigFromPath validation failures', () => {
 
 	it('fails when required profile field is missing', async () => {
 		const path = join(tempDir, 'config.json');
-		writeFileSync(path, JSON.stringify({ agents: { executor: { id: 'executor' } } }));
+		writeFileSync(path, JSON.stringify({ agents: { 'executor-medium': { id: 'executor-medium' } } }));
 
 		const result = await loadConfigFromPath(path);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe('CONFIG_INVALID');
-			expect(result.error.message).toContain('agents.executor');
+			expect(result.error.message).toContain('agents.executor-medium');
 		}
 	});
 
@@ -705,8 +705,8 @@ describe('loadConfigFromPath validation failures', () => {
 			path,
 			JSON.stringify({
 				agents: {
-					executor: {
-						...defaultAgentProfiles.executor,
+					'executor-medium': {
+						...defaultAgentProfiles['executor-medium'],
 						unexpected: true,
 					},
 				},
@@ -726,11 +726,11 @@ describe('loadConfigFromPath validation failures', () => {
 			path,
 			JSON.stringify({
 				agents: {
-					executor: {
-						...defaultAgentProfiles.executor,
-						limits: {
-							...defaultAgentProfiles.executor.limits,
-							maxIterations: 'twelve',
+					'executor-medium': {
+						...defaultAgentProfiles['executor-medium'],
+						behavior: {
+							...defaultAgentProfiles['executor-medium'].behavior,
+							temperature: 'hot',
 						},
 					},
 				},
@@ -741,20 +741,20 @@ describe('loadConfigFromPath validation failures', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe('CONFIG_INVALID');
-			expect(result.error.message).toContain('maxIterations');
+			expect(result.error.message).toContain('temperature');
 		}
 	});
 
-	it('fails for invalid enum values', async () => {
+	it('strips deprecated tool mode values instead of failing', async () => {
 		const path = join(tempDir, 'config.json');
 		writeFileSync(
 			path,
 			JSON.stringify({
 				agents: {
-					executor: {
-						...defaultAgentProfiles.executor,
+					'executor-medium': {
+						...defaultAgentProfiles['executor-medium'],
 						tools: {
-							...defaultAgentProfiles.executor.tools,
+							...defaultAgentProfiles['executor-medium'].tools,
 							mode: 'invalid-mode',
 						},
 					},
@@ -763,10 +763,70 @@ describe('loadConfigFromPath validation failures', () => {
 		);
 
 		const result = await loadConfigFromPath(path);
-		expect(result.ok).toBe(false);
-		if (!result.ok) {
-			expect(result.error.code).toBe('CONFIG_INVALID');
-			expect(result.error.message).toContain('mode');
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data.agents?.['executor-medium']?.tools).not.toHaveProperty('mode');
+		}
+	});
+
+	it('strips deprecated fields and drops legacy executor profile', async () => {
+		const path = join(tempDir, 'config.json');
+		const warn = console.warn;
+		const warnings: string[] = [];
+		console.warn = (message?: unknown, ...optionalParams: unknown[]) => {
+			warnings.push([message, ...optionalParams].map(String).join(' '));
+		};
+
+		try {
+			writeFileSync(
+				path,
+				JSON.stringify({
+					agents: {
+						executor: {
+							id: 'executor',
+							label: 'Legacy Executor',
+							kind: 'executor',
+							enabled: true,
+							behavior: { workflowMode: 'standard', workflowDepth: 'standard', autopilot: false, maxTokens: 1234 },
+							limits: { maxIterations: 10, timeoutMs: 1000, maxConcurrency: 2, maxTokens: 5000 },
+							tools: { mode: 'auto' },
+						},
+						'executor-medium': {
+							...defaultAgentProfiles['executor-medium'],
+							behavior: {
+								...defaultAgentProfiles['executor-medium'].behavior,
+								maxTokens: 777,
+							},
+							limits: {
+								maxIterations: 12,
+								timeoutMs: 2000,
+								maxConcurrency: 1,
+								maxTokens: 2048,
+							},
+							tools: {
+								...defaultAgentProfiles['executor-medium'].tools,
+								mode: 'manual',
+							},
+						},
+					},
+				}),
+			);
+
+			const loaded = await loadConfigFromPath(path);
+			expect(loaded.ok).toBe(true);
+			if (!loaded.ok) {
+				return;
+			}
+
+			expect(loaded.data.agents?.executor).toBeUndefined();
+			const profile = loaded.data.agents?.['executor-medium'];
+			expect(profile).toBeDefined();
+			expect(profile).not.toHaveProperty('limits');
+			expect(profile?.behavior).not.toHaveProperty('maxTokens');
+			expect(profile?.tools).not.toHaveProperty('mode');
+			expect(warnings.some((message) => message.includes('Ignoring legacy "executor" profile'))).toBe(true);
+		} finally {
+			console.warn = warn;
 		}
 	});
 });

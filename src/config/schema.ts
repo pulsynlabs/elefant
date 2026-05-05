@@ -10,19 +10,9 @@ const providerSchema = z.object({
 }).strict();
 
 const toolPolicyConfigSchema = z.object({
-	mode: z.enum(["auto", "manual", "deny_all"]),
 	allowedTools: z.array(z.string().min(1)).optional(),
 	deniedTools: z.array(z.string().min(1)).optional(),
 	perToolApproval: z.record(z.string(), z.boolean()).optional(),
-}).strict();
-
-const agentRuntimeLimitsSchema = z.object({
-	maxIterations: z.number().int().min(1),
-	timeoutMs: z.number().int().min(1),
-	maxConcurrency: z.number().int().min(1),
-	maxTokens: z.number().int().min(1).optional(),
-	temperature: z.number().min(0).max(2).optional(),
-	topP: z.number().min(0).max(1).optional(),
 }).strict();
 
 const agentBehaviorConfigSchema = z.object({
@@ -32,7 +22,11 @@ const agentBehaviorConfigSchema = z.object({
 	workflowMode: z.enum(["quick", "standard", "comprehensive", "milestone"]).optional(),
 	workflowDepth: z.enum(["shallow", "standard", "deep"]).optional(),
 	autopilot: z.boolean().optional(),
+	temperature: z.number().min(0).max(2).optional(),
+	topP: z.number().min(0).max(1).optional(),
 }).strict();
+
+export const AGENT_KINDS = ["orchestrator", "planner", "executor", "researcher", "explorer", "verifier", "debugger", "tester", "writer", "librarian", "default", "custom"] as const;
 
 const agentPermissionsSchema = z.object({
 	read: z.boolean().default(true),
@@ -45,7 +39,7 @@ const agentContextModeSchema = z.enum(["none", "inherit_session", "snapshot"]);
 const agentProfileSchema = z.object({
 	id: z.string().min(1),
 	label: z.string().min(1),
-	kind: z.enum(["orchestrator", "planner", "executor", "researcher", "explorer", "verifier", "debugger", "tester", "writer", "librarian", "default", "custom"]),
+	kind: z.enum(AGENT_KINDS),
 	description: z.string().min(1).optional(),
 	enabled: z.boolean(),
 	provider: z.string().min(1).optional(),
@@ -56,7 +50,6 @@ const agentProfileSchema = z.object({
 	promptFile: z.string().min(1).nullable().default(null),
 	promptOverride: z.string().min(1).nullable().default(null),
 	behavior: agentBehaviorConfigSchema,
-	limits: agentRuntimeLimitsSchema,
 	tools: toolPolicyConfigSchema,
 	maxTaskDepth: z.number().int().min(0).optional(),
 	maxChildren: z.number().int().min(1).optional(),
@@ -182,11 +175,7 @@ function createAgentProfile(input: AgentProfileInput): z.infer<typeof agentProfi
 	return agentProfileSchema.parse(input);
 }
 
-const commonLimits = {
-	maxIterations: 10,
-	timeoutMs: 180000,
-	maxConcurrency: 1,
-	maxTokens: 8192,
+const commonBehaviorDefaults = {
 	temperature: 0.2,
 	topP: 0.95,
 };
@@ -195,28 +184,26 @@ const readOnlyTools = ["read", "glob", "grep", "memory_search", "memory_save", "
 const executorTools = ["read", "glob", "grep", "bash", "apply_patch", "memory_search", "memory_save", "wf_status", "wf_chronicle", "wf_adl"];
 
 const defaultAgentProfiles = {
-	default: createAgentProfile({ id: "default", label: "Default", kind: "default", description: "Fallback profile for general agent runs", enabled: true, behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false }, limits: { ...commonLimits, maxIterations: 8, maxTokens: 4096 }, tools: { mode: "manual" } }),
-	orchestrator: createAgentProfile({ id: "orchestrator", label: "Orchestrator", kind: "orchestrator", description: "Coordinator that delegates all implementation through task dispatch", enabled: true, model: "claude-opus-4-7", provider: "anthropic", toolsAllowlist: ["wf_status", "wf_state", "wf_requirements", "wf_spec", "wf_blueprint", "wf_chronicle", "wf_adl", "task", "memory_search", "memory_save", "question"], permissions: { read: true, write: false, execute: false }, contextMode: "inherit_session", promptFile: "src/agents/prompts/orchestrator.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false, permissionMode: "strict" }, limits: { ...commonLimits, maxIterations: 16, temperature: 0.2 }, tools: { mode: "manual" } }),
-	planner: createAgentProfile({ id: "planner", label: "Planner", kind: "planner", description: "Planning profile for SPEC and BLUEPRINT generation", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "wf_requirements", "wf_spec", "wf_blueprint", "wf_adl", "memory_search", "memory_decision"], permissions: { read: true, write: true, execute: false }, contextMode: "inherit_session", promptFile: "src/agents/prompts/planner.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false, permissionMode: "strict" }, limits: { ...commonLimits, maxIterations: 8, temperature: 0.1 }, tools: { mode: "manual", deniedTools: ["bash"] } }),
-	researcher: createAgentProfile({ id: "researcher", label: "Researcher", kind: "researcher", description: "Research profile for source-backed investigation", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "webfetch", "memory_search", "memory_save", "wf_adl"], permissions: { read: true, write: true, execute: false }, contextMode: "snapshot", promptFile: "src/agents/prompts/researcher.md", behavior: { workflowMode: "comprehensive", workflowDepth: "deep", autopilot: true }, limits: { ...commonLimits, maxIterations: 16, timeoutMs: 240000, temperature: 0.3 }, tools: { mode: "manual" } }),
-	explorer: createAgentProfile({ id: "explorer", label: "Explorer", kind: "explorer", description: "Read-only codebase mapping profile", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "memory_search", "memory_save"], permissions: { read: true, write: false, execute: false }, contextMode: "snapshot", promptFile: "src/agents/prompts/explorer.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: true }, limits: { ...commonLimits, maxIterations: 8, temperature: 0.2 }, tools: { mode: "manual", allowedTools: readOnlyTools } }),
-	verifier: createAgentProfile({ id: "verifier", label: "Verifier", kind: "verifier", description: "Fresh-context validation contract auditor", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "bash", "wf_spec", "wf_blueprint", "wf_chronicle", "wf_adl", "memory_search", "memory_save"], permissions: { read: true, write: false, execute: true }, contextMode: "none", promptFile: "src/agents/prompts/verifier.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false, permissionMode: "strict" }, limits: { ...commonLimits, maxIterations: 10, temperature: 0.1 }, tools: { mode: "manual" } }),
-	debugger: createAgentProfile({ id: "debugger", label: "Debugger", kind: "debugger", description: "Scientific debugging profile", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "bash", "wf_chronicle", "wf_adl", "memory_search", "memory_save"], permissions: { read: true, write: true, execute: true }, contextMode: "snapshot", promptFile: "src/agents/prompts/debugger.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false }, limits: { ...commonLimits, maxIterations: 12, temperature: 0.2 }, tools: { mode: "manual" } }),
-	tester: createAgentProfile({ id: "tester", label: "Tester", kind: "tester", description: "Bun and Playwright test authoring profile", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "bash", "apply_patch", "memory_search", "memory_save"], permissions: { read: true, write: true, execute: true }, contextMode: "snapshot", promptFile: "src/agents/prompts/tester.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false }, limits: { ...commonLimits, maxIterations: 12, temperature: 0.1 }, tools: { mode: "manual" } }),
-	writer: createAgentProfile({ id: "writer", label: "Writer", kind: "writer", description: "Documentation writing profile", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "apply_patch", "memory_search", "memory_save"], permissions: { read: true, write: true, execute: false }, contextMode: "snapshot", promptFile: "src/agents/prompts/writer.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false }, limits: { ...commonLimits, maxIterations: 8, temperature: 0.2 }, tools: { mode: "manual" } }),
-	librarian: createAgentProfile({ id: "librarian", label: "Librarian", kind: "librarian", description: "Research and memory synthesis profile", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "memory_search", "memory_save", "wf_adl", "wf_chronicle"], permissions: { read: true, write: true, execute: false }, contextMode: "snapshot", promptFile: "src/agents/prompts/librarian.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: true }, limits: { ...commonLimits, maxIterations: 8, temperature: 0.2 }, tools: { mode: "manual" } }),
-	"executor-low": createAgentProfile({ id: "executor-low", label: "Executor Low", kind: "executor", description: "Mechanical implementation profile", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "bash", "apply_patch", "memory_search", "memory_save"], permissions: { read: true, write: true, execute: true }, contextMode: "inherit_session", promptFile: "src/agents/prompts/executor-low.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false }, limits: { ...commonLimits, maxIterations: 8, temperature: 0.1 }, tools: { mode: "manual", allowedTools: executorTools } }),
-	"executor-medium": createAgentProfile({ id: "executor-medium", label: "Executor Medium", kind: "executor", description: "Business logic implementation profile", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: executorTools, permissions: { read: true, write: true, execute: true }, contextMode: "inherit_session", promptFile: "src/agents/prompts/executor-medium.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false }, limits: { ...commonLimits, maxIterations: 12, temperature: 0.1 }, tools: { mode: "manual", allowedTools: executorTools } }),
-	"executor-high": createAgentProfile({ id: "executor-high", label: "Executor High", kind: "executor", description: "Architecture and security-sensitive implementation profile", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: executorTools, permissions: { read: true, write: true, execute: true }, contextMode: "inherit_session", promptFile: "src/agents/prompts/executor-high.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false }, limits: { ...commonLimits, maxIterations: 14, temperature: 0.1 }, tools: { mode: "manual", allowedTools: executorTools } }),
-	"executor-frontend": createAgentProfile({ id: "executor-frontend", label: "Executor Frontend", kind: "executor", description: "Svelte 5 and Tauri UI implementation profile", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: executorTools, permissions: { read: true, write: true, execute: true }, contextMode: "inherit_session", promptFile: "src/agents/prompts/executor-frontend.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false }, limits: { ...commonLimits, maxIterations: 12, temperature: 0.1 }, tools: { mode: "manual", allowedTools: executorTools } }),
-	executor: createAgentProfile({ id: "executor", label: "Executor", kind: "executor", description: "Legacy execution profile alias", enabled: true, behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false }, limits: { ...commonLimits, maxIterations: 12 }, tools: { mode: "auto" } }),
+	default: createAgentProfile({ id: "default", label: "Default", kind: "default", description: "Fallback profile used when no specific agent matches.", enabled: true, behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false, ...commonBehaviorDefaults }, tools: {} }),
+	orchestrator: createAgentProfile({ id: "orchestrator", label: "Orchestrator", kind: "orchestrator", description: "**The Conductor** — Coordinates work across planning, execution, and verification phases. Use it to manage multi-agent workflows and enforce spec-driven discipline.", enabled: true, model: "claude-opus-4-7", provider: "anthropic", toolsAllowlist: ["wf_status", "wf_state", "wf_requirements", "wf_spec", "wf_blueprint", "wf_chronicle", "wf_adl", "task", "memory_search", "memory_save", "question"], permissions: { read: true, write: false, execute: false }, contextMode: "inherit_session", promptFile: "src/agents/prompts/orchestrator.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false, permissionMode: "strict", temperature: 0.2, topP: 0.95 }, tools: {} }),
+	planner: createAgentProfile({ id: "planner", label: "Planner", kind: "planner", description: "**The Architect** — Converts requirements into locked specs and executable blueprints with validation contracts. Reach for it when you need to turn fuzzy goals into concrete task plans.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "wf_requirements", "wf_spec", "wf_blueprint", "wf_adl", "memory_search", "memory_decision"], permissions: { read: true, write: true, execute: false }, contextMode: "inherit_session", promptFile: "src/agents/prompts/planner.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false, permissionMode: "strict", temperature: 0.1, topP: 0.95 }, tools: { deniedTools: ["bash"] } }),
+	researcher: createAgentProfile({ id: "researcher", label: "Researcher", kind: "researcher", description: "**The Investigator** — Researches unknowns, compares options, and writes evidence-backed findings. Use it to inform planning decisions with primary sources and confidence levels.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "webfetch", "memory_search", "memory_save", "wf_adl"], permissions: { read: true, write: true, execute: false }, contextMode: "snapshot", promptFile: "src/agents/prompts/researcher.md", behavior: { workflowMode: "comprehensive", workflowDepth: "deep", autopilot: true, temperature: 0.3, topP: 0.95 }, tools: {} }),
+	explorer: createAgentProfile({ id: "explorer", label: "Explorer", kind: "explorer", description: "**The Cartographer** — Maps codebase files, patterns, and call flows without changing anything. Reach for it to understand terrain before implementation begins.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "memory_search", "memory_save"], permissions: { read: true, write: false, execute: false }, contextMode: "snapshot", promptFile: "src/agents/prompts/explorer.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: true, ...commonBehaviorDefaults }, tools: { allowedTools: readOnlyTools } }),
+	verifier: createAgentProfile({ id: "verifier", label: "Verifier", kind: "verifier", description: "**The Auditor** — Independently audits artifacts against validation contracts in fresh context. Use it to verify acceptance criteria and catch regressions before shipping.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "bash", "wf_spec", "wf_blueprint", "wf_chronicle", "wf_adl", "memory_search", "memory_save"], permissions: { read: true, write: false, execute: true }, contextMode: "none", promptFile: "src/agents/prompts/verifier.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false, permissionMode: "strict", temperature: 0.1, topP: 0.95 }, tools: {} }),
+	debugger: createAgentProfile({ id: "debugger", label: "Debugger", kind: "debugger", description: "**The Detective** — Hunts root causes through hypothesis testing and evidence gathering. Reach for it when a bug resists obvious fixes or behaves inconsistently.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "bash", "wf_chronicle", "wf_adl", "memory_search", "memory_save"], permissions: { read: true, write: true, execute: true }, contextMode: "snapshot", promptFile: "src/agents/prompts/debugger.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false, ...commonBehaviorDefaults }, tools: {} }),
+	tester: createAgentProfile({ id: "tester", label: "Tester", kind: "tester", description: "**The Guardian** — Writes durable Bun unit tests and Playwright E2E tests covering happy paths, failures, and edge cases. Use it to protect user workflows with comprehensive coverage.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "bash", "apply_patch", "memory_search", "memory_save"], permissions: { read: true, write: true, execute: true }, contextMode: "snapshot", promptFile: "src/agents/prompts/tester.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false, temperature: 0.1, topP: 0.95 }, tools: {} }),
+	writer: createAgentProfile({ id: "writer", label: "Writer", kind: "writer", description: "**The Scribe** — Documents implemented behavior, architecture decisions, and tool contracts. Reach for it to turn code and decisions into clear, example-driven documentation.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "apply_patch", "memory_search", "memory_save"], permissions: { read: true, write: true, execute: false }, contextMode: "snapshot", promptFile: "src/agents/prompts/writer.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false, ...commonBehaviorDefaults }, tools: {} }),
+	librarian: createAgentProfile({ id: "librarian", label: "Librarian", kind: "librarian", description: "**The Curator** — Synthesizes prior research, memory, and decisions into organized summaries. Use it to feed planners and researchers with concise context packs.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "memory_search", "memory_save", "wf_adl", "wf_chronicle"], permissions: { read: true, write: true, execute: false }, contextMode: "snapshot", promptFile: "src/agents/prompts/librarian.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: true, ...commonBehaviorDefaults }, tools: {} }),
+	"executor-low": createAgentProfile({ id: "executor-low", label: "Executor Low", kind: "executor", description: "**The Hand** — Handles mechanical, bounded changes like scaffolding, config edits, and file organization. Reach for it for simple, scoped work that doesn't touch business logic.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: ["read", "glob", "grep", "bash", "apply_patch", "memory_search", "memory_save"], permissions: { read: true, write: true, execute: true }, contextMode: "inherit_session", promptFile: "src/agents/prompts/executor-low.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false, temperature: 0.1, topP: 0.95 }, tools: { allowedTools: executorTools } }),
+	"executor-medium": createAgentProfile({ id: "executor-medium", label: "Executor Medium", kind: "executor", description: "**The Builder** — Implements business logic, utilities, and tests inside established patterns. Use it for product behavior that doesn't require architectural decisions.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: executorTools, permissions: { read: true, write: true, execute: true }, contextMode: "inherit_session", promptFile: "src/agents/prompts/executor-medium.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false, temperature: 0.1, topP: 0.95 }, tools: { allowedTools: executorTools } }),
+	"executor-high": createAgentProfile({ id: "executor-high", label: "Executor High", kind: "executor", description: "**The Engineer** — Handles architecture, security-sensitive code, and complex correctness work across module boundaries. Reach for it when changes have wide blast radius or touch data contracts.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: executorTools, permissions: { read: true, write: true, execute: true }, contextMode: "inherit_session", promptFile: "src/agents/prompts/executor-high.md", behavior: { workflowMode: "standard", workflowDepth: "deep", autopilot: false, temperature: 0.1, topP: 0.95 }, tools: { allowedTools: executorTools } }),
+	"executor-frontend": createAgentProfile({ id: "executor-frontend", label: "Executor Frontend", kind: "executor", description: "**The Stylist** — Builds polished Svelte 5 UI components with accessibility and E2E coverage. Use it for responsive, visually coherent interfaces using Tailwind and Hugeicons.", enabled: true, model: "gpt-5.5", provider: "openai", toolsAllowlist: executorTools, permissions: { read: true, write: true, execute: true }, contextMode: "inherit_session", promptFile: "src/agents/prompts/executor-frontend.md", behavior: { workflowMode: "standard", workflowDepth: "standard", autopilot: false, temperature: 0.1, topP: 0.95 }, tools: { allowedTools: executorTools } }),
 } as const satisfies Record<string, z.infer<typeof agentProfileSchema>>;
 
 export {
 	configSchema,
 	providerSchema,
 	toolPolicyConfigSchema,
-	agentRuntimeLimitsSchema,
 	agentBehaviorConfigSchema,
 	agentPermissionsSchema,
 	agentContextModeSchema,
@@ -236,7 +223,6 @@ export {
 export type ElefantConfig = z.infer<typeof configSchema>;
 export type ProviderEntry = z.infer<typeof providerSchema>;
 export type ToolPolicyConfig = z.infer<typeof toolPolicyConfigSchema>;
-export type AgentRuntimeLimits = z.infer<typeof agentRuntimeLimitsSchema>;
 export type AgentBehaviorConfig = z.infer<typeof agentBehaviorConfigSchema>;
 export type AgentPermissions = z.infer<typeof agentPermissionsSchema>;
 export type AgentContextMode = z.infer<typeof agentContextModeSchema>;

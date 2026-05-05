@@ -1,24 +1,21 @@
 <script lang="ts">
-	// AgentLimitsForm — edits the limits and generation block of a profile.
+	// AgentBehaviorForm — edits the generation parameters of a profile.
 	//
-	// Renders number inputs and range sliders with client-side validation
-	// that mirrors the daemon's Zod schema. Saves via the agent-config
-	// store's `update(agentId, patch)`; on success the store invalidates
-	// the cached resolved view so the parent card refetches attribution.
+	// Renders range sliders for temperature and topP with client-side
+	// validation that mirrors the daemon's Zod schema. Saves via the
+	// agent-config store's `update(agentId, patch)`; on success the store
+	// invalidates the cached resolved view so the parent card refetches
+	// attribution.
 
 	import type {
 		AgentProfile,
 		AgentBehavior,
-		AgentLimits,
 	} from '$lib/types/agent-config.js';
 	import { agentConfigStore } from '$lib/stores/agent-config.svelte.js';
 	import {
-		validateLimits,
 		validateGeneration,
-		mergeErrors,
 		hasErrors,
 		type ValidationErrors,
-		LIMITS_BOUNDS,
 		BEHAVIOR_BOUNDS,
 	} from './validation.js';
 
@@ -32,46 +29,20 @@
 
 	// Local draft state — initialized from the profile but decoupled so
 	// the user can type without triggering upstream updates on every keystroke.
-	let maxIterations = $state(profile.limits.maxIterations);
-	let timeoutMs = $state(profile.limits.timeoutMs);
-	let maxConcurrency = $state(profile.limits.maxConcurrency);
 	let temperature = $state(profile.behavior.temperature ?? 1);
 	let topP = $state(profile.behavior.topP ?? 1);
-	let maxTokensText = $state(
-		profile.behavior.maxTokens !== undefined
-			? String(profile.behavior.maxTokens)
-			: '',
-	);
 
 	let isSaving = $state(false);
 	let serverError = $state<string | null>(null);
 	let submittedOnce = $state(false);
 
-	const timeoutSeconds = $derived((timeoutMs / 1000).toFixed(1));
-
-	const parsedMaxTokens = $derived<number | undefined>(
-		maxTokensText.trim().length === 0 ? undefined : Number(maxTokensText),
-	);
-
-	const limitsDraft = $derived<AgentLimits>({
-		maxIterations,
-		timeoutMs,
-		maxConcurrency,
-	});
-
 	const behaviorDraft = $derived<AgentBehavior>({
 		...profile.behavior,
 		temperature,
 		topP,
-		maxTokens: parsedMaxTokens,
 	});
 
-	const errors = $derived<ValidationErrors>(
-		mergeErrors(
-			validateLimits(limitsDraft),
-			validateGeneration(behaviorDraft),
-		),
-	);
+	const errors = $derived<ValidationErrors>(validateGeneration(behaviorDraft));
 
 	// Show errors only after first submit, or on a per-field blur.
 	let touched = $state<Record<string, boolean>>({});
@@ -83,11 +54,6 @@
 	function errorFor(field: string): string | null {
 		if (!submittedOnce && !touched[field]) return null;
 		return errors[field] ?? null;
-	}
-
-	function parseIntOr(raw: string, fallback: number): number {
-		const n = parseInt(raw, 10);
-		return Number.isFinite(n) ? n : fallback;
 	}
 
 	function parseFloatOr(raw: string, fallback: number): number {
@@ -104,7 +70,6 @@
 		serverError = null;
 		try {
 			const updated = await agentConfigStore.update(profile.id, {
-				limits: limitsDraft,
 				behavior: behaviorDraft,
 			});
 			if (!updated) {
@@ -118,127 +83,24 @@
 	}
 
 	function handleReset(): void {
-		maxIterations = profile.limits.maxIterations;
-		timeoutMs = profile.limits.timeoutMs;
-		maxConcurrency = profile.limits.maxConcurrency;
 		temperature = profile.behavior.temperature ?? 1;
 		topP = profile.behavior.topP ?? 1;
-		maxTokensText =
-			profile.behavior.maxTokens !== undefined
-				? String(profile.behavior.maxTokens)
-				: '';
 		touched = {};
 		submittedOnce = false;
 		serverError = null;
 	}
 </script>
 
-<form class="form" onsubmit={handleSave} aria-labelledby="limits-form-title">
+<form class="form" onsubmit={handleSave} aria-labelledby="behavior-form-title">
 	<header class="form-header">
-		<h4 id="limits-form-title" class="form-title">Limits &amp; Generation</h4>
+		<h4 id="behavior-form-title" class="form-title">Generation</h4>
 		<p class="form-subtitle">
-			Caps and generation parameters for
+			Sampling parameters for
 			<span class="agent-id">{profile.id}</span>.
 		</p>
 	</header>
 
 	<div class="fields">
-		<!-- Limits -->
-		<div class="field">
-			<label class="field-label" for="max-iterations-{profile.id}">
-				Max iterations
-			</label>
-			<input
-				id="max-iterations-{profile.id}"
-				class="input"
-				class:input-invalid={errorFor('maxIterations')}
-				type="number"
-				min={LIMITS_BOUNDS.maxIterations.min}
-				max={LIMITS_BOUNDS.maxIterations.max}
-				step="1"
-				value={maxIterations}
-				oninput={(e) =>
-					(maxIterations = parseIntOr(
-						(e.currentTarget as HTMLInputElement).value,
-						maxIterations,
-					))}
-				onblur={() => markTouched('maxIterations')}
-				aria-invalid={errorFor('maxIterations') ? 'true' : undefined}
-				aria-describedby="max-iterations-hint-{profile.id}"
-			/>
-			<p id="max-iterations-hint-{profile.id}" class="field-hint">
-				{#if errorFor('maxIterations')}
-					<span class="error">{errorFor('maxIterations')}</span>
-				{:else}
-					{LIMITS_BOUNDS.maxIterations.min}–{LIMITS_BOUNDS.maxIterations.max}
-				{/if}
-			</p>
-		</div>
-
-		<div class="field">
-			<label class="field-label" for="timeout-{profile.id}">
-				Timeout (ms)
-				<span class="field-label-suffix">≈ {timeoutSeconds}s</span>
-			</label>
-			<input
-				id="timeout-{profile.id}"
-				class="input"
-				class:input-invalid={errorFor('timeoutMs')}
-				type="number"
-				min={LIMITS_BOUNDS.timeoutMs.min}
-				max={LIMITS_BOUNDS.timeoutMs.max}
-				step="1000"
-				value={timeoutMs}
-				oninput={(e) =>
-					(timeoutMs = parseIntOr(
-						(e.currentTarget as HTMLInputElement).value,
-						timeoutMs,
-					))}
-				onblur={() => markTouched('timeoutMs')}
-				aria-invalid={errorFor('timeoutMs') ? 'true' : undefined}
-				aria-describedby="timeout-hint-{profile.id}"
-			/>
-			<p id="timeout-hint-{profile.id}" class="field-hint">
-				{#if errorFor('timeoutMs')}
-					<span class="error">{errorFor('timeoutMs')}</span>
-				{:else}
-					{LIMITS_BOUNDS.timeoutMs.min}–{LIMITS_BOUNDS.timeoutMs.max}
-				{/if}
-			</p>
-		</div>
-
-		<div class="field">
-			<label class="field-label" for="concurrency-{profile.id}">
-				Max concurrency
-			</label>
-			<input
-				id="concurrency-{profile.id}"
-				class="input"
-				class:input-invalid={errorFor('maxConcurrency')}
-				type="number"
-				min={LIMITS_BOUNDS.maxConcurrency.min}
-				max={LIMITS_BOUNDS.maxConcurrency.max}
-				step="1"
-				value={maxConcurrency}
-				oninput={(e) =>
-					(maxConcurrency = parseIntOr(
-						(e.currentTarget as HTMLInputElement).value,
-						maxConcurrency,
-					))}
-				onblur={() => markTouched('maxConcurrency')}
-				aria-invalid={errorFor('maxConcurrency') ? 'true' : undefined}
-				aria-describedby="concurrency-hint-{profile.id}"
-			/>
-			<p id="concurrency-hint-{profile.id}" class="field-hint">
-				{#if errorFor('maxConcurrency')}
-					<span class="error">{errorFor('maxConcurrency')}</span>
-				{:else}
-					{LIMITS_BOUNDS.maxConcurrency.min}–{LIMITS_BOUNDS.maxConcurrency.max}
-				{/if}
-			</p>
-		</div>
-
-		<!-- Generation params -->
 		<div class="field">
 			<label class="field-label" for="temperature-{profile.id}">
 				Temperature
@@ -298,36 +160,6 @@
 				</p>
 			{/if}
 		</div>
-
-		<div class="field">
-			<label class="field-label" for="max-tokens-{profile.id}">
-				Max tokens
-				<span class="field-label-suffix">optional</span>
-			</label>
-			<input
-				id="max-tokens-{profile.id}"
-				class="input"
-				class:input-invalid={errorFor('maxTokens')}
-				type="number"
-				min={BEHAVIOR_BOUNDS.maxTokens.min}
-				max={BEHAVIOR_BOUNDS.maxTokens.max}
-				step="1"
-				placeholder="Default"
-				value={maxTokensText}
-				oninput={(e) =>
-					(maxTokensText = (e.currentTarget as HTMLInputElement).value)}
-				onblur={() => markTouched('maxTokens')}
-				aria-invalid={errorFor('maxTokens') ? 'true' : undefined}
-				aria-describedby="max-tokens-hint-{profile.id}"
-			/>
-			<p id="max-tokens-hint-{profile.id}" class="field-hint">
-				{#if errorFor('maxTokens')}
-					<span class="error">{errorFor('maxTokens')}</span>
-				{:else}
-					Leave blank to use the provider default.
-				{/if}
-			</p>
-		</div>
 	</div>
 
 	{#if serverError}
@@ -360,7 +192,7 @@
 			class="button button-primary"
 			disabled={isSaving || hasErrors(errors)}
 		>
-			{isSaving ? 'Saving…' : 'Save limits'}
+			{isSaving ? 'Saving…' : 'Save behavior'}
 		</button>
 	</footer>
 </form>
@@ -423,43 +255,10 @@
 		color: var(--color-text-secondary);
 	}
 
-	.field-label-suffix {
-		font-family: var(--font-mono);
-		font-size: var(--font-size-2xs, 10px);
-		color: var(--color-text-muted);
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-widest);
-	}
-
 	.field-value-readout {
 		font-family: var(--font-mono);
 		font-size: var(--font-size-sm);
 		color: var(--color-text-primary);
-	}
-
-	.input {
-		background-color: var(--color-surface-elevated);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		color: var(--color-text-primary);
-		font-family: var(--font-mono);
-		font-size: var(--font-size-sm);
-		padding: var(--space-2) var(--space-3);
-		outline: none;
-		transition:
-			border-color var(--transition-fast),
-			box-shadow var(--transition-fast);
-	}
-
-	.input:focus-visible {
-		border-color: var(--color-primary);
-		box-shadow: var(--glow-focus);
-	}
-
-	.input-invalid,
-	.input-invalid:focus-visible {
-		border-color: var(--color-error, #b23a3a);
-		box-shadow: none;
 	}
 
 	.range {

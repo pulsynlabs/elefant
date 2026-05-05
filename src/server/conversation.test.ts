@@ -153,7 +153,7 @@ describe('createConversationRoute', () => {
 		expect(abortObserved).toBe(true)
 	})
 
-	it('forwards maxTokens, temperature, topP, and timeoutMs to provider', async () => {
+	it('forwards temperature and topP to provider (maxTokens/timeoutMs removed — internal only)', async () => {
 		let receivedOptions: SendMessageOptions | undefined
 
 		const adapter: ProviderAdapter = {
@@ -174,20 +174,20 @@ describe('createConversationRoute', () => {
 			createJsonRequest({
 				messages: [{ role: 'user', content: 'Hello' }],
 				provider: 'mock-provider',
-				maxTokens: 50,
 				temperature: 0.5,
 				topP: 0.9,
-				timeoutMs: 30000,
 			}),
 		)
 
 		expect(response.status).toBe(200)
 		await response.text() // Consume stream to ensure adapter is called
 		expect(receivedOptions).toBeDefined()
-		expect(receivedOptions?.maxTokens).toBe(50)
+		// temperature and topP are still forwarded
 		expect(receivedOptions?.temperature).toBe(0.5)
 		expect(receivedOptions?.topP).toBe(0.9)
-		expect(receivedOptions?.timeoutMs).toBe(30000)
+		// maxTokens and timeoutMs are no longer passed to providers (internal only)
+		// maxTokens is now INTERNAL_ANTHROPIC_MAX_TOKENS in providers/anthropic.ts
+		// timeoutMs is a provider-level concern, not passed per-call
 	})
 
 	it('emits tool_call on tool_call_start (empty args) and tool_call_update on tool_call_complete (full args)', async () => {

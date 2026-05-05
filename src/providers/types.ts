@@ -60,9 +60,7 @@ export interface SendMessageOptions {
 	provider?: string
 	model?: string
 	temperature?: number
-	maxTokens?: number
 	topP?: number
-	timeoutMs?: number
 	signal?: AbortSignal
 }
 

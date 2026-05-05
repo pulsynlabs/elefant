@@ -1,7 +1,6 @@
 <script lang="ts">
-	// ToolPolicyEditor — tool mode + allow / deny lists for a profile.
+	// ToolPolicyEditor — allow / deny lists for a profile's tool policy.
 	//
-	// - `mode`: auto | manual | deny_all (radio group)
 	// - Allowed / denied tools: chip input with Enter/comma add + click-to-remove
 	// - Client-side validation on tool names; invalid tokens never enter the list
 	//
@@ -9,13 +8,10 @@
 
 	import type {
 		AgentProfile,
-		ToolMode,
 		ToolPolicy,
 	} from '$lib/types/agent-config.js';
-	import { TOOL_MODES } from '$lib/types/agent-config.js';
 	import { agentConfigStore } from '$lib/stores/agent-config.svelte.js';
 	import {
-		isValidToolName,
 		validateToolPolicy,
 		parseToolList,
 	} from './validation.js';
@@ -29,7 +25,6 @@
 
 	let { profile, onSaved, onCancel }: Props = $props();
 
-	let mode = $state<ToolMode>(profile.tools.mode);
 	let allowedTools = $state<string[]>([...(profile.tools.allowedTools ?? [])]);
 	let deniedTools = $state<string[]>([...(profile.tools.deniedTools ?? [])]);
 
@@ -44,19 +39,12 @@
 	let serverError = $state<string | null>(null);
 
 	const currentPolicy = $derived<ToolPolicy>({
-		mode,
 		allowedTools,
 		deniedTools,
 		perToolApproval: profile.tools.perToolApproval,
 	});
 
 	const errors = $derived(validateToolPolicy(currentPolicy));
-
-	const MODE_DESCRIPTIONS: Record<ToolMode, string> = {
-		auto: 'Agent can call any registered tool unless denied below.',
-		manual: 'Every tool call requires explicit approval.',
-		deny_all: 'Block every tool call. Use for plan-only agents.',
-	};
 
 	function addFromInput(target: 'allow' | 'deny', source: string): void {
 		const { tools, invalid } = parseToolList(source);
@@ -125,7 +113,6 @@
 		try {
 			const updated = await agentConfigStore.update(profile.id, {
 				tools: {
-					mode,
 					allowedTools,
 					deniedTools,
 					perToolApproval: profile.tools.perToolApproval,
@@ -142,7 +129,6 @@
 	}
 
 	function handleReset(): void {
-		mode = profile.tools.mode;
 		allowedTools = [...(profile.tools.allowedTools ?? [])];
 		deniedTools = [...(profile.tools.deniedTools ?? [])];
 		allowedDraft = '';
@@ -158,31 +144,12 @@
 		<h4 id="tool-policy-title" class="form-title">Tool Policy</h4>
 		<p class="form-subtitle">
 			Decide which tools
-			<span class="agent-id">{profile.id}</span> can call. Combine with
-			per-tool approval rules below.
+			<span class="agent-id">{profile.id}</span> can call. Denied tools
+			always lose, regardless of allow list.
 		</p>
 	</header>
 
-	<fieldset class="mode-group">
-		<legend class="mode-legend">Tool mode</legend>
-		{#each TOOL_MODES as m (m)}
-			<label class="mode-option" class:mode-option-selected={mode === m}>
-				<input
-					type="radio"
-					name="tool-mode-{profile.id}"
-					value={m}
-					checked={mode === m}
-					onchange={() => (mode = m)}
-				/>
-				<div class="mode-content">
-					<span class="mode-name">{m}</span>
-					<span class="mode-description">{MODE_DESCRIPTIONS[m]}</span>
-				</div>
-			</label>
-		{/each}
-	</fieldset>
-
-	<div class="chip-field" class:chip-field-muted={mode === 'deny_all'}>
+	<div class="chip-field">
 		<label class="chip-label" for="allowed-{profile.id}">
 			Allowed tools
 			<span class="chip-count">{allowedTools.length}</span>
@@ -211,7 +178,6 @@
 				onblur={() => handleChipBlur('allow')}
 				aria-invalid={errors.allowedTools ? 'true' : undefined}
 				aria-describedby="allowed-hint-{profile.id}"
-				disabled={mode === 'deny_all'}
 			/>
 		</div>
 		<p id="allowed-hint-{profile.id}" class="chip-hint">
@@ -223,6 +189,7 @@
 				>
 			{:else}
 				Press Enter or comma to add. Names must start with a letter.
+				Leave blank to allow any registered tool unless denied.
 			{/if}
 		</p>
 	</div>
@@ -268,7 +235,7 @@
 					>Ignored invalid: {deniedInvalid.join(', ')}</span
 				>
 			{:else}
-				Denied tools always lose, regardless of mode.
+				Denied tools always lose, even if also allowed.
 			{/if}
 		</p>
 	</div>
@@ -342,86 +309,10 @@
 		color: var(--color-text-secondary);
 	}
 
-	.mode-group {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		padding: 0;
-		margin: 0;
-		border: none;
-	}
-
-	.mode-legend {
-		font-size: var(--font-size-sm);
-		font-weight: var(--font-weight-medium);
-		color: var(--color-text-secondary);
-		padding: 0;
-		margin-bottom: var(--space-1);
-	}
-
-	.mode-option {
-		display: flex;
-		align-items: flex-start;
-		gap: var(--space-3);
-		padding: var(--space-3);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background-color: var(--color-surface-elevated);
-		cursor: pointer;
-		transition:
-			border-color var(--transition-fast),
-			background-color var(--transition-fast);
-	}
-
-	.mode-option:hover {
-		border-color: var(--color-border-strong);
-	}
-
-	.mode-option input {
-		margin-top: 2px;
-		accent-color: var(--color-primary);
-	}
-
-	.mode-option input:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
-	}
-
-	.mode-option-selected {
-		border-color: var(--color-primary);
-		background-color: color-mix(
-			in srgb,
-			var(--color-primary) 8%,
-			var(--color-surface-elevated)
-		);
-	}
-
-	.mode-content {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-	}
-
-	.mode-name {
-		font-family: var(--font-mono);
-		font-size: var(--font-size-sm);
-		font-weight: var(--font-weight-medium);
-		color: var(--color-text-primary);
-	}
-
-	.mode-description {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-	}
-
 	.chip-field {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-	}
-
-	.chip-field-muted {
-		opacity: 0.7;
 	}
 
 	.chip-label {

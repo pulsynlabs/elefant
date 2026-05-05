@@ -34,8 +34,6 @@ export interface ChatRequest {
 	sessionId?: string;
 	projectId?: string;
 	provider?: string;
-	maxIterations?: number;
-	maxTokens?: number;
 	temperature?: number;
 	topP?: number;
 	timeoutMs?: number;
