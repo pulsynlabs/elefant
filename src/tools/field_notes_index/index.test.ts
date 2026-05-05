@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'bun:test';
 import {
 	createFieldNotesIndexTool,
-	type ResearchIndexParams,
+	type FieldNotesIndexParams,
 	type ResearchIndexStore,
 	type TreeOutput,
 	type FlatOutput,
@@ -122,7 +122,7 @@ describe('field_notes_index tool', () => {
 			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'tree',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) throw new Error('unreachable');
@@ -156,7 +156,7 @@ describe('field_notes_index tool', () => {
 			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'tree',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) throw new Error('unreachable');
@@ -174,7 +174,7 @@ describe('field_notes_index tool', () => {
 			const tool = createFieldNotesIndexTool(mockStore([doc]));
 			const result = await tool.execute({
 				output: 'tree',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = treeData(unwrapOk(result));
@@ -193,7 +193,7 @@ describe('field_notes_index tool', () => {
 			const tool = createFieldNotesIndexTool(mockStore([doc]));
 			const result = await tool.execute({
 				output: 'tree',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = treeData(unwrapOk(result));
@@ -231,7 +231,7 @@ describe('field_notes_index tool', () => {
 			const tool = createFieldNotesIndexTool(mockStore(docs));
 			const result = await tool.execute({
 				output: 'flat',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -254,7 +254,7 @@ describe('field_notes_index tool', () => {
 			const tool = createFieldNotesIndexTool(mockStore([doc]));
 			const result = await tool.execute({
 				output: 'flat',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -290,7 +290,7 @@ describe('field_notes_index tool', () => {
 			const result = await tool.execute({
 				output: 'flat',
 				section: '02-tech',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -303,7 +303,7 @@ describe('field_notes_index tool', () => {
 			const result = await tool.execute({
 				output: 'tree',
 				section: 'nonexistent',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = treeData(unwrapOk(result));
@@ -316,7 +316,7 @@ describe('field_notes_index tool', () => {
 			const result = await tool.execute({
 				output: 'flat',
 				section: 'nonexistent',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -354,7 +354,7 @@ describe('field_notes_index tool', () => {
 			const result = await tool.execute({
 				output: 'flat',
 				tag: 'embeddings',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -372,7 +372,7 @@ describe('field_notes_index tool', () => {
 			const result = await tool.execute({
 				output: 'flat',
 				tag: 'embeddings',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -410,7 +410,7 @@ describe('field_notes_index tool', () => {
 			const result = await tool.execute({
 				output: 'flat',
 				recencyDays: 7,
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -436,7 +436,7 @@ describe('field_notes_index tool', () => {
 			const result = await tool.execute({
 				output: 'flat',
 				recencyDays: 5,
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -463,7 +463,7 @@ describe('field_notes_index tool', () => {
 			const result = await tool.execute({
 				output: 'flat',
 				limit: 3,
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -507,7 +507,7 @@ describe('field_notes_index tool', () => {
 			const result = await tool.execute({
 				output: 'tree',
 				limit: 3,
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = treeData(unwrapOk(result));
@@ -536,7 +536,7 @@ describe('field_notes_index tool', () => {
 			const tool = createFieldNotesIndexTool(mockStore([]));
 			const result = await tool.execute({
 				output: 'tree',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = treeData(unwrapOk(result));
@@ -548,7 +548,7 @@ describe('field_notes_index tool', () => {
 			const tool = createFieldNotesIndexTool(mockStore([]));
 			const result = await tool.execute({
 				output: 'flat',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -564,7 +564,7 @@ describe('field_notes_index tool', () => {
 			const tool = createFieldNotesIndexTool(mockStore([]));
 			const result = await tool.execute({
 				output: 'invalid' as 'tree',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(false);
 			const error = assertError(result);
@@ -611,7 +611,7 @@ describe('field_notes_index tool', () => {
 				output: 'flat',
 				tag: 'embeddings',
 				recencyDays: 7,
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -644,7 +644,7 @@ describe('field_notes_index tool', () => {
 				output: 'flat',
 				section: '02-tech',
 				tag: 'embeddings',
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -693,7 +693,7 @@ describe('field_notes_index tool', () => {
 				section: '02-tech',
 				tag: 'embeddings',
 				recencyDays: 7,
-			} as ResearchIndexParams);
+			} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(true);
 			const data = flatData(unwrapOk(result));
@@ -717,7 +717,7 @@ describe('field_notes_index tool', () => {
 			};
 
 			const tool = createFieldNotesIndexTool(store);
-			const result = await tool.execute({} as ResearchIndexParams);
+			const result = await tool.execute({} as FieldNotesIndexParams);
 
 			expect(result.ok).toBe(false);
 			const error = assertError(result);

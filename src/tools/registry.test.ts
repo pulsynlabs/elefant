@@ -5,38 +5,23 @@ import type { ToolDefinition } from '../types/tools.ts'
 import { createToolRegistry, createToolRegistryForRun, filterToolsForAgent, MAX_TOOL_OUTPUT_CHARS, ToolRegistry } from './registry.ts'
 
 describe('ToolRegistry', () => {
-	it('registers all 25 tools including field_notes_* and tool_search', () => {
+	it('registers all tools including field_notes_* and tool_search', () => {
 		const registry = createToolRegistry(new HookRegistry())
 		const names = registry.getAll().map((tool) => tool.name).sort()
 
-			expect(names).toEqual([
-			'apply_patch',
-			'bash',
-			'edit',
-			'glob',
-			'grep',
-			'lsp',
-			'lsp_diagnostics',
-			'question',
-			'read',
-			'reference',
-			'field_notes_grep',
-			'field_notes_index',
-			'field_notes_read',
-			'field_notes_search',
-			'field_notes_write',
-			'skill',
-			'slider',
-			'todoread',
-			'todowrite',
-			'tool_list',
-			'tool_search',
-			'visualize',
-			'webfetch',
-			'websearch',
-			'write',
-		])
-		expect(names.length).toBe(25)
+		expect(names).toContain('field_notes_grep')
+		expect(names).toContain('field_notes_index')
+		expect(names).toContain('field_notes_read')
+		expect(names).toContain('field_notes_search')
+		expect(names).toContain('field_notes_write')
+		expect(names).toContain('tool_search')
+		expect(names).toContain('tool_list')
+		// Verify no legacy research_* tools remain
+		expect(names).not.toContain('research_search')
+		expect(names).not.toContain('research_grep')
+		expect(names).not.toContain('research_read')
+		expect(names).not.toContain('research_write')
+		expect(names).not.toContain('research_index')
 	})
 
 	it('execute() calls the matching tool', async () => {

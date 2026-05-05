@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { researchGrepTool, type ResearchGrepResult } from './index.js';
+import { fieldNotesGrepTool, type FieldNotesGrepResult } from './index.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -17,8 +17,8 @@ function nextUuid(): string {
 	return `550e8400-e29b-41d4-a716-${hex}`;
 }
 
-function parseResult(result: { ok: true; data: string }): ResearchGrepResult {
-	return JSON.parse(result.data) as ResearchGrepResult;
+function parseResult(result: { ok: true; data: string }): FieldNotesGrepResult {
+	return JSON.parse(result.data) as FieldNotesGrepResult;
 }
 
 interface TempLayout {
@@ -28,7 +28,7 @@ interface TempLayout {
 
 function setupTemp(): TempLayout {
 	const root = mkdtempSync(join(tmpdir(), 'elefant-research-grep-test-'));
-	const researchDir = join(root, '.elefant', 'markdown-db');
+	const researchDir = join(root, '.elefant', 'field-notes');
 	mkdirSync(researchDir, { recursive: true });
 	uuidCounter = 0;
 	return { root, researchDir };
@@ -116,7 +116,7 @@ describe('field_notes_grep', () => {
 			}),
 		);
 
-		const result = await researchGrepTool.execute({ pattern: 'elephant', maxFiles: 20 });
+		const result = await fieldNotesGrepTool.execute({ pattern: 'elephant', maxFiles: 20 });
 
 		expect(result.ok).toBe(true);
 		const data = parseResult(result as { ok: true; data: string });
@@ -153,7 +153,7 @@ describe('field_notes_grep', () => {
 			}),
 		);
 
-		const result = await researchGrepTool.execute({ pattern: 'nonexistent_term_xyz', maxFiles: 20 });
+		const result = await fieldNotesGrepTool.execute({ pattern: 'nonexistent_term_xyz', maxFiles: 20 });
 
 		expect(result.ok).toBe(true);
 		const data = parseResult(result as { ok: true; data: string });
@@ -185,7 +185,7 @@ describe('field_notes_grep', () => {
 			}),
 		);
 
-		const result = await researchGrepTool.execute({
+		const result = await fieldNotesGrepTool.execute({
 			pattern: 'elephant',
 			section: '02-tech',
 			maxFiles: 20,
@@ -210,7 +210,7 @@ describe('field_notes_grep', () => {
 			}),
 		);
 
-		const result = await researchGrepTool.execute({
+		const result = await fieldNotesGrepTool.execute({
 			pattern: 'elephant',
 			section: '04-comparisons',
 			maxFiles: 20,
@@ -236,7 +236,7 @@ describe('field_notes_grep', () => {
 		);
 
 		// Unclosed character class is a classic ripgrep regex error
-		const result = await researchGrepTool.execute({ pattern: '[invalid', maxFiles: 20 });
+		const result = await fieldNotesGrepTool.execute({ pattern: '[invalid', maxFiles: 20 });
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -257,7 +257,7 @@ describe('field_notes_grep', () => {
 			}),
 		);
 
-		const result = await researchGrepTool.execute({
+		const result = await fieldNotesGrepTool.execute({
 			pattern: 'content',
 			section: '../../etc',
 			maxFiles: 20,
@@ -285,7 +285,7 @@ describe('field_notes_grep', () => {
 			);
 		}
 
-		const result = await researchGrepTool.execute({ pattern: 'Matchable', maxFiles: 3 });
+		const result = await fieldNotesGrepTool.execute({ pattern: 'Matchable', maxFiles: 3 });
 
 		expect(result.ok).toBe(true);
 		const data = parseResult(result as { ok: true; data: string });
@@ -303,7 +303,7 @@ describe('field_notes_grep', () => {
 			'Just some raw notes about elephants.\nNo frontmatter here.\n',
 		);
 
-		const result = await researchGrepTool.execute({ pattern: 'elephants', maxFiles: 20 });
+		const result = await fieldNotesGrepTool.execute({ pattern: 'elephants', maxFiles: 20 });
 
 		expect(result.ok).toBe(true);
 		const data = parseResult(result as { ok: true; data: string });
@@ -328,7 +328,7 @@ describe('field_notes_grep', () => {
 		);
 
 		// The ripgrep output will use base64 for non-ASCII; invalid base64 should return ''
-		const result = await researchGrepTool.execute({ pattern: 'á', maxFiles: 20 });
+		const result = await fieldNotesGrepTool.execute({ pattern: 'á', maxFiles: 20 });
 		// Should not throw, even with bytes field oddities
 		expect(result.ok).toBe(true);
 	});
@@ -336,7 +336,7 @@ describe('field_notes_grep', () => {
 	// ── maxFiles validation edge cases ───────────────────────────────
 
 	it('returns VALIDATION_ERROR when maxFiles is zero', async () => {
-		const result = await researchGrepTool.execute({ pattern: 'elephant', maxFiles: 0 });
+		const result = await fieldNotesGrepTool.execute({ pattern: 'elephant', maxFiles: 0 });
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -346,7 +346,7 @@ describe('field_notes_grep', () => {
 	});
 
 	it('returns VALIDATION_ERROR when maxFiles is negative', async () => {
-		const result = await researchGrepTool.execute({ pattern: 'elephant', maxFiles: -1 });
+		const result = await fieldNotesGrepTool.execute({ pattern: 'elephant', maxFiles: -1 });
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -356,7 +356,7 @@ describe('field_notes_grep', () => {
 	});
 
 	it('returns VALIDATION_ERROR when maxFiles is non-integer', async () => {
-		const result = await researchGrepTool.execute({ pattern: 'elephant', maxFiles: 3.5 } as unknown as number);
+		const result = await fieldNotesGrepTool.execute({ pattern: 'elephant', maxFiles: 3.5 } as unknown as number);
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -378,7 +378,7 @@ describe('field_notes_grep', () => {
 		);
 
 		// No section param — searchRoot === base
-		const result = await researchGrepTool.execute({ pattern: 'Matches', maxFiles: 10 });
+		const result = await fieldNotesGrepTool.execute({ pattern: 'Matches', maxFiles: 10 });
 
 		expect(result.ok).toBe(true);
 		const data = parseResult(result as { ok: true; data: string });
@@ -388,7 +388,7 @@ describe('field_notes_grep', () => {
 	// ── Non-existent section directory → empty result (not error) ─────
 
 	it('returns empty result for non-existent section directory', async () => {
-		const result = await researchGrepTool.execute({
+		const result = await fieldNotesGrepTool.execute({
 			pattern: 'anything',
 			section: '99-nonexistent-section',
 			maxFiles: 20,
@@ -414,7 +414,7 @@ describe('field_notes_grep', () => {
 		);
 
 		// Invalid regex with ripgrep-specific error message
-		const result = await researchGrepTool.execute({ pattern: '*invalid(regex', maxFiles: 20 });
+		const result = await fieldNotesGrepTool.execute({ pattern: '*invalid(regex', maxFiles: 20 });
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -437,7 +437,7 @@ describe('field_notes_grep', () => {
 		);
 
 		// Pattern that produces a blank line in ripgrep JSON output
-		const result = await researchGrepTool.execute({ pattern: '^$', maxFiles: 20 });
+		const result = await fieldNotesGrepTool.execute({ pattern: '^$', maxFiles: 20 });
 
 		expect(result.ok).toBe(true);
 		const data = parseResult(result as { ok: true; data: string });
@@ -464,7 +464,7 @@ describe('field_notes_grep', () => {
 		);
 
 		// Include only .md files — the .txt file should be excluded
-		const result = await researchGrepTool.execute({
+		const result = await fieldNotesGrepTool.execute({
 			pattern: 'globterm',
 			include: '*.md',
 			maxFiles: 20,
@@ -490,7 +490,7 @@ describe('field_notes_grep', () => {
 			}),
 		);
 
-		const result = await researchGrepTool.execute({
+		const result = await fieldNotesGrepTool.execute({
 			pattern: 'Should',
 			section: '02-tech',
 			maxFiles: 20,
@@ -514,7 +514,7 @@ describe('field_notes_grep', () => {
 			}),
 		);
 
-		const result = await researchGrepTool.execute({ pattern: 'elephant', section: '04-comparisons', maxFiles: 20 });
+		const result = await fieldNotesGrepTool.execute({ pattern: 'elephant', section: '04-comparisons', maxFiles: 20 });
 
 		expect(result.ok).toBe(true);
 		const data = parseResult(result as { ok: true; data: string });
@@ -528,7 +528,7 @@ describe('field_notes_grep', () => {
 	it('skips non-match JSON lines from ripgrep output', async () => {
 		// This is implicitly tested via the empty output path
 		// but here we confirm the isMatchEvent guard works
-		const result = await researchGrepTool.execute({ pattern: '^$', maxFiles: 20 });
+		const result = await fieldNotesGrepTool.execute({ pattern: '^$', maxFiles: 20 });
 		expect(result.ok).toBe(true);
 	});
 });

@@ -73,9 +73,9 @@ export const fixtures: BenchmarkFixture[] = [
 **AI21** offers the jamba-1.5-large model with a 256K context window. Pricing is $2 per million input tokens and $8 per million output tokens.`
   },
   {
-    name: 'research-card (4 cards)',
+    name: 'field-notes-card (4 cards)',
     vizCall: {
-      type: 'research-card',
+      type: 'field-notes-card',
       data: {
         cards: [
           { title: 'OpenCode Architecture', summary: 'Effect-TS service composition with plugin hooks.', url: 'research://02-tech/opencode', confidence: 0.9, tags: ['opencode', 'effect-ts', 'plugins'] },

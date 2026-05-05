@@ -10,7 +10,7 @@ import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   createFieldNotesReadTool,
-  type ResearchReadDeps,
+  type FieldNotesReadDeps,
 } from './index.js';
 
 // ─── Fixture helpers ────────────────────────────────────────────────────────
@@ -107,14 +107,14 @@ No frontmatter here, just plain content.
 
 // ─── Test setup ─────────────────────────────────────────────────────────────
 
-function makeDeps(projectPath: string): ResearchReadDeps {
+function makeDeps(projectPath: string): FieldNotesReadDeps {
   return { projectPath };
 }
 
 function makeDepsWithStore(
   projectPath: string,
-  store: ResearchReadDeps['store'],
-): ResearchReadDeps {
+  store: FieldNotesReadDeps['store'],
+): FieldNotesReadDeps {
   return { projectPath, store };
 }
 
@@ -123,7 +123,7 @@ async function writeResearchFile(
   relPath: string,
   content: string,
 ): Promise<string> {
-  const baseDir = join(projectPath, '.elefant', 'markdown-db');
+  const baseDir = join(projectPath, '.elefant', 'field-notes');
   const dir = join(baseDir, relPath, '..');
   await mkdir(dir, { recursive: true });
   const fullPath = join(baseDir, relPath);
