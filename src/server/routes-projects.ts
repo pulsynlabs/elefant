@@ -132,7 +132,7 @@ export function mountProjectsCreateRoute(app: Elysia, db: Database) {
 }
 
 export function mountProjectEventsRoute(app: Elysia, sse: SseManager) {
-	return app.get('/api/projects/:id/events', ({ params, request, query }) => {
+	return app.get('/api/projects/:projectId/events', ({ params, request, query }) => {
 		// Prefer the standard header; fall back to the ?lastEventId query
 		// parameter so browser EventSource clients (which cannot set custom
 		// headers) can still resume from a known cursor.
@@ -140,7 +140,7 @@ export function mountProjectEventsRoute(app: Elysia, sse: SseManager) {
 			typeof query?.lastEventId === 'string' ? query.lastEventId : undefined;
 		const lastEventId =
 			request.headers.get('Last-Event-ID') ?? queryLastEventId ?? undefined;
-		return sse.subscribe(params.id, lastEventId);
+		return sse.subscribe(params.projectId, lastEventId);
 	});
 }
 
@@ -160,20 +160,20 @@ const ProjectUpdateBodySchema = z.object({
 });
 
 export function mountProjectsUpdateRoute(app: Elysia, db: Database) {
-	return app.put('/api/projects/:id', ({ params, body, set }) => {
+	return app.put('/api/projects/:projectId', ({ params, body, set }) => {
 		const parsed = ProjectUpdateBodySchema.safeParse(body);
 		if (!parsed.success) {
 			set.status = 400;
 			return { ok: false, error: parsed.error.message };
 		}
 
-		const existing = getProjectById(db, params.id);
+		const existing = getProjectById(db, params.projectId);
 		if (!existing.ok) {
 			set.status = 404;
 			return { ok: false, error: existing.error.message };
 		}
 
-		const updated = updateProject(db, { id: params.id, ...parsed.data });
+		const updated = updateProject(db, { id: params.projectId, ...parsed.data });
 		if (!updated.ok) {
 			set.status = 500;
 			return { ok: false, error: updated.error.message };
@@ -184,14 +184,14 @@ export function mountProjectsUpdateRoute(app: Elysia, db: Database) {
 }
 
 export function mountProjectsDeleteRoute(app: Elysia, db: Database) {
-	return app.delete('/api/projects/:id', ({ params, set }) => {
-		const existing = getProjectById(db, params.id);
+	return app.delete('/api/projects/:projectId', ({ params, set }) => {
+		const existing = getProjectById(db, params.projectId);
 		if (!existing.ok) {
 			set.status = 404;
 			return { ok: false, error: existing.error.message };
 		}
 
-		const result = deleteProject(db, params.id);
+		const result = deleteProject(db, params.projectId);
 		if (!result.ok) {
 			set.status = 500;
 			return { ok: false, error: result.error.message };
@@ -204,14 +204,14 @@ export function mountProjectsDeleteRoute(app: Elysia, db: Database) {
 
 export function mountProjectsSessionsRoutes(app: Elysia, db: Database) {
 	return app
-		.get('/api/projects/:id/sessions', ({ params, set }) => {
-			const project = getProjectById(db, params.id);
+		.get('/api/projects/:projectId/sessions', ({ params, set }) => {
+			const project = getProjectById(db, params.projectId);
 			if (!project.ok) {
 				set.status = 404;
 				return { ok: false, error: project.error.message };
 			}
 
-			const sessions = listSessionsByProject(db, params.id, 10);
+			const sessions = listSessionsByProject(db, params.projectId, 10);
 			if (!sessions.ok) {
 				set.status = 500;
 				return { ok: false, error: sessions.error.message };
@@ -219,14 +219,14 @@ export function mountProjectsSessionsRoutes(app: Elysia, db: Database) {
 
 			return { ok: true, data: sessions.data.map(toSessionResponse) };
 		})
-		.post('/api/projects/:id/sessions', ({ params, body, set }) => {
+		.post('/api/projects/:projectId/sessions', ({ params, body, set }) => {
 			const parsed = SessionCreateBodySchema.safeParse(body ?? {});
 			if (!parsed.success) {
 				set.status = 400;
 				return { error: 'VALIDATION_ERROR', message: parsed.error.message };
 			}
 
-			const project = getProjectById(db, params.id);
+			const project = getProjectById(db, params.projectId);
 			if (!project.ok) {
 				set.status = 404;
 				return { ok: false, error: project.error.message };
@@ -234,7 +234,7 @@ export function mountProjectsSessionsRoutes(app: Elysia, db: Database) {
 
 			const session = insertSession(db, {
 				id: crypto.randomUUID(),
-				project_id: params.id,
+				project_id: params.projectId,
 				mode: parsed.data.mode,
 			});
 

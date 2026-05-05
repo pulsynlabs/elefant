@@ -58,8 +58,8 @@ function projectPathFromId(db: Database, projectId: string) {
 }
 
 export function mountWorktreeRoutes(app: Elysia, deps: { db: Database }): Elysia {
-	app.get('/api/projects/:id/worktrees', async ({ params, set }) => {
-		const projectPath = projectPathFromId(deps.db, params.id)
+	app.get('/api/projects/:projectId/worktrees', async ({ params, set }) => {
+		const projectPath = projectPathFromId(deps.db, params.projectId)
 		if (!projectPath.ok) {
 			set.status = 404
 			return { ok: false, error: projectPath.error }
@@ -74,7 +74,7 @@ export function mountWorktreeRoutes(app: Elysia, deps: { db: Database }): Elysia
 		return { ok: true, data: result.data }
 	})
 
-	app.post('/api/projects/:id/worktrees', async ({ params, body, set }) => {
+	app.post('/api/projects/:projectId/worktrees', async ({ params, body, set }) => {
 		const parsedBody = CreateWorktreeBodySchema.safeParse(body)
 		if (!parsedBody.success) {
 			set.status = 400
@@ -87,7 +87,7 @@ export function mountWorktreeRoutes(app: Elysia, deps: { db: Database }): Elysia
 			}
 		}
 
-		const projectPath = projectPathFromId(deps.db, params.id)
+		const projectPath = projectPathFromId(deps.db, params.projectId)
 		if (!projectPath.ok) {
 			set.status = 404
 			return { ok: false, error: projectPath.error }
@@ -109,7 +109,7 @@ export function mountWorktreeRoutes(app: Elysia, deps: { db: Database }): Elysia
 		return { ok: true, data: result.data }
 	})
 
-	app.delete('/api/projects/:id/worktrees', async ({ params, body, set }) => {
+	app.delete('/api/projects/:projectId/worktrees', async ({ params, body, set }) => {
 		const parsedBody = DeleteWorktreeBodySchema.safeParse(body)
 		if (!parsedBody.success) {
 			set.status = 400
@@ -122,7 +122,7 @@ export function mountWorktreeRoutes(app: Elysia, deps: { db: Database }): Elysia
 			}
 		}
 
-		const projectPath = projectPathFromId(deps.db, params.id)
+		const projectPath = projectPathFromId(deps.db, params.projectId)
 		if (!projectPath.ok) {
 			set.status = 404
 			return { ok: false, error: projectPath.error }
@@ -142,8 +142,8 @@ export function mountWorktreeRoutes(app: Elysia, deps: { db: Database }): Elysia
 		return { ok: true, data: null }
 	})
 
-	app.post('/api/projects/:id/worktrees/prune', async ({ params, set }) => {
-		const projectPath = projectPathFromId(deps.db, params.id)
+	app.post('/api/projects/:projectId/worktrees/prune', async ({ params, set }) => {
+		const projectPath = projectPathFromId(deps.db, params.projectId)
 		if (!projectPath.ok) {
 			set.status = 404
 			return { ok: false, error: projectPath.error }

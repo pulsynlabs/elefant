@@ -193,7 +193,7 @@ export function createApp(
 	mountTokenRoutes(baseApp as unknown as Elysia)
 
 	// Mount PTY route (MH9 — W2.T3)
-	mountPtyRoute(baseApp as unknown as Elysia)
+	mountPtyRoute(baseApp as unknown as Elysia, db)
 
 	return baseApp
 }

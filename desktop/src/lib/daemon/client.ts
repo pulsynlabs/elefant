@@ -206,6 +206,31 @@ export class DaemonClient {
 		}
 	}
 
+	/**
+	 * Fetch models for ALL configured providers using the daemon's stored
+	 * (real, unmasked) API keys. Returns a flat list of {provider, id, name}.
+	 */
+	async fetchAllProviderModels(): Promise<Array<{ provider: string; id: string; name: string }>> {
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+		try {
+			const response = await fetch(`${this.baseUrl}/api/providers/all-models`, {
+				headers: { Accept: 'application/json' },
+				signal: controller.signal,
+			});
+
+			if (!response.ok) return [];
+
+			const data = (await response.json()) as { models?: Array<{ provider: string; id: string; name: string }> };
+			return Array.isArray(data?.models) ? data.models : [];
+		} catch {
+			return [];
+		} finally {
+			clearTimeout(timeoutId);
+		}
+	}
+
 	async setVisualizeModelOverride(override: VisualizeModelOverride | null): Promise<void> {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), this.timeout);

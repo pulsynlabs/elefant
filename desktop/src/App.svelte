@@ -17,11 +17,15 @@
 	import { daemonLifecycle } from "$lib/services/daemon-lifecycle.js";
 	import { configService } from "$lib/services/config-service.js";
 	import { SHORTCUTS, matchesShortcut } from "$lib/shortcuts.js";
+	import NewSessionDialog from "./features/chat/mode-picker/NewSessionDialog.svelte";
+	import { getLastMode, setLastMode } from "./features/chat/mode-picker/last-mode.js";
+	import type { SessionMode } from "./features/chat/mode-picker/mode-picker-state.js";
+	import type { Project } from "$lib/types/project.js";
 
 	// All view imports
 	import ChatView from "./features/chat/ChatView.svelte";
 	import SettingsView from "./features/settings/SettingsView.svelte";
-	import ModelsView from "./features/models/ModelsView.svelte";
+
 	import AboutView from "./features/about/AboutView.svelte";
 	import OnboardingView from "./features/onboarding/OnboardingView.svelte";
 	import ProjectPickerView from "./features/projects/ProjectPickerView.svelte";
@@ -44,6 +48,43 @@
 	let layoutMode = $state<LayoutMode>('expanded');
 	let drawerOpen = $state(false);
 	let isDesignSystemRoute = $state(false);
+
+	// New-session dialog — lifted out of Sidebar so it renders at the
+	// top level and is never clipped by the sidebar's overflow:clip.
+	let pendingProject = $state<Project | null>(null);
+	let pendingDefaultMode = $state<SessionMode>('quick');
+	let isCreatingSession = $state(false);
+
+	function handleOpenNewSession(project: Project, defaultMode: SessionMode): void {
+		pendingProject = project;
+		pendingDefaultMode = defaultMode;
+		isCreatingSession = false;
+	}
+
+	function closeNewSessionDialog(): void {
+		pendingProject = null;
+		isCreatingSession = false;
+	}
+
+	async function confirmNewSession(mode: SessionMode): Promise<void> {
+		const project = pendingProject;
+		if (!project || isCreatingSession) return;
+		isCreatingSession = true;
+
+		if (projectsStore.activeProjectId !== project.id) {
+			await projectsStore.selectProject(project.id);
+		}
+
+		try {
+			await projectsStore.createSession(project.id, { mode });
+			setLastMode(project.id, mode);
+			chatStore.clearConversation();
+			navigationStore.navigate('chat');
+			closeNewSessionDialog();
+		} catch {
+			isCreatingSession = false;
+		}
+	}
 
 	// Right session panel (SPEC MH1, MH9, MH2). Driven by the persistence
 	// store; the in-chat topbar toggle (ChatView.svelte) flips
@@ -71,6 +112,8 @@
 							realProviders.map((p) => p.name),
 							config.defaultProvider || realProviders[0].name,
 						);
+						// Load all available models for the model selector
+						void chatStore.loadAvailableModels(realProviders);
 					}
 				}
 			});
@@ -165,6 +208,7 @@
 							realProviders.map((p) => p.name),
 							config.defaultProvider || realProviders[0].name,
 						);
+						void chatStore.loadAvailableModels(realProviders);
 						await projectsStore.loadProjects();
 					}
 					return;
@@ -262,7 +306,7 @@
 {:else}
 	<AppShell {layoutMode} {rightPanelOpen}>
 		{#snippet sidebar()}
-			<Sidebar collapsed={layoutMode === 'collapsed'} />
+			<Sidebar collapsed={layoutMode === 'collapsed'} onOpenNewSession={handleOpenNewSession} />
 		{/snippet}
 
 		{#snippet topbar()}
@@ -315,23 +359,19 @@
 			<ProjectPickerView onProjectSelected={() => {
 				navigationStore.navigate("chat");
 			}} />
-		{:else if projectsStore.activeProjectId === null && ["settings", "models", "about"].includes(navigationStore.current)}
-			<!-- Global views work even without an active project -->
-			{#if navigationStore.current === "settings"}
-				<SettingsView />
-			{:else if navigationStore.current === "models"}
-				<ModelsView />
-			{:else if navigationStore.current === "about"}
-				<AboutView />
-			{/if}
+	{:else if projectsStore.activeProjectId === null && ["settings", "about"].includes(navigationStore.current)}
+		<!-- Global views work even without an active project -->
+		{#if navigationStore.current === "settings"}
+			<SettingsView />
+		{:else if navigationStore.current === "about"}
+			<AboutView />
+		{/if}
 		{:else if currentView === "projects"}
 			<ProjectPickerView />
 		{:else if currentView === "chat"}
 			<ChatView />
 		{:else if currentView === "settings"}
 			<SettingsView />
-		{:else if currentView === "models"}
-			<ModelsView />
 		{:else if currentView === "about"}
 			<AboutView />
 		{:else if currentView === "agent-config"}
@@ -409,6 +449,18 @@
 
 	<!-- Floating tool-call approval overlay (shown when daemon requests user decision) -->
 	<ApprovalPanel />
+
+	<!-- New-session dialog — rendered here (top-level) so position:fixed
+	     is never clipped by the sidebar's overflow:clip stacking context. -->
+	{#if pendingProject}
+		<NewSessionDialog
+			projectName={pendingProject.name}
+			defaultMode={pendingDefaultMode}
+			isCreating={isCreatingSession}
+			onCreate={confirmNewSession}
+			onCancel={closeNewSessionDialog}
+		/>
+	{/if}
 {/if}
 
 <style>

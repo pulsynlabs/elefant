@@ -1,4 +1,7 @@
-import { Store } from "@tauri-apps/plugin-store";
+// @tauri-apps/plugin-store is loaded dynamically to avoid Vite pre-bundling
+// Tauri-specific modules, which causes 504 errors in dev mode.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+type TauriStore = Awaited<ReturnType<typeof import('@tauri-apps/plugin-store').Store.load>>;
 
 type Theme = "dark" | "light";
 
@@ -9,11 +12,16 @@ const DEFAULT_THEME: Theme = "dark";
 // Reactive theme state using Svelte 5 runes
 let theme = $state<Theme>(DEFAULT_THEME);
 
-let store: Store | null = null;
+let store: TauriStore | null = null;
 
-async function getStore(): Promise<Store> {
+async function getStore(): Promise<TauriStore | null> {
 	if (!store) {
-		store = await Store.load(STORE_KEY + ".json");
+		try {
+			const { Store } = await import("@tauri-apps/plugin-store");
+			store = await Store.load(STORE_KEY + ".json");
+		} catch {
+			return null;
+		}
 	}
 	return store;
 }
@@ -29,7 +37,7 @@ export function isDark(): boolean {
 export async function initTheme(): Promise<void> {
 	try {
 		const s = await getStore();
-		const savedTheme = await s.get<Theme>(THEME_KEY);
+		const savedTheme = s ? await s.get<Theme>(THEME_KEY) : null;
 		if (savedTheme === "dark" || savedTheme === "light") {
 			theme = savedTheme;
 		} else {
@@ -54,8 +62,10 @@ export async function toggleTheme(): Promise<void> {
 	applyTheme(theme);
 	try {
 		const s = await getStore();
-		await s.set(THEME_KEY, theme);
-		await s.save();
+		if (s) {
+			await s.set(THEME_KEY, theme);
+			await s.save();
+		}
 	} catch {
 		// Store not available (e.g., in browser dev), silently ignore
 	}
@@ -66,8 +76,10 @@ export async function setTheme(newTheme: Theme): Promise<void> {
 	applyTheme(theme);
 	try {
 		const s = await getStore();
-		await s.set(THEME_KEY, theme);
-		await s.save();
+		if (s) {
+			await s.set(THEME_KEY, theme);
+			await s.save();
+		}
 	} catch {
 		// Silent
 	}

@@ -3,6 +3,11 @@
 	import type { Snippet } from "svelte";
 	import { commandsStore } from "$lib/stores/commands.svelte.js";
 
+	const RIGHT_PANEL_MIN = 240;
+	const RIGHT_PANEL_MAX = 600;
+	const RIGHT_PANEL_DEFAULT = 320;
+	const LS_KEY = 'elefant.rightPanelWidth';
+
 	type Props = {
 		sidebar?: Snippet;
 		topbar?: Snippet;
@@ -21,22 +26,52 @@
 		layoutMode = 'expanded',
 	}: Props = $props();
 
+	// Persisted panel width, restored from localStorage on mount.
+	let rightPanelWidth = $state(RIGHT_PANEL_DEFAULT);
+
 	// The right panel is an inline grid column on desktop only.
-	// On mobile (≤640px) the panel is rendered as a separate bottom sheet
-	// outside this shell — see SPEC MH10. We never widen the grid in
-	// mobileOverlay mode, regardless of `rightPanelOpen`, so the chat
-	// content keeps the full viewport width when a mobile sheet is open
-	// underneath.
 	const rightPanelInlineOpen = $derived(
 		rightPanelOpen && rightPanel !== undefined && layoutMode !== 'mobileOverlay',
 	);
 
-	// Pre-fetch slash commands so the completion overlay has data
-	// immediately when the user first types `/`. Without this the
-	// overlay mounts with an empty list and renders nothing on the
-	// initial keystroke. Fire-and-forget — the store deduplicates
-	// concurrent calls and never throws to the UI.
+	// ── Drag-to-resize ────────────────────────────────────────────────────
+	let isDragging = $state(false);
+	let dragStartX = 0;
+	let dragStartWidth = 0;
+
+	function startResize(event: MouseEvent) {
+		event.preventDefault();
+		isDragging = true;
+		dragStartX = event.clientX;
+		dragStartWidth = rightPanelWidth;
+
+		function onMove(e: MouseEvent) {
+			// Dragging left (smaller clientX) = wider panel
+			const delta = dragStartX - e.clientX;
+			rightPanelWidth = Math.min(RIGHT_PANEL_MAX, Math.max(RIGHT_PANEL_MIN, dragStartWidth + delta));
+		}
+
+		function onUp() {
+			isDragging = false;
+			try { localStorage.setItem(LS_KEY, String(rightPanelWidth)); } catch {}
+			window.removeEventListener('mousemove', onMove);
+			window.removeEventListener('mouseup', onUp);
+		}
+
+		window.addEventListener('mousemove', onMove);
+		window.addEventListener('mouseup', onUp);
+	}
+
 	onMount(() => {
+		// Restore persisted width
+		try {
+			const stored = localStorage.getItem(LS_KEY);
+			if (stored) {
+				const n = Number(stored);
+				if (n >= RIGHT_PANEL_MIN && n <= RIGHT_PANEL_MAX) rightPanelWidth = n;
+			}
+		} catch {}
+
 		void commandsStore.load();
 	});
 </script>
@@ -46,15 +81,15 @@
 	class:mode-collapsed={layoutMode === 'collapsed'}
 	class:mode-mobile={layoutMode === 'mobileOverlay'}
 	class:has-right-panel={rightPanelInlineOpen}
+	class:is-resizing={isDragging}
+	style={rightPanelInlineOpen ? `--right-panel-width: ${rightPanelWidth}px` : undefined}
 >
 	<!-- Sidebar — Quire md surface (bound editorial sheet, no blur) -->
 	<aside class="sidebar quire-md" aria-label="Navigation sidebar">
 		{@render sidebar?.()}
 	</aside>
 
-	<!-- Main area: topbar + content. Topbar deliberately lives inside the
-	     main column so it never spans across the right panel — the right
-	     panel renders its own header (added in W1.T2). -->
+	<!-- Main area: topbar + content. -->
 	<div class="main-area">
 		<header class="topbar quire-sm" aria-label="Application toolbar">
 			{@render topbar?.()}
@@ -64,15 +99,20 @@
 		</main>
 	</div>
 
-	<!-- Right panel — optional 3rd inline column. Only rendered on desktop
-	     (≥641px) and only when the consumer passes both `rightPanel` and
-	     `rightPanelOpen=true`. On mobile (≤640px) the panel is rendered
-	     as a fixed bottom sheet outside this shell (see SPEC MH10). -->
+	<!-- Right panel — optional 3rd inline column. Only rendered on desktop. -->
 	{#if rightPanelInlineOpen}
 		<aside
 			class="right-panel"
 			aria-label="Session panel"
 		>
+			<!-- Drag handle — sits on the left edge of the panel -->
+			<div
+				class="resize-handle"
+				role="separator"
+				aria-label="Resize session panel"
+				aria-orientation="vertical"
+				onmousedown={startResize}
+			></div>
 			{@render rightPanel?.()}
 		</aside>
 	{/if}
@@ -102,37 +142,35 @@
 		position: relative;
 	}
 
-	/* Single fluid indigo ambient field — position: fixed so it covers the
-	   entire viewport behind every layer. Orbs in child views (e.g. hero)
-	   must NOT use overflow:hidden or isolation:isolate so they bleed
-	   into each other and into this gradient without a hard seam. */
+	/* Single fluid indigo ambient field. Pre-resolved to rgba so the GPU
+	   compositor doesn't recompute oklch color-mix on every frame. The
+	   pseudo-element is promoted to its own compositing layer via
+	   will-change so the browser never re-paints it during grid transitions. */
 	.app-shell::before {
 		content: '';
 		position: fixed;
 		inset: 0;
 		pointer-events: none;
 		z-index: 0;
+		will-change: transform;
 		background:
-			/* Primary bloom: top-center, tall enough to reach the fold */
 			radial-gradient(
 				ellipse 1400px 1000px at 50% -5%,
-				color-mix(in oklch, var(--color-primary) 18%, transparent) 0%,
-				color-mix(in oklch, var(--color-primary) 10%, transparent) 25%,
-				color-mix(in oklch, var(--color-primary) 4%, transparent) 55%,
+				rgba(64, 73, 225, 0.18) 0%,
+				rgba(64, 73, 225, 0.10) 25%,
+				rgba(64, 73, 225, 0.04) 55%,
 				transparent 85%
 			),
-			/* Left mid-bloom — anchors the left side */
 			radial-gradient(
 				ellipse 900px 700px at 15% 35%,
-				color-mix(in oklch, var(--color-primary) 10%, transparent) 0%,
-				color-mix(in oklch, var(--color-primary) 4%, transparent) 45%,
+				rgba(64, 73, 225, 0.10) 0%,
+				rgba(64, 73, 225, 0.04) 45%,
 				transparent 80%
 			),
-			/* Right accent — subtle tint near top-right */
 			radial-gradient(
 				ellipse 700px 600px at 85% 15%,
-				color-mix(in oklch, var(--color-primary) 8%, transparent) 0%,
-				color-mix(in oklch, var(--color-primary) 3%, transparent) 45%,
+				rgba(64, 73, 225, 0.08) 0%,
+				rgba(64, 73, 225, 0.03) 45%,
 				transparent 78%
 			);
 	}
@@ -176,13 +214,12 @@
 		display: flex;
 		flex-direction: column;
 		overflow: clip;
-		/* Match the shell's dual-declaration so the sidebar tracks the
-		   dynamic viewport on mobile browsers without layout shift. */
 		height: 100vh;
 		height: 100dvh;
 		position: relative;
 		z-index: var(--z-sticky);
 		transition: width var(--transition-spring);
+		will-change: transform;
 	}
 
 	/* Sidebar override — transparent to let the single AppShell gradient show through.
@@ -241,10 +278,7 @@
 		background: transparent;
 	}
 
-	/* Right panel column — sits at column 3 / 4. Has its own internal
-	   header/footer (rendered by the consumer via the `rightPanel` snippet);
-	   AppShell is purely the layout slot. The leading hairline border
-	   matches the trailing border on .sidebar for visual symmetry. */
+	/* Right panel column — sits at column 3 / 4. */
 	.right-panel {
 		grid-row: 1 / 2;
 		grid-column: 3 / 4;
@@ -257,6 +291,44 @@
 		z-index: var(--z-sticky);
 		background-color: var(--surface-substrate);
 		border-left: 1px solid var(--border-edge);
+		will-change: transform;
+	}
+
+	/* Drag handle — a 5px invisible hit zone on the left edge of the panel.
+	   The visible 1px line is the panel's border-left; this element sits
+	   on top of it so the cursor changes to col-resize without a second
+	   visual bar appearing. */
+	.resize-handle {
+		position: absolute;
+		left: -3px;
+		top: 0;
+		bottom: 0;
+		width: 7px;
+		cursor: col-resize;
+		z-index: calc(var(--z-sticky) + 1);
+		/* Subtle hover affordance — a faint indigo tint on the hairline */
+		transition: background-color var(--duration-fast) var(--ease-out-expo);
+	}
+
+	.resize-handle:hover {
+		background-color: rgba(64, 73, 225, 0.30);
+	}
+
+	/* While dragging: disable text selection, kill the spring transition
+	   so the panel tracks the cursor without lag, and switch cursor. */
+	.app-shell.is-resizing {
+		cursor: col-resize;
+		user-select: none;
+		transition: none;
+	}
+
+	.app-shell.is-resizing * {
+		pointer-events: none;
+	}
+
+	/* The handle itself still needs pointer events while dragging */
+	.app-shell.is-resizing .resize-handle {
+		pointer-events: auto;
 	}
 
 	@media (max-width: 900px) {

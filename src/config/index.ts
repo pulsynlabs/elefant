@@ -15,6 +15,8 @@ export {
 	skillsConfigSchema,
 	fieldNotesConfigSchema,
 	fieldNotesProviderConfigSchema,
+	visualizeModelOverrideSchema,
+	agentsMdConfigSchema,
 	BUNDLED_REGISTRIES,
 } from './schema.ts';
 export type {
@@ -33,6 +35,8 @@ export type {
 	SkillsConfig,
 	FieldNotesConfig,
 	FieldNotesProviderConfig,
+	VisualizeModelOverride,
+	AgentsMdConfig,
 } from './schema.ts';
 export {
 	ConfigManager,

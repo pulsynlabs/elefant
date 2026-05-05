@@ -236,7 +236,7 @@ export class AnthropicCompatibleAdapter implements ProviderAdapter {
 
 		const endpoint = buildAnthropicEndpoint(this.config.baseURL)
 		const requestBody: Record<string, unknown> = {
-			model: this.config.model,
+			model: options?.model || this.config.model,
 			messages: normalizedMessages.messages,
 			tools: toAnthropicTools(tools),
 			stream: true,

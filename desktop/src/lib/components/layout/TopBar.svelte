@@ -26,14 +26,17 @@
 		isDesktop = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
 	});
 
-	// W6.T2 (MH10): mobile-only right-panel toggle. The desktop equivalent
-	// lives inside ChatView (floating top-right of the chat surface) and is
-	// hidden via CSS at ≤640px so this topbar affordance owns the mobile
-	// path. Gated on layoutMode + activeSessionId so the button never
-	// appears on desktop OR without a session in scope.
 	const activeSessionId = $derived(projectsStore.activeSessionId);
+
+	// Mobile-only right-panel toggle (bottom-sheet path).
 	const showMobilePanelToggle = $derived(
 		layoutMode === 'mobileOverlay' && activeSessionId !== null,
+	);
+
+	// Desktop right-panel toggle — shown whenever a session is active on
+	// non-mobile layouts. Sits next to ThemeToggle in the topbar.
+	const showDesktopPanelToggle = $derived(
+		layoutMode !== 'mobileOverlay' && activeSessionId !== null,
 	);
 
 	// Compact context-window indicator shown when the panel sheet is closed
@@ -60,6 +63,23 @@
 	<div class="topbar-spacer"></div>
 
 	{@render children?.()}
+
+	{#if showDesktopPanelToggle}
+		<button
+			type="button"
+			class="sidebar-toggle"
+			onclick={() => rightPanelStore.togglePanel()}
+			aria-label="Toggle session panel"
+			aria-expanded={rightPanelStore.panelOpen}
+			title={rightPanelStore.panelOpen ? 'Hide session panel' : 'Show session panel'}
+		>
+			<HugeiconsIcon
+				icon={rightPanelStore.panelOpen ? PanelRightCloseIcon : PanelRightIcon}
+				size={16}
+				strokeWidth={1.5}
+			/>
+		</button>
+	{/if}
 
 	{#if showTokenChip}
 		<button

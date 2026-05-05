@@ -34,6 +34,8 @@ const FALLBACK_COMMANDS: Command[] = [
 	{ trigger: '/pr-review', description: 'Review a GitHub pull request end-to-end' },
 	{ trigger: '/btw', description: 'Ask a question in side context without polluting main history' },
 	{ trigger: '/back', description: 'Return to the main conversation from side context' },
+	{ trigger: '/undo', description: 'Undo the last message pair and restore the prompt to the input' },
+	{ trigger: '/redo', description: 'Redo the last undone message pair' },
 ];
 
 let commands = $state<Command[]>([]);
