@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * ResearchBaseTab — Settings → Research Base
+	 * FieldNotesTab — Settings → Field Notes
 	 *
 	 * Six sections, top-to-bottom:
 	 *   1. Vector Index toggle — gates the rest of the controls
@@ -8,25 +8,27 @@
 	 *   3. Hardware — read-only profile + recommended-tier shortcut
 	 *   4. Index Stats — totals + reindex action with progress
 	 *   5. Editor Override — optional path to an editor binary
-	 *   6. Open Folder — reveals the .elefant/markdown-db/ directory
+	 *   6. Open Folder — reveals the .elefant/field-notes/ directory
 	 *
 	 * All persistence flows through `PUT /api/config` with the `research`
-	 * block. Saves debounce 800 ms after any field change. The component is
-	 * defensive when no project is selected, when the daemon is offline,
-	 * and when the research config block has not yet been written.
+	 * block. (The on-disk config key remains `research` for backward
+	 * compatibility — only the product surface is renamed.) Saves
+	 * debounce 800 ms after any field change. The component is defensive
+	 * when no project is selected, when the daemon is offline, and when
+	 * the config block has not yet been written.
 	 */
 
 	import { onMount, onDestroy } from 'svelte';
 	import { configService } from '$lib/services/config-service.js';
-	import { researchClient } from '$lib/daemon/research-client.js';
+	import { fieldNotesClient } from '$lib/daemon/fieldnotes-client.js';
 	import { projectsStore } from '$lib/stores/projects.svelte.js';
 	import SelectInput from '$lib/components/ui/SelectInput.svelte';
 	import { HugeiconsIcon, RefreshIcon, FolderIcon, WarningIcon } from '$lib/icons/index.js';
 	import type {
 		EmbeddingProviderName,
-		ResearchConfig,
-		ResearchProviderConfig,
-		ResearchStatus,
+		FieldNotesConfig,
+		FieldNotesProviderConfig,
+		FieldNotesStatus,
 	} from '$lib/daemon/types.js';
 
 	// ─── Provider catalog ──────────────────────────────────────────────────
@@ -61,7 +63,7 @@
 
 	// ─── Reactive state ────────────────────────────────────────────────────
 
-	const DEFAULT_CONFIG: ResearchConfig = {
+	const DEFAULT_CONFIG: FieldNotesConfig = {
 		enabled: true,
 		provider: 'bundled-cpu',
 		editorOverride: undefined,
@@ -76,7 +78,7 @@
 	let providerModel = $state('');
 	let bundledModelId = $state('');
 
-	let status = $state<ResearchStatus | null>(null);
+	let status = $state<FieldNotesStatus | null>(null);
 	let statusError = $state<string | null>(null);
 	let isLoadingStatus = $state(false);
 
@@ -103,8 +105,8 @@
 	const showBundledModelOverride = $derived(providerKind === 'bundled');
 	const isVectorActive = $derived(enabled && provider !== 'disabled');
 
-	const researchBasePath = $derived(
-		activeProject ? joinPath(activeProject.path, '.elefant', 'markdown-db') : null,
+	const fieldNotesPath = $derived(
+		activeProject ? joinPath(activeProject.path, '.elefant', 'field-notes') : null,
 	);
 
 	function joinPath(...parts: string[]): string {
@@ -127,11 +129,11 @@
 
 	async function loadConfig(): Promise<void> {
 		const config = await configService.readConfig();
-		const research = config?.research ?? DEFAULT_CONFIG;
-		enabled = research.enabled ?? DEFAULT_CONFIG.enabled;
-		provider = research.provider ?? DEFAULT_CONFIG.provider;
-		editorOverride = research.editorOverride ?? '';
-		const pc = research.providerConfig ?? {};
+		const fieldNotes = config?.research ?? DEFAULT_CONFIG;
+		enabled = fieldNotes.enabled ?? DEFAULT_CONFIG.enabled;
+		provider = fieldNotes.provider ?? DEFAULT_CONFIG.provider;
+		editorOverride = fieldNotes.editorOverride ?? '';
+		const pc = fieldNotes.providerConfig ?? {};
 		providerBaseUrl = pc.baseUrl ?? '';
 		providerApiKey = pc.apiKey ?? '';
 		providerModel = pc.model ?? '';
@@ -149,10 +151,10 @@
 		isLoadingStatus = true;
 		statusError = null;
 		try {
-			status = await researchClient.fetchStatus(activeProjectId);
+			status = await fieldNotesClient.fetchStatus(activeProjectId);
 		} catch (error) {
 			status = null;
-			statusError = error instanceof Error ? error.message : 'Failed to load Research status';
+			statusError = error instanceof Error ? error.message : 'Failed to load Field Notes status';
 		} finally {
 			isLoadingStatus = false;
 		}
@@ -160,8 +162,8 @@
 
 	// ─── Debounced auto-save ───────────────────────────────────────────────
 
-	function buildProviderConfig(): ResearchProviderConfig | undefined {
-		const config: ResearchProviderConfig = {};
+	function buildProviderConfig(): FieldNotesProviderConfig | undefined {
+		const config: FieldNotesProviderConfig = {};
 		if (showLocalHttpFields && providerBaseUrl.trim() !== '') {
 			config.baseUrl = providerBaseUrl.trim();
 		}
@@ -197,7 +199,7 @@
 		saveStatus = 'saving';
 		saveMessage = '';
 
-		const research: ResearchConfig = {
+		const fieldNotes: FieldNotesConfig = {
 			enabled,
 			provider,
 			editorOverride: editorOverride.trim() === '' ? undefined : editorOverride.trim(),
@@ -205,7 +207,7 @@
 		};
 
 		try {
-			await configService.updateConfig({ research });
+			await configService.updateConfig({ research: fieldNotes });
 			dirty = false;
 			saveStatus = 'saved';
 			saveMessage = 'Saved';
@@ -225,7 +227,7 @@
 		reindexState = 'starting';
 		reindexMessage = '';
 		try {
-			await researchClient.reindex(activeProjectId);
+			await fieldNotesClient.reindex(activeProjectId);
 			reindexState = 'started';
 			reindexMessage = 'Reindex started — refresh status in a moment.';
 			// Give the daemon a beat and refresh stats.
@@ -249,13 +251,13 @@
 	// ─── Open Folder ───────────────────────────────────────────────────────
 
 	async function openFolder(): Promise<void> {
-		if (!researchBasePath) return;
+		if (!fieldNotesPath) return;
 		try {
 			const tauri = (window as unknown as {
 				__TAURI__?: { shell?: { open: (target: string) => Promise<void> } };
 			}).__TAURI__;
 			if (tauri?.shell?.open) {
-				await tauri.shell.open(researchBasePath);
+				await tauri.shell.open(fieldNotesPath);
 				return;
 			}
 		} catch {
@@ -263,7 +265,7 @@
 		}
 		// Fallback: copy to clipboard so the user can paste it.
 		try {
-			await navigator.clipboard.writeText(researchBasePath);
+			await navigator.clipboard.writeText(fieldNotesPath);
 			copiedPath = true;
 			setTimeout(() => {
 				copiedPath = false;
@@ -307,9 +309,9 @@
 	}
 </script>
 
-<div class="research-tab">
+<div class="field-notes-tab">
 	<div class="header-row">
-		<h3 class="section-heading">Research Base</h3>
+		<h3 class="section-heading">Field Notes</h3>
 		{#if saveStatus !== 'idle'}
 			<span class="save-feedback" class:error={saveStatus === 'error'}>
 				{saveMessage || (saveStatus === 'saving' ? 'Saving…' : '')}
@@ -319,8 +321,8 @@
 
 	<p class="lede">
 		Per-project markdown knowledge garden at
-		<code>.elefant/markdown-db/</code>. Configure how research is indexed
-		and embedded.
+		<code>.elefant/field-notes/</code>. Configure how field notes are
+		indexed and embedded.
 	</p>
 
 	<!-- ── 1. Vector Index toggle ─────────────────────────────────────── -->
@@ -342,7 +344,7 @@
 		</header>
 		<p class="card-hint">
 			{#if enabled}
-				Research files are embedded into a local vector index for semantic search.
+				Field notes are embedded into a local vector index for semantic search.
 			{:else}
 				Search uses keyword matching only.
 			{/if}
@@ -584,31 +586,31 @@
 		<!-- ── 6. Open Folder ─────────────────────────────────────────────── -->
 		<section class="card">
 			<header class="card-header">
-				<h4 class="card-title">Research Folder</h4>
+				<h4 class="card-title">Field Notes Folder</h4>
 			</header>
 
-			{#if researchBasePath}
+			{#if fieldNotesPath}
 				<div class="folder-row">
 					<button type="button" class="ghost-btn" onclick={openFolder}>
 						<span class="btn-icon" aria-hidden="true">
 							<HugeiconsIcon icon={FolderIcon} size={14} strokeWidth={1.8} />
 						</span>
-						Browse research files in file manager
+						Browse field notes in file manager
 					</button>
 					{#if copiedPath}
 						<span class="save-feedback">Path copied</span>
 					{/if}
 				</div>
-				<code class="path-code" title={researchBasePath}>{researchBasePath}</code>
+				<code class="path-code" title={fieldNotesPath}>{fieldNotesPath}</code>
 			{:else}
-				<p class="card-hint">Select a project to locate its research folder.</p>
+				<p class="card-hint">Select a project to locate its field notes folder.</p>
 			{/if}
 		</section>
 	{/if}
 </div>
 
 <style>
-	.research-tab {
+	.field-notes-tab {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-5);

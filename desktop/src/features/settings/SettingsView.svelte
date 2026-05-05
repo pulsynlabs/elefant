@@ -5,7 +5,7 @@
 	import ProjectSettings from './ProjectSettings.svelte';
 	import MCPSettings from './MCPSettings.svelte';
 	import ServeSettings from './ServeSettings.svelte';
-	import ResearchBaseTab from './ResearchBaseTab.svelte';
+	import FieldNotesTab from './FieldNotesTab.svelte';
 
 	type Section =
 		| 'general'
@@ -14,7 +14,7 @@
 		| 'daemon'
 		| 'serve'
 		| 'project'
-		| 'research';
+		| 'fieldnotes';
 
 	let activeSection = $state<Section>('general');
 
@@ -22,7 +22,7 @@
 		{ id: 'general', label: 'General' },
 		{ id: 'project', label: 'Project' },
 		{ id: 'providers', label: 'Providers' },
-		{ id: 'research', label: 'Research Base' },
+		{ id: 'fieldnotes', label: 'Field Notes' },
 		{ id: 'mcp', label: 'MCP' },
 		{ id: 'daemon', label: 'Servers' },
 		{ id: 'serve', label: 'Serve' },
@@ -55,8 +55,8 @@
 				<ProjectSettings />
 			{:else if activeSection === 'providers'}
 				<ProviderSettings />
-			{:else if activeSection === 'research'}
-				<ResearchBaseTab />
+			{:else if activeSection === 'fieldnotes'}
+				<FieldNotesTab />
 			{:else if activeSection === 'mcp'}
 				<MCPSettings />
 			{:else if activeSection === 'daemon'}

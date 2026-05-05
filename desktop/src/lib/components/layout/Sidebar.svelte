@@ -41,7 +41,7 @@
 		RunsIcon,
 		WorktreesIcon,
 		SpecModeIcon,
-		ResearchIcon,
+		FieldNotesIcon,
 	} from '$lib/icons/index.js';
 	import { clearConversation } from '../../../features/chat/chat.svelte.js';
 	import { agentConfigStore } from '$lib/stores/agent-config.svelte.js';
@@ -172,7 +172,7 @@
 		| 'agent-runs'
 		| 'worktrees'
 		| 'spec-mode'
-		| 'research';
+		| 'fieldnotes';
 
 	type BottomNavItem = {
 		id: NavItemId;
@@ -185,7 +185,7 @@
 		{ id: 'agent-config', label: 'Agent Config', icon: AgentsIcon },
 		{ id: 'agent-runs', label: 'Runs', icon: RunsIcon },
 		{ id: 'spec-mode', label: 'Spec', icon: SpecModeIcon },
-		{ id: 'research', label: 'Research', icon: ResearchIcon },
+		{ id: 'fieldnotes', label: 'Field Notes', icon: FieldNotesIcon },
 		{ id: 'worktrees', label: 'Worktrees', icon: WorktreesIcon },
 	];
 

@@ -30,7 +30,7 @@
 	import WorktreeListPanel from "./features/worktrees/WorktreeListPanel.svelte";
 	import ChildRunView from "./features/agent-runs/ChildRunView.svelte";
 	import { SpecModeView } from "./features/spec-mode/index.js";
-	import { ResearchView } from "./features/research/index.js";
+	import { FieldNotesView } from "./features/fieldnotes/index.js";
 	import { RightPanel, RightPanelMobile, TokenBar, rightPanelStore } from "./features/right-panel/index.js";
 
 	type NavigationRuntime = typeof navigationStore & {
@@ -342,8 +342,8 @@
 			<WorktreeListPanel />
 		{:else if currentView === "spec-mode"}
 			<SpecModeView />
-		{:else if currentView === "research"}
-			<ResearchView />
+		{:else if currentView === "fieldnotes"}
+			<FieldNotesView />
 		{:else if currentView === "child-run" && navigationStore.currentChildRunId !== null}
 			<ChildRunView runId={navigationStore.currentChildRunId} />
 		{:else}
