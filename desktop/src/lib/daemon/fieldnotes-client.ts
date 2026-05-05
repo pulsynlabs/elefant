@@ -1,10 +1,10 @@
 /**
- * Research client — thin wrapper over `/v1/research/*` daemon routes.
+ * Field Notes client — thin wrapper over `/v1/fieldnotes/*` daemon routes.
  *
  * The desktop never talks to the file system or vector index directly; every
  * operation goes through the daemon so a single source of truth (project
  * membership, traversal guards, embedding-provider state) is enforced server
- * side. This client gives the Research View, Settings tab, and chat chip
+ * side. This client gives the Field Notes View, Settings tab, and chat chip
  * renderer a consistent typed surface.
  *
  * The shapes here are mirrored from the server module — kept in sync by
@@ -16,26 +16,26 @@
 
 import { getDaemonClient } from './client.js';
 import type {
-	ResearchFile,
-	ResearchSearchOptions,
-	ResearchSearchResult,
-	ResearchStatus,
-	ResearchTree,
+	FieldNotesFile,
+	FieldNotesSearchOptions,
+	FieldNotesSearchResult,
+	FieldNotesStatus,
+	FieldNotesTree,
 } from './types.js';
 
-// Re-export the research-shaped types so callers can import everything
-// related to the research surface from one place. Sibling components
-// (TreePane, ReaderPane, research-store) consume these via this module
+// Re-export the field-notes-shaped types so callers can import everything
+// related to the field-notes surface from one place. Sibling components
+// (TreePane, ReaderPane, fieldnotes-store) consume these via this module
 // instead of reaching into `./types.js` directly.
 export type {
-	ResearchFile,
-	ResearchSearchMode,
-	ResearchSearchOptions,
-	ResearchSearchResult,
-	ResearchStatus,
-	ResearchTree,
-	ResearchTreeFile,
-	ResearchTreeSection,
+	FieldNotesFile,
+	FieldNotesSearchMode,
+	FieldNotesSearchOptions,
+	FieldNotesSearchResult,
+	FieldNotesStatus,
+	FieldNotesTree,
+	FieldNotesTreeFile,
+	FieldNotesTreeSection,
 } from './types.js';
 
 function baseUrl(): string {
@@ -59,23 +59,23 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
 	return (await res.json()) as T;
 }
 
-/** Fetch the Research Base health/status snapshot for a project. */
-export async function fetchStatus(projectId: string): Promise<ResearchStatus> {
-	const url = `/v1/research/status?projectId=${encodeURIComponent(projectId)}`;
-	return jsonFetch<ResearchStatus>(url);
+/** Fetch the Field Notes health/status snapshot for a project. */
+export async function fetchStatus(projectId: string): Promise<FieldNotesStatus> {
+	const url = `/v1/fieldnotes/status?projectId=${encodeURIComponent(projectId)}`;
+	return jsonFetch<FieldNotesStatus>(url);
 }
 
 /** Trigger a full reindex for a project. Returns once the daemon accepts the job. */
 export async function reindex(projectId: string): Promise<{ started: boolean }> {
-	return jsonFetch<{ started: boolean }>('/v1/research/reindex', {
+	return jsonFetch<{ started: boolean }>('/v1/fieldnotes/reindex', {
 		method: 'POST',
 		body: JSON.stringify({ projectId }),
 	});
 }
 
 /**
- * Ask the daemon to launch the user's external editor on the given research
- * file. Returns the daemon's response envelope (`launched`, optional
+ * Ask the daemon to launch the user's external editor on the given field
+ * note. Returns the daemon's response envelope (`launched`, optional
  * `command`/`error` strings) so the UI can surface a meaningful message
  * without throwing on every editor failure.
  */
@@ -83,7 +83,7 @@ export async function openInEditor(
 	projectId: string,
 	filePath: string,
 ): Promise<{ launched: boolean; command?: string; error?: string }> {
-	const res = await fetch(`${baseUrl()}/v1/research/open-in-editor`, {
+	const res = await fetch(`${baseUrl()}/v1/fieldnotes/open-in-editor`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ projectId, path: filePath }),
@@ -98,19 +98,19 @@ export async function openInEditor(
 }
 
 /**
- * Fetch the section/folder tree for a project's Research Base.
+ * Fetch the section/folder tree for a project's Field Notes.
  *
  * The tree is computed on-demand from disk on every call, so it always
  * reflects the latest state. Caching is the caller's responsibility (see
- * `research-store.svelte.ts`).
+ * `fieldnotes-store.svelte.ts`).
  */
-export async function getTree(projectId: string): Promise<ResearchTree> {
-	const url = `/v1/research/tree?projectId=${encodeURIComponent(projectId)}`;
-	return jsonFetch<ResearchTree>(url);
+export async function getTree(projectId: string): Promise<FieldNotesTree> {
+	const url = `/v1/fieldnotes/tree?projectId=${encodeURIComponent(projectId)}`;
+	return jsonFetch<FieldNotesTree>(url);
 }
 
 /**
- * Fetch a single research file by section-relative path.
+ * Fetch a single field note by section-relative path.
  *
  * @param meta When true, the daemon skips the markdown→HTML render and
  *   returns only the frontmatter + raw body. Useful for chip-style previews
@@ -120,15 +120,15 @@ export async function getFile(
 	projectId: string,
 	path: string,
 	meta = false,
-): Promise<ResearchFile> {
+): Promise<FieldNotesFile> {
 	const params = new URLSearchParams({ projectId, path });
 	if (meta) params.set('meta', 'true');
-	const url = `/v1/research/file?${params.toString()}`;
-	return jsonFetch<ResearchFile>(url);
+	const url = `/v1/fieldnotes/file?${params.toString()}`;
+	return jsonFetch<FieldNotesFile>(url);
 }
 
 /**
- * Run a Research Base search.
+ * Run a Field Notes search.
  *
  * Defaults to `hybrid` mode server-side; pass `mode: 'keyword'` to force
  * pure ripgrep/FTS5 lookup. The daemon transparently degrades semantic /
@@ -141,18 +141,18 @@ export async function getFile(
 export async function search(
 	projectId: string,
 	query: string,
-	opts: ResearchSearchOptions = {},
-): Promise<ResearchSearchResult[]> {
+	opts: FieldNotesSearchOptions = {},
+): Promise<FieldNotesSearchResult[]> {
 	const data = await jsonFetch<
-		ResearchSearchResult[] | { results: ResearchSearchResult[] }
-	>('/v1/research/search', {
+		FieldNotesSearchResult[] | { results: FieldNotesSearchResult[] }
+	>('/v1/fieldnotes/search', {
 		method: 'POST',
 		body: JSON.stringify({ projectId, query, ...opts }),
 	});
 	return Array.isArray(data) ? data : data.results;
 }
 
-export const researchClient = {
+export const fieldNotesClient = {
 	fetchStatus,
 	reindex,
 	openInEditor,

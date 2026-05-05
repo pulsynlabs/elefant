@@ -155,18 +155,18 @@ export type EmbeddingProviderName =
 	| 'google'
 	| 'disabled';
 
-export interface ResearchProviderConfig {
+export interface FieldNotesProviderConfig {
 	baseUrl?: string;
 	apiKey?: string;
 	model?: string;
 	bundledModelId?: string;
 }
 
-export interface ResearchConfig {
+export interface FieldNotesConfig {
 	enabled: boolean;
 	provider: EmbeddingProviderName;
 	editorOverride?: string;
-	providerConfig?: ResearchProviderConfig;
+	providerConfig?: FieldNotesProviderConfig;
 }
 
 export interface ElefantConfig {
@@ -176,10 +176,10 @@ export interface ElefantConfig {
 	logLevel: LogLevel;
 	hardwareAccelerationDisabled?: boolean;
 	visualizeModelOverride?: VisualizeModelOverride | null;
-	research?: ResearchConfig;
+	research?: FieldNotesConfig;
 }
 
-export interface ResearchHardwareProfile {
+export interface FieldNotesHardwareProfile {
 	ramGB: number;
 	cpuCores: number;
 	hasGPU: boolean;
@@ -190,14 +190,14 @@ export interface ResearchHardwareProfile {
 
 export type RecommendedTier = 'bundled-large' | 'bundled-gpu' | 'bundled-cpu';
 
-export interface ResearchStatus {
+export interface FieldNotesStatus {
 	projectId: string;
 	provider: EmbeddingProviderName;
 	providerIsLocal: boolean;
 	embeddingDim: number;
 	vectorEnabled: boolean;
 	recommendedTier: RecommendedTier | null;
-	hardware: ResearchHardwareProfile | null;
+	hardware: FieldNotesHardwareProfile | null;
 	totalDocs: number;
 	totalChunks: number;
 	lastIndexedAt: string | null;
@@ -206,13 +206,13 @@ export interface ResearchStatus {
 	indexExists: boolean;
 }
 
-// ─── Research tree, file, and search shapes ─────────────────────────────────
+// ─── Field Notes tree, file, and search shapes ─────────────────────────────
 //
-// Mirror the payloads served by `src/server/routes-research.ts`. Frontmatter
+// Mirror the payloads served by `src/server/routes-fieldnotes.ts`. Frontmatter
 // is a permissive shape because the canonical Zod-validated definition lives
 // in the daemon and the desktop only needs a handful of fields.
 
-export interface ResearchFrontmatter {
+export interface FieldNotesFrontmatter {
 	id?: string | null;
 	title?: string;
 	section?: string;
@@ -227,7 +227,7 @@ export interface ResearchFrontmatter {
 	[key: string]: unknown;
 }
 
-export interface ResearchTreeFile {
+export interface FieldNotesTreeFile {
 	name: string;
 	/** Section-relative path, e.g. `02-tech/sqlite-vec.md`. */
 	path: string;
@@ -236,50 +236,50 @@ export interface ResearchTreeFile {
 	tags: string[];
 	confidence: string;
 	updated: string;
-	research_link: string;
+	fieldnotes_link: string;
 }
 
-export interface ResearchTreeSection {
+export interface FieldNotesTreeSection {
 	/** Folder name, e.g. `02-tech`. */
 	name: string;
 	/** Human label, e.g. `Tech`. */
 	label: string;
-	files: ResearchTreeFile[];
+	files: FieldNotesTreeFile[];
 }
 
-export interface ResearchTree {
-	sections: ResearchTreeSection[];
+export interface FieldNotesTree {
+	sections: FieldNotesTreeSection[];
 	/** ISO-8601 timestamp of when the tree was assembled. */
 	lastRefreshed: string;
 }
 
-export interface ResearchFile {
+export interface FieldNotesFile {
 	path: string;
-	frontmatter: ResearchFrontmatter;
+	frontmatter: FieldNotesFrontmatter;
 	/** Sanitized HTML rendered by the daemon. Empty when `meta=true`. */
 	html: string;
 	rawBody: string;
-	research_link: string;
+	fieldnotes_link: string;
 }
 
-export interface ResearchSearchResult {
+export interface FieldNotesSearchResult {
 	path: string;
 	section: string;
 	title: string;
 	summary: string;
 	score: number;
 	snippet: string;
-	frontmatter: ResearchFrontmatter;
-	research_link: string;
+	frontmatter: FieldNotesFrontmatter;
+	fieldnotes_link: string;
 }
 
-export type ResearchSearchMode = 'semantic' | 'keyword' | 'hybrid';
+export type FieldNotesSearchMode = 'semantic' | 'keyword' | 'hybrid';
 
-export interface ResearchSearchOptions {
+export interface FieldNotesSearchOptions {
 	k?: number;
 	section?: string;
 	tags?: string[];
-	mode?: ResearchSearchMode;
+	mode?: FieldNotesSearchMode;
 	minScore?: number;
 }
 
