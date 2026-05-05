@@ -6,7 +6,6 @@ import {
 	configSchema,
 	providerSchema,
 	toolPolicyConfigSchema,
-	agentRuntimeLimitsSchema,
 	agentBehaviorConfigSchema,
 	agentProfileSchema,
 	defaultAgentProfiles,
@@ -261,7 +260,7 @@ describe("configSchema", () => {
 			providers: [],
 			defaultProvider: '',
 			agents: {
-				executor: defaultAgentProfiles.executor,
+				'executor-medium': defaultAgentProfiles['executor-medium'],
 			},
 		});
 
@@ -282,7 +281,6 @@ describe("configSchema", () => {
 describe('agent config schemas', () => {
 	it('accepts valid tool policy', () => {
 		const result = toolPolicyConfigSchema.safeParse({
-			mode: 'manual',
 			allowedTools: ['read', 'glob'],
 			perToolApproval: { bash: true },
 		});
@@ -290,7 +288,7 @@ describe('agent config schemas', () => {
 		expect(result.success).toBe(true);
 	});
 
-	it('fails tool policy for invalid enum', () => {
+	it('fails tool policy for unknown field in strict mode', () => {
 		const result = toolPolicyConfigSchema.safeParse({
 			mode: 'invalid',
 		});
@@ -298,29 +296,14 @@ describe('agent config schemas', () => {
 		expect(result.success).toBe(false);
 	});
 
-	it('fails runtime limits for wrong type', () => {
-		const result = agentRuntimeLimitsSchema.safeParse({
-			maxIterations: '10',
-			timeoutMs: 1000,
-			maxConcurrency: 1,
-		});
-
-		expect(result.success).toBe(false);
-	});
-
 	it('fails profile when required field missing', () => {
 		const result = agentProfileSchema.safeParse({
-			id: 'executor',
+			id: 'legacy-executor',
 			kind: 'executor',
 			enabled: true,
 			behavior: {},
-			limits: {
-				maxIterations: 12,
-				timeoutMs: 30000,
-				maxConcurrency: 1,
-			},
 			tools: {
-				mode: 'auto',
+				allowedTools: ['read'],
 			},
 		});
 

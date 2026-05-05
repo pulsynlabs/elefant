@@ -38,6 +38,8 @@ describe('DaemonClient public API snapshot', () => {
 			'getProviders',
 			'fetchProviderRegistry',
 			'fetchProviderModels',
+			'fetchAllProviderModels',
+			'setVisualizeModelOverride',
 			'answerQuestion',
 			'answerSlider',
 			'fetchSessionMessages',

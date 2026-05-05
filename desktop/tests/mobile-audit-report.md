@@ -1,31 +1,10 @@
 # Mobile Audit Report
 
-**Generated:** 2026-05-04T07:52:00.890Z
+**Generated:** 2026-05-05T07:53:18.845Z
 **Viewport:** 390×844 (iPhone 14 Pro)
-**Audited:** 9 views
+**Audited:** 6 views
 
 ---
-
-## View: home
-**Status:** PASS
-**Screenshot:** tests/screenshots/mobile/home.png
-**Horizontal Scroll:** ✓ No
-**Off-Viewport Elements:** ✓ None
-**Touch Targets:** ✓ All measured targets ≥ 44×44px
-
-## View: settings
-**Status:** PASS
-**Screenshot:** tests/screenshots/mobile/settings.png
-**Horizontal Scroll:** ✓ No
-**Off-Viewport Elements:** ✓ None
-**Touch Targets:** ✓ All measured targets ≥ 44×44px
-
-## View: models
-**Status:** PASS
-**Screenshot:** tests/screenshots/mobile/models.png
-**Horizontal Scroll:** ✓ No
-**Off-Viewport Elements:** ✓ None
-**Touch Targets:** ✓ All measured targets ≥ 44×44px
 
 ## View: about
 **Status:** PASS
@@ -59,8 +38,8 @@
 
 | Metric | Count |
 |--------|-------|
-| Total views | 9 |
-| Audited | 5 |
-| Passed | 5 |
+| Total views | 6 |
+| Audited | 2 |
+| Passed | 2 |
 | Failed | 0 |
 | Skipped | 4 |

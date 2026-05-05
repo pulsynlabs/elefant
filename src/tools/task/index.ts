@@ -452,10 +452,8 @@ Use agent_session_search to query the child's full message history by runId.`,
 					runContext: childCtx,
 					sseManager,
 					provider: resolvedConfig?.provider ?? resolvedConfig?.behavior?.provider,
-					maxTokens: resolvedConfig?.limits?.maxTokens,
-					temperature: resolvedConfig?.limits?.temperature,
-					topP: resolvedConfig?.limits?.topP,
-					timeoutMs: resolvedConfig?.limits?.timeoutMs,
+					temperature: resolvedConfig?.behavior?.temperature,
+					topP: resolvedConfig?.behavior?.topP,
 				})) {
 					if (event.type === 'text_delta') {
 						pendingAssistantText += event.text

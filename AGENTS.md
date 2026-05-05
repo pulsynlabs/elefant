@@ -269,3 +269,31 @@ The chat view includes a collapsible right session panel (desktop: inline 320px 
 **Token Bar (footer):** Always-visible context window usage counter (window + session cumulative). Click to open the Context Window Visualizer treemap.
 
 **Persistence:** Panel open/closed is global; active tab is per-session (localStorage / Tauri plugin-store).
+
+---
+
+## Agent Profiles
+
+The **Agent Config** sidebar view (`desktop/src/features/agent-config/`) displays all 13 user-facing agents grouped into six functional roles:
+
+| Role Group | Agents |
+|---|---|
+| Coordination | Orchestrator |
+| Planning | Planner |
+| Research | Researcher, Explorer, Librarian |
+| Execution | Executor Low, Medium, High, Frontend |
+| Verification | Verifier, Tester, Debugger |
+| Documentation | Writer |
+
+### Model Selection
+
+Each agent card exposes a live model picker that reuses the chat composer's model store (`chatStore` from `desktop/src/features/chat/chat.svelte.ts`). Selecting a model sets `behavior.provider` and `behavior.model` on the profile.
+
+### Adding a New Agent
+
+1. Add a new profile in `src/config/schema.ts > defaultAgentProfiles`.
+2. Assign a `kind` from the daemon's `AGENT_KINDS` tuple.
+3. Update `desktop/src/lib/types/agent-config.ts > AGENT_KINDS` if the kind is new.
+4. The cross-package sync test `src/config/agent-config-sync.test.ts` will fail if the two enum sets diverge — that's the intended guard.
+5. Add a role-group assignment in `AgentProfilesView.svelte > ROLE_GROUPS`.
+6. Add an icon mapping in `AgentProfileCard.svelte > getAgentIcon()`.

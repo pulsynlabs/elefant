@@ -306,8 +306,9 @@
 								<div class="group-header quire-sm">
 									{group.provider}
 								</div>
-								<div class="group-rows">
-									{#each group.models as entry (entry.provider + ':' + entry.id)}
+							<div class="group-rows">
+								<!-- context-window hint: not available in current registry shape — add when ModelEntry exposes contextWindow field -->
+								{#each group.models as entry (entry.provider + ':' + entry.id)}
 										{@const idx = flatRows.findIndex(
 											(r) =>
 												r.kind === 'model' &&

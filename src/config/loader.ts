@@ -9,7 +9,6 @@ import {
 	defaultAgentProfiles,
 	type AgentBehaviorConfig,
 	type AgentProfile,
-	type AgentRuntimeLimits,
 	type ElefantConfig,
 	type ToolPolicyConfig,
 	type ProviderEntry,
@@ -25,9 +24,8 @@ export interface ResolvedAgentConfig extends AgentProfile {
 	_sources: Record<string, ConfigSourceLayer>;
 }
 
-export type AgentProfileOverride = Omit<Partial<AgentProfile>, 'behavior' | 'limits' | 'tools'> & {
+export type AgentProfileOverride = Omit<Partial<AgentProfile>, 'behavior' | 'tools'> & {
 	behavior?: Partial<AgentBehaviorConfig>;
-	limits?: Partial<AgentRuntimeLimits>;
 	tools?: Partial<ToolPolicyConfig>;
 };
 
@@ -59,6 +57,8 @@ const DEFAULT_CONFIG_SEARCH_PATHS = [
 	join(homedir(), '.config', 'elefant', 'elefant.config.ts'),
 	DEFAULT_GLOBAL_CONFIG_PATH,
 ];
+
+let hasWarnedLegacyExecutorProfile = false;
 
 function makeConfigError(code: ConfigError['code'], message: string, details?: unknown): ConfigError {
 	return { code, message, details };
@@ -163,6 +163,49 @@ function applyEnvOverrides(config: RawConfig): RawConfig {
 	return result;
 }
 
+function stripDeprecatedAgentFields(rawConfig: RawConfig): RawConfig {
+	if (!rawConfig.agents || !isRecord(rawConfig.agents)) {
+		return rawConfig;
+	}
+
+	const agents: Record<string, unknown> = { ...rawConfig.agents };
+
+	if ('executor' in agents) {
+		delete agents.executor;
+		if (!hasWarnedLegacyExecutorProfile) {
+			console.warn('[config] Ignoring legacy "executor" profile. Use executor-low, executor-medium, executor-high, or executor-frontend instead.');
+			hasWarnedLegacyExecutorProfile = true;
+		}
+	}
+
+	for (const profile of Object.values(agents)) {
+		if (!isRecord(profile)) {
+			continue;
+		}
+
+		if (isRecord(profile.limits)) {
+			delete profile.limits.maxIterations;
+			delete profile.limits.timeoutMs;
+			delete profile.limits.maxConcurrency;
+			delete profile.limits.maxTokens;
+			delete profile.limits;
+		}
+
+		if (isRecord(profile.behavior)) {
+			delete profile.behavior.maxTokens;
+		}
+
+		if (isRecord(profile.tools)) {
+			delete profile.tools.mode;
+		}
+	}
+
+	return {
+		...rawConfig,
+		agents: agents as Record<string, AgentProfile>,
+	};
+}
+
 export async function loadConfigFromPath(path: string): Promise<Result<ElefantConfig, ConfigError>> {
 	const loaded = path.endsWith('.ts')
 		? await loadRawTsConfig(path)
@@ -172,7 +215,8 @@ export async function loadConfigFromPath(path: string): Promise<Result<ElefantCo
 		return loaded;
 	}
 
-	const parsed = configSchema.safeParse(loaded.data);
+	const strippedConfig = stripDeprecatedAgentFields(loaded.data);
+	const parsed = configSchema.safeParse(strippedConfig);
 	if (!parsed.success) {
 		return err(
 			makeConfigError('CONFIG_INVALID', formatZodErrors(parsed.error), parsed.error.issues),
@@ -221,7 +265,6 @@ function cloneAgentProfile(profile: AgentProfile): AgentProfile {
 		toolsAllowlist: profile.toolsAllowlist ? [...profile.toolsAllowlist] : null,
 		permissions: { ...profile.permissions },
 		behavior: { ...profile.behavior },
-		limits: { ...profile.limits },
 		tools: {
 			...profile.tools,
 			allowedTools: profile.tools.allowedTools ? [...profile.tools.allowedTools] : undefined,
@@ -239,7 +282,6 @@ function cloneAgentProfileOverride(profile: AgentProfileOverride): AgentProfileO
 		toolsAllowlist: profile.toolsAllowlist ? [...profile.toolsAllowlist] : undefined,
 		permissions: profile.permissions ? { ...profile.permissions } : undefined,
 		behavior: profile.behavior ? { ...profile.behavior } : undefined,
-		limits: profile.limits ? { ...profile.limits } : undefined,
 		tools: profile.tools
 			? {
 					...profile.tools,

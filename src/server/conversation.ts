@@ -41,11 +41,8 @@ const chatRequestSchema = z.object({
 	projectId: z.string().min(1).optional(),
 	provider: z.string().min(1).optional(),
 	model: z.string().min(1).optional(),
-	maxIterations: z.number().int().positive().max(200).optional(),
-	maxTokens: z.number().int().positive().optional(),
 	temperature: z.number().min(0).max(2).optional(),
 	topP: z.number().min(0).max(1).optional(),
-	timeoutMs: z.number().int().positive().optional(),
 })
 
 const SSE_HEADERS = {
@@ -272,11 +269,8 @@ function createSSEStream(
 					tools: activeRegistry.getAll(),
 					provider: request.provider,
 					model: request.model,
-					maxIterations: request.maxIterations,
-					maxTokens: request.maxTokens,
 					temperature: request.temperature,
 					topP: request.topP,
-					timeoutMs: request.timeoutMs,
 						hookRegistry,
 						runContext: loopRunContext,
 						questionEmitter,

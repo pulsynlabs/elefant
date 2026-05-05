@@ -190,10 +190,6 @@ export class OpenAIAdapter implements ProviderAdapter {
 			requestBody.temperature = options.temperature
 		}
 
-		if (typeof options?.maxTokens === 'number') {
-			requestBody.max_tokens = options.maxTokens
-		}
-
 		if (typeof options?.topP === 'number') {
 			requestBody.top_p = options.topP
 		}
