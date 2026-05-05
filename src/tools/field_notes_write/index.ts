@@ -1,17 +1,17 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, join, relative, sep } from 'node:path';
-import type { IndexerService } from '../../research/indexer.ts';
-import { ensureResearchBase } from '../../research/init.ts';
-import { assertInsideResearchBase } from '../../research/membership.ts';
+import type { IndexerService } from '../../fieldnotes/indexer.ts';
+import { ensureFieldNotes } from '../../fieldnotes/init.ts';
+import { assertInsideFieldNotes } from '../../fieldnotes/membership.ts';
 import {
   autoFillFrontmatter,
   FrontmatterSchema,
   parseFrontmatter,
   serializeFrontmatter,
   type Frontmatter,
-} from '../../research/frontmatter.ts';
-import { serializeResearchLink } from '../../research/link.ts';
+} from '../../fieldnotes/frontmatter.ts';
+import { serializeFieldNotesLink } from '../../fieldnotes/link.ts';
 import { FIELD_NOTES_SECTIONS, fieldNotesDir } from '../../project/paths.ts';
 import type { RunContext } from '../../runs/types.ts';
 import type { ElefantError } from '../../types/errors.ts';
@@ -21,7 +21,7 @@ import type { ToolDefinition } from '../../types/tools.ts';
 type Confidence = Frontmatter['confidence'];
 type AuthorAgent = Frontmatter['author_agent'];
 
-export interface ResearchWriteParams {
+export interface FieldNotesWriteParams {
   path: string;
   title?: string;
   summary?: string;
@@ -34,23 +34,23 @@ export interface ResearchWriteParams {
   id?: string;
 }
 
-export interface ResearchWriteResult {
+export interface FieldNotesWriteResult {
   path: string;
   id: string;
   created: boolean;
-  research_link: string;
+  fieldnotes_link: string;
 }
 
-export interface ResearchWriteContext {
+export interface FieldNotesWriteContext {
   agentName?: string;
   agentType?: string;
 }
 
-export interface ResearchWriteDeps {
+export interface FieldNotesWriteDeps {
   projectPath?: string;
   currentRun?: RunContext;
   indexerService?: Pick<IndexerService, 'indexFile'>;
-  ctx?: ResearchWriteContext;
+  ctx?: FieldNotesWriteContext;
 }
 
 const WRITE_ALLOWED_AGENTS = new Set(['researcher', 'writer', 'librarian']);
@@ -70,7 +70,7 @@ function normalizeAgentName(value: string | undefined): string | undefined {
   return trimmed.startsWith('goop-') ? trimmed.slice('goop-'.length) : trimmed;
 }
 
-function callingAgent(deps: ResearchWriteDeps): string | undefined {
+function callingAgent(deps: FieldNotesWriteDeps): string | undefined {
   return normalizeAgentName(
     deps.ctx?.agentName ?? deps.ctx?.agentType ?? deps.currentRun?.agentType,
   );
@@ -86,7 +86,7 @@ function validatePermission(agent: string | undefined): Result<void, ElefantErro
   if (WRITE_ALLOWED_AGENTS.has(agent)) return ok(undefined);
   return err({
     code: 'PERMISSION_DENIED',
-    message: `research_write is restricted to researcher, writer, and librarian agents (called by ${agent}).`,
+      message: `field_notes_write is restricted to researcher, writer, and librarian agents (called by ${agent}).`,
   });
 }
 
@@ -123,7 +123,7 @@ function isScratchPath(relativePath: string): boolean {
   return relativePath === '99-scratch' || relativePath.startsWith('99-scratch/');
 }
 
-function validateSection(params: ResearchWriteParams, scratch: boolean): Result<Frontmatter['section'], ElefantError> {
+function validateSection(params: FieldNotesWriteParams, scratch: boolean): Result<Frontmatter['section'], ElefantError> {
   const section = params.section ?? (scratch ? '99-scratch' : undefined);
   if (!section) return err(validationError('section is required outside 99-scratch/'));
   if (!isKnownSection(section)) return err(validationError(`section must be one of ${FIELD_NOTES_SECTIONS.join(', ')}; got ${section}`));
@@ -153,7 +153,7 @@ async function existingFrontmatter(absolutePath: string): Promise<Frontmatter | 
 }
 
 function buildFrontmatter(args: {
-  params: ResearchWriteParams;
+  params: FieldNotesWriteParams;
   section: Frontmatter['section'];
   agent: string | undefined;
   existing: Frontmatter | null;
@@ -193,15 +193,15 @@ function buildFrontmatter(args: {
   }
 }
 
-function triggerReindex(indexerService: ResearchWriteDeps['indexerService'], absolutePath: string): void {
+function triggerReindex(indexerService: FieldNotesWriteDeps['indexerService'], absolutePath: string): void {
   if (!indexerService) return;
   void indexerService.indexFile(absolutePath).catch(() => undefined);
 }
 
-export async function executeResearchWrite(
-  params: ResearchWriteParams,
-  deps: ResearchWriteDeps = {},
-): Promise<Result<ResearchWriteResult, ElefantError>> {
+export async function executeFieldNotesWrite(
+  params: FieldNotesWriteParams,
+  deps: FieldNotesWriteDeps = {},
+): Promise<Result<FieldNotesWriteResult, ElefantError>> {
   try {
     const agent = callingAgent(deps);
     const permission = validatePermission(agent);
@@ -214,11 +214,11 @@ export async function executeResearchWrite(
     if (!body.ok) return err(body.error);
 
     const projectPath = deps.projectPath ?? process.cwd();
-    const ensure = ensureResearchBase(projectPath);
+    const ensure = ensureFieldNotes(projectPath);
     if (!ensure.ok) return err(ensure.error);
 
     const absoluteCandidate = join(fieldNotesDir(projectPath), relativePath.data);
-    const membership = assertInsideResearchBase(projectPath, absoluteCandidate, { requireMarkdown: true });
+    const membership = assertInsideFieldNotes(projectPath, absoluteCandidate, { requireMarkdown: true });
     if (!membership.ok) return err(membership.error);
 
     const absolutePath = membership.data;
@@ -247,33 +247,33 @@ export async function executeResearchWrite(
       path: canonicalRelativePath,
       id: fm.data.id,
       created: existing === null,
-      research_link: serializeResearchLink({
-        kind: 'research-uri',
+      fieldnotes_link: serializeFieldNotesLink({
+        kind: 'fieldnotes-uri',
         workflow: fm.data.workflow ?? '_',
         path: canonicalRelativePath,
         anchor: null,
       }),
     });
   } catch (error) {
-    return err(executionError(`Failed to write research file: ${error instanceof Error ? error.message : String(error)}`, error));
+    return err(executionError(`Failed to write field notes file: ${error instanceof Error ? error.message : String(error)}`, error));
   }
 }
 
-export function createResearchWriteTool(deps: ResearchWriteDeps = {}): ToolDefinition<ResearchWriteParams, ResearchWriteResult> {
+export function createFieldNotesWriteTool(deps: FieldNotesWriteDeps = {}): ToolDefinition<FieldNotesWriteParams, FieldNotesWriteResult> {
   return {
-    name: 'research_write',
-    description: 'Write or update a Research Base markdown file with validated frontmatter and single-file reindexing.',
+    name: 'field_notes_write',
+    description: 'Write or update a Field Notes markdown file with validated frontmatter and single-file reindexing.',
     allowedAgents: ['researcher', 'writer', 'librarian'],
     parameters: {
-      path: { type: 'string', required: true, description: 'Relative path from .elefant/markdown-db/, e.g. 02-tech/my-notes.md.' },
-      title: { type: 'string', required: true, description: 'Research document title.' },
+      path: { type: 'string', required: true, description: 'Relative path from .elefant/field-notes/, e.g. 02-tech/my-notes.md.' },
+      title: { type: 'string', required: true, description: 'Field Notes document title.' },
       summary: { type: 'string', required: true, description: 'Concise summary for indexes and search results.' },
       section: { type: 'string', required: false, description: 'One of the 8 known sections; optional only for 99-scratch/ paths.' },
       body: { type: 'string', required: true, description: 'Full markdown body without frontmatter.' },
       tags: { type: 'array', required: false, default: [], description: 'String tags for filtering and browsing.' },
       sources: { type: 'array', required: false, default: [], description: 'Source URLs or citations.' },
       confidence: { type: 'string', required: false, default: 'medium', description: 'Confidence: high, medium, or low.' },
-      workflow: { type: 'string', required: false, description: 'Workflow slug for research:// links.' },
+      workflow: { type: 'string', required: false, description: 'Workflow slug for fieldnotes:// links.' },
       id: { type: 'string', required: false, description: 'Existing UUID to preserve on update; omit to create new.' },
     },
     inputJSONSchema: {
@@ -293,8 +293,8 @@ export function createResearchWriteTool(deps: ResearchWriteDeps = {}): ToolDefin
         id: { type: 'string' },
       },
     },
-    execute: (params) => executeResearchWrite(params, deps),
+    execute: (params) => executeFieldNotesWrite(params, deps),
   };
 }
 
-export const researchWriteTool = createResearchWriteTool();
+export const fieldNotesWriteTool = createFieldNotesWriteTool();

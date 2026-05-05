@@ -28,8 +28,8 @@ export const codeSchema = z.object({
 	title: z.string().optional(),
 }).strict()
 
-export const researchCardSchema = z.object({
-	type: z.literal('research-card'),
+export const fieldNotesCardSchema = z.object({
+	type: z.literal('field-notes-card'),
 	cards: z.array(z.object({
 		title: z.string(),
 		summary: z.string(),
@@ -64,7 +64,7 @@ export const VizPayloadSchema = z.discriminatedUnion('type', [
 	tableSchema,
 	statGridSchema,
 	codeSchema,
-	researchCardSchema,
+	fieldNotesCardSchema,
 	loadingSchema,
 	comparisonSchema,
 ])

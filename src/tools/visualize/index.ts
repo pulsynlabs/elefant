@@ -16,7 +16,7 @@ interface VisualizeToolDeps {
 	getConfig?: () => Promise<Pick<ElefantConfig, 'visualizeModelOverride'> | null>
 }
 
-const VISUALIZE_DESCRIPTION = 'Render inline viz: mermaid|table|stat-grid|code|research-card|loading|comparison. Pass type, data payload, intent, optional title.'
+const VISUALIZE_DESCRIPTION = 'Render inline viz: mermaid|table|stat-grid|code|field-notes-card|loading|comparison. Pass type, data payload, intent, optional title.'
 
 function invalidResult(content: string): Result<VisualizeToolResult, ElefantError> {
 	return ok({ content, isError: true })
@@ -40,7 +40,7 @@ export function createVisualizeTool(deps?: VisualizeToolDeps): ToolDefinition<Vi
 			type: {
 				type: 'string',
 				required: true,
-				description: 'Viz type: mermaid, table, stat-grid, code, research-card, loading, or comparison.',
+				description: 'Viz type: mermaid, table, stat-grid, code, field-notes-card, loading, or comparison.',
 			},
 			data: {
 				type: 'object',
@@ -63,7 +63,7 @@ export function createVisualizeTool(deps?: VisualizeToolDeps): ToolDefinition<Vi
 			additionalProperties: false,
 			required: ['type', 'data', 'intent'],
 			properties: {
-				type: { type: 'string', enum: ['mermaid', 'table', 'stat-grid', 'code', 'research-card', 'loading', 'comparison'] },
+				type: { type: 'string', enum: ['mermaid', 'table', 'stat-grid', 'code', 'field-notes-card', 'loading', 'comparison'] },
 				data: { type: 'object', additionalProperties: true },
 				intent: { type: 'string' },
 				title: { type: 'string' },

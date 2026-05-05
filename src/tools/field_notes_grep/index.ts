@@ -1,8 +1,8 @@
 /**
- * research_grep tool — ripgrep scoped to `.elefant/markdown-db/`.
+ * field_notes_grep tool — ripgrep scoped to `.elefant/field-notes/`.
  *
  * Returns matches grouped by file with frontmatter-derived titles
- * and `research://` links. Delegates execution to the shared ripgrep
+ * and `fieldnotes://` links. Delegates execution to the shared ripgrep
  * binary runner, then parses the JSON output and enriches it.
  */
 
@@ -11,9 +11,9 @@ import { basename, join, relative } from 'node:path';
 
 import { executeBinary, getRipgrepPath } from '../binary.js';
 import { fieldNotesDir } from '../../project/paths.js';
-import { assertInsideResearchBase } from '../../research/membership.js';
-import { parseFrontmatter } from '../../research/frontmatter.js';
-import { serializeResearchLink } from '../../research/link.js';
+import { assertInsideFieldNotes } from '../../fieldnotes/membership.js';
+import { parseFrontmatter } from '../../fieldnotes/frontmatter.js';
+import { serializeFieldNotesLink } from '../../fieldnotes/link.js';
 import type { ToolDefinition } from '../../types/tools.js';
 import type { ElefantError } from '../../types/errors.js';
 import type { Result } from '../../types/result.js';
@@ -71,33 +71,33 @@ function extractStderr(details: unknown): string {
 
 // ─── Tool params / result types ─────────────────────────────────────────────
 
-export interface ResearchGrepParams {
+export interface FieldNotesGrepParams {
 	pattern: string;
 	section?: string;
 	include?: string;
 	maxFiles?: number;
 }
 
-export interface ResearchGrepFileMatch {
+export interface FieldNotesGrepFileMatch {
 	path: string;
 	section: string;
 	title: string;
-	research_link: string;
+	fieldnotes_link: string;
 	matches: Array<{ line: number; snippet: string }>;
 	matchCount: number;
 }
 
-export interface ResearchGrepResult {
-	files: ResearchGrepFileMatch[];
+export interface FieldNotesGrepResult {
+	files: FieldNotesGrepFileMatch[];
 	totalMatches: number;
 }
 
 // ─── Tool definition ────────────────────────────────────────────────────────
 
-export const researchGrepTool: ToolDefinition<ResearchGrepParams, string> = {
-	name: 'research_grep',
+export const fieldNotesGrepTool: ToolDefinition<FieldNotesGrepParams, string> = {
+	name: 'field_notes_grep',
 	description:
-		'Search the Research Base (.elefant/markdown-db/) using ripgrep. Returns matches grouped by file with frontmatter titles and research:// links.',
+		'Search the Field Notes (.elefant/field-notes/) using ripgrep. Returns matches grouped by file with frontmatter titles and fieldnotes:// links.',
 	deferred: true,
 	parameters: {
 		pattern: {
@@ -112,7 +112,7 @@ export const researchGrepTool: ToolDefinition<ResearchGrepParams, string> = {
 		},
 		include: {
 			type: 'string',
-			description: 'File glob pattern within the research base (e.g. "*.md")',
+			description: 'File glob pattern within the field notes base (e.g. "*.md")',
 			required: false,
 		},
 		maxFiles: {
@@ -154,7 +154,7 @@ export const researchGrepTool: ToolDefinition<ResearchGrepParams, string> = {
 		if (searchRoot === base) {
 			searchPath = base;
 		} else {
-			const validated = assertInsideResearchBase(projectPath, searchRoot);
+			const validated = assertInsideFieldNotes(projectPath, searchRoot);
 			if (!validated.ok) return err(validated.error);
 			searchPath = validated.data;
 		}
@@ -235,7 +235,7 @@ export const researchGrepTool: ToolDefinition<ResearchGrepParams, string> = {
 
 		const filePaths = [...fileMatches.keys()].slice(0, maxFiles);
 
-		const files: ResearchGrepFileMatch[] = filePaths.map((absPath) => {
+		const files: FieldNotesGrepFileMatch[] = filePaths.map((absPath) => {
 			const matches = fileMatches.get(absPath)!;
 			const relPath = relative(base, absPath);
 
@@ -255,8 +255,8 @@ export const researchGrepTool: ToolDefinition<ResearchGrepParams, string> = {
 				// Keep the filename fallback
 			}
 
-			const researchLink = serializeResearchLink({
-				kind: 'research-uri',
+			const fieldNotesLink = serializeFieldNotesLink({
+				kind: 'fieldnotes-uri',
 				workflow: '_',
 				path: relPath,
 				anchor: null,
@@ -266,7 +266,7 @@ export const researchGrepTool: ToolDefinition<ResearchGrepParams, string> = {
 				path: relPath,
 				section: sectionName,
 				title,
-				research_link: researchLink,
+				fieldnotes_link: fieldNotesLink,
 				matches,
 				matchCount: matches.length,
 			};

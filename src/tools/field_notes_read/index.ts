@@ -1,5 +1,5 @@
 /**
- * research_read tool — read a Research Base file by id, path, or research:// URI
+ * field_notes_read tool — read a Field Notes file by id, path, or fieldnotes:// URI
  * with optional #anchor section extraction.
  *
  * MR-18
@@ -10,24 +10,24 @@ import type { ToolDefinition } from '../../types/tools.js';
 import type { ElefantError } from '../../types/errors.js';
 import { ok, err, type Result } from '../../types/result.js';
 import { fieldNotesDir } from '../../project/paths.js';
-import { assertInsideResearchBase } from '../../research/membership.js';
+import { assertInsideFieldNotes } from '../../fieldnotes/membership.js';
 import {
   parseFrontmatter,
   type Frontmatter,
-} from '../../research/frontmatter.js';
-import { parseResearchLink } from '../../research/link.js';
+} from '../../fieldnotes/frontmatter.js';
+import { parseFieldNotesLink } from '../../fieldnotes/link.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export interface ResearchReadParams {
+export interface FieldNotesReadParams {
   id?: string;
   path?: string;
   link?: string;
   anchor?: string;
 }
 
-export interface ResearchReadResult {
-  /** File path relative to .elefant/markdown-db/ */
+export interface FieldNotesReadResult {
+  /** File path relative to .elefant/field-notes/ */
   path: string;
   /** Parsed frontmatter, or null for lenient reads of scratch/unstructured files */
   frontmatter: Frontmatter | null;
@@ -35,13 +35,13 @@ export interface ResearchReadResult {
   body: string;
   /** Extracted section when matching heading found, or undefined */
   anchorBody?: string;
-  /** research:// URI for this file */
-  research_link: string;
+  /** fieldnotes:// URI for this file */
+  fieldnotes_link: string;
   /** Whitespace-delimited word count of body text */
   wordCount: number;
 }
 
-export interface ResearchReadDeps {
+export interface FieldNotesReadDeps {
   /** Absolute path to the project root */
   projectPath: string;
   /** Store resolver for id-based lookups; omitted when resolving by path/link */
@@ -153,15 +153,15 @@ function lenientParse(
 
 // ─── Tool factory ───────────────────────────────────────────────────────────
 
-export function createResearchReadTool(
-  deps: ResearchReadDeps,
-): ToolDefinition<ResearchReadParams, ResearchReadResult> {
+export function createFieldNotesReadTool(
+  deps: FieldNotesReadDeps,
+): ToolDefinition<FieldNotesReadParams, FieldNotesReadResult> {
   const { projectPath, store } = deps;
 
   return {
-    name: 'research_read',
+    name: 'field_notes_read',
     description:
-      'Read a Research Base file by id, path, or research:// URI, with optional #anchor section extraction.',
+      'Read a Field Notes file by id, path, or fieldnotes:// URI, with optional #anchor section extraction.',
     deferred: true,
     parameters: {
       id: {
@@ -172,12 +172,12 @@ export function createResearchReadTool(
       path: {
         type: 'string',
         required: false,
-        description: 'relative path from .elefant/markdown-db/',
+        description: 'relative path from .elefant/field-notes/',
       },
       link: {
         type: 'string',
         required: false,
-        description: 'research:// URI',
+        description: 'fieldnotes:// URI',
       },
       anchor: {
         type: 'string',
@@ -186,8 +186,8 @@ export function createResearchReadTool(
       },
     },
     execute: async (
-      params: ResearchReadParams,
-    ): Promise<Result<ResearchReadResult, ElefantError>> => {
+      params: FieldNotesReadParams,
+    ): Promise<Result<FieldNotesReadResult, ElefantError>> => {
       const { id, path, link, anchor: paramAnchor } = params;
 
       // ── 1. Validate: exactly one of id / path / link ──
@@ -212,8 +212,8 @@ export function createResearchReadTool(
       let resolvedAnchor: string | null = paramAnchor ?? null;
 
       if (link !== undefined) {
-        // Parse the research:// URI
-        const linkResult = parseResearchLink(link);
+        // Parse the fieldnotes:// URI
+        const linkResult = parseFieldNotesLink(link);
         if (!linkResult.ok) return err(linkResult.error);
 
         resolvedRelPath = linkResult.data.path;
@@ -251,7 +251,7 @@ export function createResearchReadTool(
       const baseDir = fieldNotesDir(projectPath);
       const absolutePath = join(baseDir, resolvedRelPath);
 
-      const membershipResult = assertInsideResearchBase(
+      const membershipResult = assertInsideFieldNotes(
         projectPath,
         absolutePath,
       );
@@ -287,7 +287,7 @@ export function createResearchReadTool(
         frontmatter,
         body,
         anchorBody,
-        research_link: `research://_/${resolvedRelPath}`,
+        fieldnotes_link: `fieldnotes://_/${resolvedRelPath}`,
         wordCount: wordCount(body),
       });
     },

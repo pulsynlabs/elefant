@@ -1,5 +1,5 @@
 /**
- * research_index — list/browse the Research Base by section, tag, or recency.
+ * field_notes_index — list/browse the Field Notes by section, tag, or recency.
  *
  * Supports two output formats:
  *   - `tree` — grouped by section, ordered by FIELD_NOTES_SECTIONS
@@ -13,13 +13,13 @@ import type { ToolDefinition } from '../../types/tools.js';
 import type { ElefantError } from '../../types/errors.js';
 import type { Result } from '../../types/result.js';
 import { ok, err } from '../../types/result.js';
-import type { DocumentRow } from '../../research/store.js';
+import type { DocumentRow } from '../../fieldnotes/store.js';
 import { FIELD_NOTES_SECTIONS } from '../../project/paths.js';
-import { serializeResearchLink } from '../../research/link.js';
+import { serializeFieldNotesLink } from '../../fieldnotes/link.js';
 
 // ─── Parameters ─────────────────────────────────────────────────────────────
 
-export interface ResearchIndexParams {
+export interface FieldNotesIndexParams {
 	output?: 'tree' | 'flat';
 	section?: string;
 	tag?: string;
@@ -36,7 +36,7 @@ export interface TreeFile {
 	tags: string[];
 	confidence: 'high' | 'medium' | 'low';
 	updated: string;
-	research_link: string;
+	fieldnotes_link: string;
 }
 
 export interface TreeSection {
@@ -60,7 +60,7 @@ export interface FlatFile {
 	tags: string[];
 	confidence: string;
 	updated: string;
-	research_link: string;
+	fieldnotes_link: string;
 }
 
 export interface FlatOutput {
@@ -69,11 +69,11 @@ export interface FlatOutput {
 	total: number;
 }
 
-export type ResearchIndexOutput = TreeOutput | FlatOutput;
+export type FieldNotesIndexOutput = TreeOutput | FlatOutput;
 
 // ─── Store dependency interface (narrow — only what this tool needs) ────────
 
-export interface ResearchIndexStore {
+export interface FieldNotesIndexStore {
 	listDocuments(opts?: { section?: string }): Result<DocumentRow[], ElefantError>;
 }
 
@@ -92,10 +92,10 @@ const SECTION_LABELS: Record<string, string> = {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function buildResearchLink(doc: DocumentRow): string {
+function buildFieldNotesLink(doc: DocumentRow): string {
 	const workflow = doc.workflow ?? '_';
-	return serializeResearchLink({
-		kind: 'research-uri',
+	return serializeFieldNotesLink({
+		kind: 'fieldnotes-uri',
 		workflow,
 		path: doc.filePath,
 		anchor: null,
@@ -110,7 +110,7 @@ function mapToTreeFile(doc: DocumentRow): TreeFile {
 		tags: doc.tags,
 		confidence: doc.confidence,
 		updated: doc.updated,
-		research_link: buildResearchLink(doc),
+		fieldnotes_link: buildFieldNotesLink(doc),
 	};
 }
 
@@ -123,7 +123,7 @@ function mapToFlatFile(doc: DocumentRow): FlatFile {
 		tags: doc.tags,
 		confidence: doc.confidence,
 		updated: doc.updated,
-		research_link: buildResearchLink(doc),
+		fieldnotes_link: buildFieldNotesLink(doc),
 	};
 }
 
@@ -205,13 +205,13 @@ function buildFlat(docs: DocumentRow[], limit: number): FlatOutput {
 
 // ─── Tool factory ───────────────────────────────────────────────────────────
 
-export function createResearchIndexTool(
-	store: ResearchIndexStore,
-): ToolDefinition<ResearchIndexParams, string> {
+export function createFieldNotesIndexTool(
+	store: FieldNotesIndexStore,
+): ToolDefinition<FieldNotesIndexParams, string> {
 	return {
-		name: 'research_index',
+		name: 'field_notes_index',
 		description:
-			'List and browse the Research Base by section, tag, or recency. ' +
+			'List and browse the Field Notes by section, tag, or recency. ' +
 			'Supports tree (grouped by section) and flat (sorted by last updated) output formats.',
 		deferred: true,
 		parameters: {

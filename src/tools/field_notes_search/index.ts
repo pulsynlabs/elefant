@@ -1,21 +1,21 @@
 import type { Database } from '../../db/database.ts';
-import type { EmbeddingProvider } from '../../research/embeddings/provider.ts';
-import type { Frontmatter } from '../../research/frontmatter.ts';
-import { serializeResearchLink } from '../../research/link.ts';
-import { ResearchStore } from '../../research/store.ts';
+import type { EmbeddingProvider } from '../../fieldnotes/embeddings/provider.ts';
+import type { Frontmatter } from '../../fieldnotes/frontmatter.ts';
+import { serializeFieldNotesLink } from '../../fieldnotes/link.ts';
+import { FieldNotesStore } from '../../fieldnotes/store.ts';
 import type { RunContext } from '../../runs/types.ts';
 import type { ElefantError } from '../../types/errors.ts';
 import { err, ok, type Result } from '../../types/result.ts';
 import type { ToolDefinition } from '../../types/tools.ts';
 
-export type ResearchSearchMode = 'semantic' | 'keyword' | 'hybrid';
+export type FieldNotesSearchMode = 'semantic' | 'keyword' | 'hybrid';
 
-export interface ResearchSearchParams {
+export interface FieldNotesSearchParams {
   query: string;
   k?: number;
   section?: string;
   tags?: string[];
-  mode?: ResearchSearchMode;
+  mode?: FieldNotesSearchMode;
   minScore?: number;
 }
 
@@ -27,12 +27,12 @@ export interface SearchResult {
   score: number;
   snippet: string;
   frontmatter: Frontmatter;
-  research_link: string;
+  fieldnotes_link: string;
 }
 
-export interface ResearchSearchOutput {
+export interface FieldNotesSearchOutput {
   results: SearchResult[];
-  mode_used: ResearchSearchMode;
+  mode_used: FieldNotesSearchMode;
   total: number;
 }
 
@@ -56,15 +56,15 @@ interface StoreDocumentRow {
   frontmatter: Frontmatter;
 }
 
-export interface ResearchSearchStore {
+export interface FieldNotesSearchStore {
   searchKeyword(query: string, opts: { k: number; section?: string }): Result<StoreSearchRow[], ElefantError>;
   searchVector(queryEmbedding: Float32Array, opts: { k: number; section?: string }): Result<StoreSearchRow[], ElefantError>;
   getDocumentById(id: string): Result<StoreDocumentRow | null, ElefantError>;
   close?(): void;
 }
 
-export interface ResearchSearchDeps {
-  store?: ResearchSearchStore;
+export interface FieldNotesSearchDeps {
+  store?: FieldNotesSearchStore;
   embeddingProvider: EmbeddingProvider;
   projectPath?: string;
   database?: Database;
@@ -89,12 +89,12 @@ function clampK(value: number | undefined): number {
   return Math.min(Math.max(Math.trunc(requested), 1), MAX_K);
 }
 
-function validateParams(params: ResearchSearchParams): Result<{
+function validateParams(params: FieldNotesSearchParams): Result<{
   query: string;
   k: number;
   section?: string;
   tags?: string[];
-  mode: ResearchSearchMode;
+  mode: FieldNotesSearchMode;
   minScore?: number;
 }, ElefantError> {
   const query = params.query.trim();
@@ -123,10 +123,10 @@ function validateParams(params: ResearchSearchParams): Result<{
   });
 }
 
-function resolveProjectPath(deps: ResearchSearchDeps): Result<string, ElefantError> {
+function resolveProjectPath(deps: FieldNotesSearchDeps): Result<string, ElefantError> {
   if (deps.projectPath) return ok(deps.projectPath);
   if (!deps.database || !deps.currentRun) {
-    return err(executionError('research_search requires either a store, a projectPath, or database/currentRun dependencies'));
+    return err(executionError('field_notes_search requires either a store, a projectPath, or database/currentRun dependencies'));
   }
 
   const row = deps.database.db
@@ -140,13 +140,13 @@ function resolveProjectPath(deps: ResearchSearchDeps): Result<string, ElefantErr
   return ok(row.path);
 }
 
-function openStore(deps: ResearchSearchDeps): Result<{ store: ResearchSearchStore; shouldClose: boolean }, ElefantError> {
+function openStore(deps: FieldNotesSearchDeps): Result<{ store: FieldNotesSearchStore; shouldClose: boolean }, ElefantError> {
   if (deps.store) return ok({ store: deps.store, shouldClose: false });
 
   const projectPath = resolveProjectPath(deps);
   if (!projectPath.ok) return err(projectPath.error);
 
-  const store = ResearchStore.open(projectPath.data);
+  const store = FieldNotesStore.open(projectPath.data);
   if (!store.ok) return err(store.error);
   return ok({ store: store.data, shouldClose: true });
 }
@@ -254,10 +254,10 @@ async function embedQuery(provider: EmbeddingProvider, query: string): Promise<R
 }
 
 async function getRows(
-  store: ResearchSearchStore,
+  store: FieldNotesSearchStore,
   provider: EmbeddingProvider,
   query: string,
-  mode: ResearchSearchMode,
+  mode: FieldNotesSearchMode,
   k: number,
   section?: string,
 ): Promise<Result<StoreSearchRow[], ElefantError>> {
@@ -291,14 +291,14 @@ function scorePasses(row: StoreSearchRow, minScore: number | undefined): boolean
 }
 
 async function toSearchResult(
-  store: ResearchSearchStore,
+  store: FieldNotesSearchStore,
   row: StoreSearchRow,
   query: string,
 ): Promise<Result<SearchResult, ElefantError>> {
   const document = store.getDocumentById(row.documentId);
   if (!document.ok) return err(document.error);
   if (!document.data) {
-    return err({ code: 'FILE_NOT_FOUND', message: `Research document not found for chunk: ${row.documentId}` });
+    return err({ code: 'FILE_NOT_FOUND', message: `Field Notes document not found for chunk: ${row.documentId}` });
   }
 
   const workflow = document.data.frontmatter.workflow ?? '_';
@@ -310,14 +310,14 @@ async function toSearchResult(
     score: Math.max(0, Math.min(1, row.score)),
     snippet: extractSnippet(row.text, query),
     frontmatter: document.data.frontmatter,
-    research_link: serializeResearchLink({ kind: 'research-uri', workflow, path: document.data.filePath, anchor: null }),
+    fieldnotes_link: serializeFieldNotesLink({ kind: 'fieldnotes-uri', workflow, path: document.data.filePath, anchor: null }),
   });
 }
 
-export function createResearchSearchTool(deps: ResearchSearchDeps): ToolDefinition<ResearchSearchParams, ResearchSearchOutput> {
+export function createFieldNotesSearchTool(deps: FieldNotesSearchDeps): ToolDefinition<FieldNotesSearchParams, FieldNotesSearchOutput> {
   return {
-    name: 'research_search',
-    description: 'Search the per-project Research Base with keyword, semantic, or hybrid retrieval. Falls back to keyword when vectors are disabled.',
+    name: 'field_notes_search',
+    description: 'Search the per-project Field Notes with keyword, semantic, or hybrid retrieval. Falls back to keyword when vectors are disabled.',
     deferred: true,
     parameters: {
       query: { type: 'string', required: true, description: 'Search query text.' },
@@ -340,11 +340,11 @@ export function createResearchSearchTool(deps: ResearchSearchDeps): ToolDefiniti
         minScore: { type: 'number', minimum: 0, maximum: 1 },
       },
     },
-    execute: async (params): Promise<Result<ResearchSearchOutput, ElefantError>> => {
+    execute: async (params): Promise<Result<FieldNotesSearchOutput, ElefantError>> => {
       const parsed = validateParams(params);
       if (!parsed.ok) return err(parsed.error);
 
-      const modeUsed: ResearchSearchMode = deps.embeddingProvider.name === 'disabled' && parsed.data.mode !== 'keyword'
+      const modeUsed: FieldNotesSearchMode = deps.embeddingProvider.name === 'disabled' && parsed.data.mode !== 'keyword'
         ? 'keyword'
         : parsed.data.mode;
 
