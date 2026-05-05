@@ -11,7 +11,10 @@
 // We serialize only the fields we need to reconstruct the display —
 // full ContentBlock trees are stored so tool cards re-render correctly.
 
-import { Store } from '@tauri-apps/plugin-store';
+// @tauri-apps/plugin-store is loaded dynamically to avoid Vite pre-bundling
+// Tauri-specific modules, which causes 504 errors in dev mode.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+type TauriStore = Awaited<ReturnType<typeof import('@tauri-apps/plugin-store').Store.load>>;
 import type { ChatMessage, ContentBlock } from '../../features/chat/types.js';
 
 const STORE_FILE = 'chat-history.json';
@@ -27,10 +30,17 @@ interface SerializedMessage {
 	timestamp: string; // ISO string
 }
 
-let store: Store | null = null;
+let store: TauriStore | null = null;
 
-async function getStore(): Promise<Store> {
-	if (!store) store = await Store.load(STORE_FILE);
+async function getStore(): Promise<TauriStore | null> {
+	if (!store) {
+		try {
+			const { Store } = await import('@tauri-apps/plugin-store');
+			store = await Store.load(STORE_FILE);
+		} catch {
+			return null;
+		}
+	}
 	return store;
 }
 
@@ -68,6 +78,7 @@ export async function saveSessionHistory(
 ): Promise<void> {
 	try {
 		const s = await getStore();
+		if (!s) return;
 		const serialized = messages
 			.map(serialize)
 			.filter((m): m is SerializedMessage => m !== null)
@@ -86,6 +97,7 @@ export async function saveSessionHistory(
 export async function loadSessionHistory(sessionId: string): Promise<ChatMessage[]> {
 	try {
 		const s = await getStore();
+		if (!s) return [];
 		const raw = await s.get<SerializedMessage[]>(sessionId);
 		if (!Array.isArray(raw)) return [];
 		return raw.map(deserialize);

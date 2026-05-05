@@ -1,4 +1,9 @@
-import { Command } from '@tauri-apps/plugin-shell';
+// @tauri-apps/plugin-shell is loaded dynamically to avoid Vite pre-bundling
+// Tauri-specific modules, which causes 504 errors in dev mode.
+async function getCommand() {
+	const { Command } = await import('@tauri-apps/plugin-shell');
+	return Command;
+}
 import { getDaemonClient, DAEMON_URL } from '$lib/daemon/client.js';
 import { settingsStore } from '$lib/stores/settings.svelte.js';
 
@@ -46,6 +51,7 @@ async function resolveEntryPath(): Promise<string | null> {
 			`process.stdout.write(pwd + '/' + scriptArg);`,
 		].join(' ');
 
+		const Command = await getCommand();
 		const cmd = Command.create('bun', ['-e', script]);
 		const output = await cmd.execute();
 		const path = output.stdout.trim();
@@ -94,6 +100,7 @@ export async function startDaemon(): Promise<void> {
 
 	// Use spawn() not execute() — the daemon runs forever so execute() would
 	// block until Tauri kills it. spawn() fires-and-forgets the process.
+	const Command = await getCommand();
 	const command = Command.create('bun', [cachedEntryPath]);
 	await command.spawn();
 

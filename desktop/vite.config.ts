@@ -13,6 +13,27 @@ export default defineConfig(async () => ({
       $features: path.resolve("./src/features"),
     },
   },
+  // Target modern Chromium (WebKitGTK 2.52 ships a recent V8/Blink).
+  // Avoids unnecessary transpilation of modern JS syntax.
+  esbuild: {
+    target: "chrome120",
+  },
+  // Tauri packages use Tauri-specific globals (__TAURI__) and must not be
+  // pre-bundled by Vite. Excluding them prevents the 504 "Outdated Optimize
+  // Dep" errors and the cascading text/html MIME type + WebSocket failures.
+  optimizeDeps: {
+    exclude: [
+      "@tauri-apps/api",
+      "@tauri-apps/api/core",
+      "@tauri-apps/api/event",
+      "@tauri-apps/api/webviewWindow",
+      "@tauri-apps/plugin-dialog",
+      "@tauri-apps/plugin-fs",
+      "@tauri-apps/plugin-process",
+      "@tauri-apps/plugin-shell",
+      "@tauri-apps/plugin-store",
+    ],
+  },
   clearScreen: false,
   server: {
     port: 1420,
