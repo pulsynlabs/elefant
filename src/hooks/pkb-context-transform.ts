@@ -12,12 +12,16 @@
 
 import { join } from 'node:path';
 import type { HookContextMap, HookHandler } from './types.ts';
+import { createInstructionService } from '../instruction/loader.ts';
+import type { InstructionService } from '../instruction/types.ts';
 
 export interface PkbHookOptions {
 	/** Absolute path to the project root used to resolve PROJECT_KNOWLEDGE_BASE.md. */
 	readonly projectPath: string;
 	/** Override for tests; defaults to Bun's file API. */
 	readonly readFile?: (path: string) => Promise<string | null>;
+	/** Optional pre-created instruction service for root AGENTS.md/CLAUDE.md loading. */
+	readonly instructionService?: InstructionService;
 }
 
 async function defaultReadFile(path: string): Promise<string | null> {
@@ -36,14 +40,26 @@ export function createPkbContextTransformHandler(
 ): HookHandler<'context:transform'> {
 	const read = options.readFile ?? defaultReadFile;
 	const pkbPath = join(options.projectPath, '.goopspec', 'PROJECT_KNOWLEDGE_BASE.md');
+	const instruction =
+		options.instructionService ?? createInstructionService(options.projectPath);
 
 	return async (ctx: HookContextMap['context:transform']) => {
 		try {
 			const content = await read(pkbPath);
-			if (content === null || content.trim().length === 0) return;
-			ctx.system.push(`## Project Knowledge Base\n\n${content.trim()}`);
+			if (content !== null && content.trim().length > 0) {
+				ctx.system.push(`## Project Knowledge Base\n\n${content.trim()}`);
+			}
 		} catch {
 			// PKB load failure should never block agent dispatch.
+		}
+
+		try {
+			const rootInstruction = await instruction.resolveRoot();
+			if (rootInstruction) {
+				ctx.system.push(rootInstruction.content);
+			}
+		} catch {
+			// Root instruction load failure should never block agent dispatch.
 		}
 	};
 }

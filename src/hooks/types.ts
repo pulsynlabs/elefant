@@ -159,6 +159,11 @@ export interface HookContextMap {
 	'wave:completed': { readonly workflowId: string; readonly projectId: string; readonly waveNumber: number };
 	'task:assigned': { readonly workflowId: string; readonly projectId: string; readonly taskId: string; readonly agentRunId: string };
 	'task:completed': { readonly workflowId: string; readonly projectId: string; readonly taskId: string };
+	'spec:acceptance_confirmed': {
+		readonly projectId: string;
+		readonly workflowId: string;
+		readonly confirmedAt: string;
+	};
 }
 
 export type HookEventName = keyof HookContextMap;
@@ -200,4 +205,5 @@ export const HOOK_EVENT_NAMES: readonly HookEventName[] = [
 	'wave:completed',
 	'task:assigned',
 	'task:completed',
+	'spec:acceptance_confirmed',
 ];

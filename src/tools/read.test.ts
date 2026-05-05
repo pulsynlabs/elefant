@@ -3,9 +3,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { readTool } from './read.js';
+import { readTool, createReadTool } from './read.js';
+import type { ReadToolDeps } from './read.js';
+import { createInstructionService } from '../instruction/index.js';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const TEST_DIR = join(import.meta.dir, 'test-fixtures');
 
@@ -131,6 +133,158 @@ describe('readTool', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data).toBe('1: Line 1\n2: Line 2\n3: ');
+    }
+  });
+});
+
+// ─── createReadTool with instruction guard ───────────────────────────────
+
+const INSTR_GUARD_DIR = join(import.meta.dir, 'test-fixtures-instruction-guard');
+
+describe('createReadTool with instruction guard', () => {
+  beforeEach(async () => {
+    await mkdir(INSTR_GUARD_DIR, { recursive: true });
+  });
+
+  afterEach(async () => {
+    try {
+      await rm(INSTR_GUARD_DIR, { recursive: true, force: true });
+    } catch { /* ignore */ }
+  });
+
+  async function makeInstructionGuardDeps(
+    projectRoot: string,
+    alreadyLoaded?: Set<string>,
+  ): Promise<ReadToolDeps> {
+    const service = createInstructionService(projectRoot);
+    return {
+      service,
+      alreadyLoaded: alreadyLoaded ?? new Set(),
+      projectRoot,
+    };
+  }
+
+  it('injects system-reminder block when parent directory has AGENTS.md', async () => {
+    // ── Arrange ──
+    const root = resolve(INSTR_GUARD_DIR, 'fixture-01');
+    await mkdir(join(root, 'parent', 'nested'), { recursive: true });
+
+    const agentsContent = '# AGENTS.md\nUse tabs.\n';
+    await writeFile(join(root, 'parent', 'AGENTS.md'), agentsContent, 'utf-8');
+
+    const testContent = 'Hello from nested';
+    const targetFile = join(root, 'parent', 'nested', 'test.txt');
+    await writeFile(targetFile, testContent, 'utf-8');
+
+    const deps = await makeInstructionGuardDeps(root);
+    const tool = createReadTool(deps);
+
+    // ── Act ──
+    const result = await tool.execute({ filePath: targetFile });
+
+    // ── Assert ──
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // Original file content with line numbers should be present
+      expect(result.data).toContain('1: Hello from nested');
+
+      // The system-reminder block should be appended
+      expect(result.data).toContain('<system-reminder>');
+      expect(result.data).toContain('</system-reminder>');
+
+      // The AGENTS.md content should be inside the reminder block
+      expect(result.data).toContain('Use tabs.');
+
+      // The Instructions from: prefix (OpenCode convention) should be present
+      expect(result.data).toContain('Instructions from:');
+
+      // Verify ordering: original content before system-reminder
+      const reminderIdx = result.data.indexOf('<system-reminder>');
+      const contentIdx = result.data.indexOf('1: Hello from nested');
+      expect(contentIdx).toBeLessThan(reminderIdx);
+    }
+
+    // alreadyLoaded should now contain the AGENTS.md path
+    const agentsPath = resolve(join(root, 'parent', 'AGENTS.md'));
+    expect(deps.alreadyLoaded.has(agentsPath)).toBe(true);
+  });
+
+  it('no system-reminder when no AGENTS.md in ancestry', async () => {
+    // ── Arrange ──
+    const root = resolve(INSTR_GUARD_DIR, 'fixture-02');
+    await mkdir(join(root, 'subdir'), { recursive: true });
+
+    const testContent = 'Just a file\n';
+    const targetFile = join(root, 'subdir', 'plain.txt');
+    await writeFile(targetFile, testContent, 'utf-8');
+
+    const deps = await makeInstructionGuardDeps(root);
+    const tool = createReadTool(deps);
+
+    // ── Act ──
+    const result = await tool.execute({ filePath: targetFile });
+
+    // ── Assert ──
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data).toContain('1: Just a file');
+      expect(result.data).not.toContain('<system-reminder>');
+    }
+
+    // No paths added to alreadyLoaded
+    expect(deps.alreadyLoaded.size).toBe(0);
+  });
+
+  it('no double-injection when file already in alreadyLoaded', async () => {
+    // ── Arrange ──
+    const root = resolve(INSTR_GUARD_DIR, 'fixture-03');
+    await mkdir(join(root, 'src'), { recursive: true });
+
+    const agentsContent = '# AGENTS.md\nUse spaces.\n';
+    const agentsPath = resolve(join(root, 'src', 'AGENTS.md'));
+    await writeFile(agentsPath, agentsContent, 'utf-8');
+
+    const testContent = 'File under src';
+    const targetFile = join(root, 'src', 'helpers.ts');
+    await writeFile(targetFile, testContent, 'utf-8');
+
+    // Pre-seed alreadyLoaded with the AGENTS.md path
+    const alreadyLoaded = new Set<string>([agentsPath]);
+    const deps = await makeInstructionGuardDeps(root, alreadyLoaded);
+    const tool = createReadTool(deps);
+
+    // ── Act ──
+    const result = await tool.execute({ filePath: targetFile });
+
+    // ── Assert ──
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data).toContain('1: File under src');
+      expect(result.data).not.toContain('<system-reminder>');
+    }
+
+    // alreadyLoaded should still contain exactly the pre-seeded path
+    expect(deps.alreadyLoaded.size).toBe(1);
+    expect(deps.alreadyLoaded.has(agentsPath)).toBe(true);
+  });
+
+  it('preserves read errors without guard modification', async () => {
+    // ── Arrange ──
+    const root = resolve(INSTR_GUARD_DIR, 'fixture-04');
+    await mkdir(root, { recursive: true });
+
+    const deps = await makeInstructionGuardDeps(root);
+    const tool = createReadTool(deps);
+
+    // ── Act ──
+    const result = await tool.execute({
+      filePath: join(root, 'nonexistent.txt'),
+    });
+
+    // ── Assert ──
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('FILE_NOT_FOUND');
     }
   });
 });

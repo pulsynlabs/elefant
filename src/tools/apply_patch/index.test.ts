@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync, mkdirSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { applyPatchTool } from './index.js';
+import { applyPatchTool, createApplyPatchTool } from './index.js';
+import { createInstructionService } from '../../instruction/index.js';
 
 describe('applyPatchTool', () => {
 	let testRoot: string;
@@ -170,5 +171,99 @@ describe('applyPatchTool', () => {
 
 		expect(existsSync(join(testRoot, 'src/should-not-exist.ts'))).toBe(false);
 		expect(readFileSync(stable, 'utf-8')).toBe('stable');
+	});
+});
+
+describe('createApplyPatchTool', () => {
+	let testRoot: string;
+	let originalCwd: string;
+
+	beforeEach(() => {
+		originalCwd = process.cwd();
+		testRoot = mkdtempSync(join(tmpdir(), 'elefant-apply-patch-guard-'));
+		mkdirSync(join(testRoot, 'src'), { recursive: true });
+		process.chdir(testRoot);
+	});
+
+	afterEach(() => {
+		process.chdir(originalCwd);
+		rmSync(testRoot, { recursive: true, force: true });
+	});
+
+	it('should append system-reminder when patching a file in a dir with AGENTS.md', async () => {
+		writeFileSync(join(testRoot, 'src', 'existing.ts'), 'const OLD = true;\n', 'utf-8');
+		writeFileSync(join(testRoot, 'AGENTS.md'), 'Root context — prefer const over let.\n', 'utf-8');
+
+		const service = createInstructionService(testRoot);
+		const alreadyLoaded = new Set<string>();
+		const tool = createApplyPatchTool({
+			service,
+			alreadyLoaded,
+			projectRoot: testRoot,
+		});
+
+		const patchText = [
+			'*** Update File: src/existing.ts',
+			'@@',
+			'-const OLD = true;',
+			'+const NEW = false;',
+		].join('\n');
+
+		const result = await tool.execute({ patchText });
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toContain('<system-reminder>');
+			expect(result.data).toContain('prefer const over let');
+			expect(result.data).toContain('Instructions from:');
+			// Verify the patch was actually applied
+			expect(readFileSync(join(testRoot, 'src', 'existing.ts'), 'utf-8')).toBe(
+				'const NEW = false;\n',
+			);
+		}
+	});
+
+	it('should not append system-reminder when no AGENTS.md exists', async () => {
+		writeFileSync(join(testRoot, 'src', 'existing.ts'), 'export const x = 1;\n', 'utf-8');
+
+		const service = createInstructionService(testRoot);
+		const alreadyLoaded = new Set<string>();
+		const tool = createApplyPatchTool({
+			service,
+			alreadyLoaded,
+			projectRoot: testRoot,
+		});
+
+		const patchText = [
+			'*** Update File: src/existing.ts',
+			'@@',
+			'-export const x = 1;',
+			'+export const x = 2;',
+		].join('\n');
+
+		const result = await tool.execute({ patchText });
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).not.toContain('<system-reminder>');
+			expect(result.data).toContain('Applied patch');
+		}
+	});
+
+	it('should not modify output on patch error', async () => {
+		const service = createInstructionService(testRoot);
+		const alreadyLoaded = new Set<string>();
+		const tool = createApplyPatchTool({
+			service,
+			alreadyLoaded,
+			projectRoot: testRoot,
+		});
+
+		const result = await tool.execute({ patchText: '*** Update File: src/missing.ts\n@@\n-old\n+new' });
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('FILE_NOT_FOUND');
+		}
 	});
 });

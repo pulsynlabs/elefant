@@ -13,5 +13,6 @@
   { "name": "research", "trigger": "/research", "description": "Dispatch researcher agent on a specific topic.", "category": "spec-mode", "args": "<topic>" },
   { "name": "debug", "trigger": "/debug", "description": "Dispatch debugger with scientific debugging workflow.", "category": "spec-mode" },
   { "name": "map-codebase", "trigger": "/map-codebase", "description": "Dispatch explorer to map codebase and build knowledge base.", "category": "spec-mode" },
-  { "name": "pr-review", "trigger": "/pr-review", "description": "Review a GitHub PR end-to-end with fix options.", "category": "spec-mode", "args": "<pr-url>" }
+  { "name": "pr-review", "trigger": "/pr-review", "description": "Review a GitHub PR end-to-end with fix options.", "category": "spec-mode", "args": "<pr-url>" },
+  { "name": "init", "trigger": "/init", "description": "Generate or refresh the project AGENTS.md context file.", "category": "utility" }
 ]

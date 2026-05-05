@@ -11,16 +11,17 @@ import { ResearchStore } from '../research/store.ts';
 import type { ElefantError } from '../types/errors.ts';
 import { err, ok, type Result } from '../types/result.ts';
 import type { ParameterDefinition, ToolDefinition, ToolResult } from '../types/tools.ts';
+import type { InstructionService } from '../instruction/index.js';
 import type { SseManager } from '../transport/sse-manager.js';
-import { applyPatchTool } from './apply_patch/index.js';
+import { applyPatchTool, createApplyPatchTool } from './apply_patch/index.js';
 import { createAgentSessionSearchTool, type AgentSessionSearchDeps } from './agent_session_search/index.js';
-import { editTool } from './edit.js';
+import { editTool, createEditTool } from './edit.js';
 import { globTool } from './glob.js';
 import { grepTool } from './grep.js';
 import { lspTool } from './lsp/index.js';
 import { lspDiagnosticsTool } from './lsp_diagnostics/index.js';
 import { createInteractiveTools } from './interactive/index.js';
-import { readTool } from './read.js';
+import { readTool, createReadTool } from './read.js';
 import { bashTool } from './shell/index.js';
 import { skillTool } from './skill/index.js';
 import { referenceTool } from './reference/index.js';
@@ -32,7 +33,7 @@ import { createToolListTool } from './tool_list/index.js';
 import { createToolSearchTool, type SkillCatalogEntry } from './tool_search/index.js';
 import { webfetchTool } from './webfetch.js';
 import { websearchTool } from './websearch.js';
-import { writeTool } from './write.js';
+import { writeTool, createWriteTool } from './write.js';
 import { createResearchSearchTool } from './research_search/index.js';
 import { researchGrepTool } from './research_grep/index.js';
 import { createResearchReadTool } from './research_read/index.js';
@@ -488,6 +489,10 @@ export interface ToolRegistryRunDeps {
 	mode?: 'spec' | 'quick'
 	mcpManager?: MCPManager
 	metadataEmitter?: MetadataEmitter
+	/** Optional instruction service for AGENTS.md/CLAUDE.md guard injection on file-touching tools. */
+	instructionService?: InstructionService
+	/** Absolute project root path (required when instructionService is provided). */
+	projectRoot?: string
 }
 
 export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistry {
@@ -496,14 +501,36 @@ export function createToolRegistryForRun(deps: ToolRegistryRunDeps): ToolRegistr
 	// allowedAgents at the execute() boundary.
 	registry.setCurrentAgentName(deps.currentRun.agentType);
 
-	// Register all static tools (same list as createToolRegistry)
-	registry.register(readTool)
-	registry.register(writeTool)
-	registry.register(editTool)
+	// ── Instruction-aware tool registration ──────────────────────────
+	// When instructionService + projectRoot are available (live sessions),
+	// register factory-wrapped read/write/edit/apply_patch tools that inject
+	// AGENTS.md/CLAUDE.md content from ancestor directories as
+	// <system-reminder> blocks in tool output.  When absent (static
+	// registry, tests), fall back to the plain tools with no guard.
+	const alreadyLoaded = new Set<string>();
+	const useInstructionTools = deps.instructionService && deps.projectRoot;
+
+	if (useInstructionTools) {
+		const instrDeps = {
+			service: deps.instructionService!,
+			alreadyLoaded,
+			projectRoot: deps.projectRoot!,
+		};
+		registry.register(createReadTool(instrDeps));
+		registry.register(createWriteTool(instrDeps));
+		registry.register(createEditTool(instrDeps));
+		registry.register(createApplyPatchTool(instrDeps));
+	} else {
+		registry.register(readTool);
+		registry.register(writeTool);
+		registry.register(editTool);
+		registry.register(applyPatchTool);
+	}
+
+	// Register all other static tools (same list as createToolRegistry)
 	registry.register(globTool)
 	registry.register(grepTool)
 	registry.register(bashTool)
-	registry.register(applyPatchTool)
 	registry.register(webfetchTool)
 	registry.register(websearchTool)
 	registry.register(todowriteTool)

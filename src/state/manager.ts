@@ -613,7 +613,11 @@ export class StateManager {
             acceptance_confirmed: 1,
           }),
         )();
-        // TODO(Wave 3 Task 3.2): emit spec:acceptance_confirmed hook event here.
+        this.emitHook('spec:acceptance_confirmed', {
+          projectId,
+          workflowId,
+          confirmedAt: updated.updatedAt,
+        });
         return updated;
       });
     }

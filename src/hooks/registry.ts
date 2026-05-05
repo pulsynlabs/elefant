@@ -41,6 +41,7 @@ function createEmptyStore(): HandlerStore {
 		'wave:completed': [],
 		'task:assigned': [],
 		'task:completed': [],
+		'spec:acceptance_confirmed': [],
 	};
 }
 

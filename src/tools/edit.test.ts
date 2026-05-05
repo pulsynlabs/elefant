@@ -3,9 +3,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { editTool } from './edit.js';
+import { editTool, createEditTool } from './edit.js';
 import { writeFile, mkdir, rm, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { createInstructionService } from '../instruction/index.js';
+import { LINE_TARGET } from '../instruction/types.js';
 
 const TEST_DIR = join(import.meta.dir, 'test-fixtures-edit');
 
@@ -157,5 +159,185 @@ describe('editTool', () => {
 
     const content = await readFile(filePath, 'utf-8');
     expect(content).toBe('replaced second first third');
+  });
+});
+
+describe('createEditTool', () => {
+  beforeEach(async () => {
+    await mkdir(TEST_DIR, { recursive: true });
+  });
+
+  afterEach(async () => {
+    try {
+      await rm(TEST_DIR, { recursive: true, force: true });
+    } catch { /* ignore */ }
+  });
+
+  it('should append system-reminder when editing a file in a dir with AGENTS.md', async () => {
+    const agentsPath = join(TEST_DIR, 'AGENTS.md');
+    const filePath = join(TEST_DIR, 'target.ts');
+
+    await writeFile(agentsPath, 'Always use named exports. Run `bun test` before committing.', 'utf-8');
+    await writeFile(filePath, 'export default function foo() {}', 'utf-8');
+
+    const service = createInstructionService(resolve(TEST_DIR));
+    const alreadyLoaded = new Set<string>();
+    const tool = createEditTool({
+      service,
+      alreadyLoaded,
+      projectRoot: resolve(TEST_DIR),
+    });
+
+    const result = await tool.execute({
+      filePath,
+      oldString: 'export default function',
+      newString: 'export function',
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data).toContain('<system-reminder>');
+      expect(result.data).toContain('Always use named exports');
+      expect(result.data).toContain('Instructions from:');
+      // Verify the edit was actually applied
+      const content = await readFile(filePath, 'utf-8');
+      expect(content).toBe('export function foo() {}');
+    }
+  });
+
+  it('should not append system-reminder when no AGENTS.md exists', async () => {
+    const filePath = join(TEST_DIR, 'no-guard.ts');
+    await writeFile(filePath, 'export const x = 1;', 'utf-8');
+
+    const service = createInstructionService(resolve(TEST_DIR));
+    const alreadyLoaded = new Set<string>();
+    const tool = createEditTool({
+      service,
+      alreadyLoaded,
+      projectRoot: resolve(TEST_DIR),
+    });
+
+    const result = await tool.execute({
+      filePath,
+      oldString: 'export const x = 1;',
+      newString: 'export const x = 2;',
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data).not.toContain('<system-reminder>');
+      expect(result.data).toContain('Replaced');
+    }
+  });
+
+  it('should not modify output on edit error', async () => {
+    const filePath = join(TEST_DIR, 'missing.ts');
+
+    const service = createInstructionService(resolve(TEST_DIR));
+    const alreadyLoaded = new Set<string>();
+    const tool = createEditTool({
+      service,
+      alreadyLoaded,
+      projectRoot: resolve(TEST_DIR),
+    });
+
+    const result = await tool.execute({
+      filePath,
+      oldString: 'nonexistent',
+      newString: 'replacement',
+    });
+
+    // Should return error (not crash or produce a guarded success)
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('FILE_NOT_FOUND');
+    }
+  });
+
+  it('should invalidate cache when editing AGENTS.md', async () => {
+    const agentsPath = join(TEST_DIR, 'AGENTS.md');
+    await writeFile(agentsPath, '# Guide v1\n- Rule 1\n- Rule 2', 'utf-8');
+
+    const service = createInstructionService(resolve(TEST_DIR));
+    const alreadyLoaded = new Set<string>();
+    const tool = createEditTool({
+      service,
+      alreadyLoaded,
+      projectRoot: resolve(TEST_DIR),
+    });
+
+    // First read via service to populate mtime cache
+    const result1 = await service.resolveRoot();
+    expect(result1).not.toBeNull();
+    expect(result1!.content).toContain('Guide v1');
+
+    // Edit the file
+    await tool.execute({
+      filePath: agentsPath,
+      oldString: 'Guide v1',
+      newString: 'Guide v2',
+    });
+
+    // After edit + invalidation, resolveRoot should see fresh content
+    const result2 = await service.resolveRoot();
+    expect(result2).not.toBeNull();
+    expect(result2!.content).toContain('Guide v2');
+    expect(result2!.content).not.toContain('Guide v1');
+  });
+
+  it('should warn when edited AGENTS.md exceeds LINE_TARGET lines', async () => {
+    const agentsPath = join(TEST_DIR, 'AGENTS.md');
+    // Start with a marker placeholder
+    await writeFile(agentsPath, '# AGENTS.md\n## PLACEHOLDER\n', 'utf-8');
+
+    // Build a replacement that pushes it over the limit
+    const overLimit = LINE_TARGET;
+    const manyLines = Array.from({ length: overLimit }, (_, i) => `- Rule ${i + 1}: do the thing`).join('\n');
+    const replacement = `## Expanded Rules\n${manyLines}`;
+
+    const service = createInstructionService(resolve(TEST_DIR));
+    const alreadyLoaded = new Set<string>();
+    const tool = createEditTool({
+      service,
+      alreadyLoaded,
+      projectRoot: resolve(TEST_DIR),
+    });
+
+    const result = await tool.execute({
+      filePath: agentsPath,
+      oldString: '## PLACEHOLDER',
+      newString: replacement,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data).toContain('[WARNING');
+      expect(result.data).toContain('exceeds target of');
+    }
+  });
+
+  it('should not warn when editing a non-instruction file', async () => {
+    const filePath = join(TEST_DIR, 'regular.ts');
+    await writeFile(filePath, 'export const x = 1;', 'utf-8');
+
+    const service = createInstructionService(resolve(TEST_DIR));
+    const alreadyLoaded = new Set<string>();
+    const tool = createEditTool({
+      service,
+      alreadyLoaded,
+      projectRoot: resolve(TEST_DIR),
+    });
+
+    const result = await tool.execute({
+      filePath,
+      oldString: 'export const x = 1;',
+      newString: 'export const x = 2;',
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data).not.toContain('[WARNING');
+      expect(result.data).not.toContain('exceeds target');
+    }
   });
 });
