@@ -7,6 +7,8 @@ import type { ToolDefinition } from '../types/tools.js';
 import type { ElefantError } from '../types/errors.js';
 import type { Result } from '../types/result.js';
 import { ok, err } from '../types/result.js';
+import type { InstructionService } from '../instruction/types.js';
+import { applyInstructionGuard } from '../instruction/guard.js';
 import { readdirSync, statSync } from 'node:fs';
 
 export interface ReadParams {
@@ -124,3 +126,46 @@ export const readTool: ToolDefinition<ReadParams, string> = {
     }
   },
 };
+
+// ─── Factory-wrapped read tool with instruction guard ─────────────────────
+
+export interface ReadToolDeps {
+  /** InstructionService instance (from createInstructionService). */
+  service: InstructionService;
+  /** Already-loaded instruction paths for this session. MUTATED by the guard. */
+  alreadyLoaded: Set<string>;
+  /** Absolute path to the project root. */
+  projectRoot: string;
+}
+
+/**
+ * Create a read tool with optional instruction guard injection.
+ *
+ * When deps are provided, the factory wraps the base {@link readTool}'s
+ * `execute` to call {@link applyInstructionGuard} after reading.  When new
+ * AGENTS.md (or CLAUDE.md) files are found in the ancestry of the file being
+ * read, a `<system-reminder>` block is appended to the output.
+ *
+ * When called without deps (or with the plain {@link readTool}), the guard
+ * is skipped entirely — the base read behavior is unchanged.
+ */
+export function createReadTool(
+  deps: ReadToolDeps,
+): ToolDefinition<ReadParams, string> {
+  return {
+    ...readTool,
+    execute: async (params): Promise<Result<string, ElefantError>> => {
+      const base = await readTool.execute(params);
+      if (!base.ok) return base;
+
+      const guarded = await applyInstructionGuard({
+        service: deps.service,
+        filepath: params.filePath,
+        alreadyLoaded: deps.alreadyLoaded,
+        output: base.data,
+      });
+
+      return ok(guarded.content);
+    },
+  };
+}

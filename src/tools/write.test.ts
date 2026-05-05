@@ -210,6 +210,8 @@ describe('createWriteTool', () => {
     expect(result1!.content).toContain('Guide v1');
 
     // Second write: should invalidate cache so resolveRoot sees fresh content
+    // Small sleep ensures tmpfs mtime advances past the cached value
+    await Bun.sleep(15);
     await tool.execute({ filePath: agentsPath, content: '# Guide v2\n- Rule A\n- Rule B' });
 
     const result2 = await service.resolveRoot();

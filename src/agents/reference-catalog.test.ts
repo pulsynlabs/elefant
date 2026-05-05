@@ -307,3 +307,25 @@ describe('reference catalog', () => {
 		expect(agentKindToAudience('custom')).toBeNull();
 	});
 });
+
+describe('agents-md-system reference', () => {
+	it('is listed in the reference catalog', async () => {
+		const catalog = await buildReferenceCatalog({ cwd: process.cwd() });
+		const names = catalog.all.map(r => r.name);
+		expect(names).toContain('agents-md-system');
+	});
+
+	it('has correct tags', async () => {
+		const catalog = await buildReferenceCatalog({ cwd: process.cwd() });
+		const ref = catalog.all.find(r => r.name === 'agents-md-system');
+		expect(ref?.frontmatter?.tags).toContain('instruction');
+		expect(ref?.frontmatter?.tags).toContain('agents-md');
+	});
+
+	it('has correct audience', async () => {
+		const catalog = await buildReferenceCatalog({ cwd: process.cwd() });
+		const ref = catalog.all.find(r => r.name === 'agents-md-system');
+		expect(ref?.frontmatter?.audience).toContain('writer');
+		expect(ref?.frontmatter?.audience).toContain('orchestrator');
+	});
+});

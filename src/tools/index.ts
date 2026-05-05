@@ -2,9 +2,9 @@
  * Tool exports for the Elefant agent tool system.
  */
 
-export { readTool, type ReadParams } from './read.js';
-export { writeTool, type WriteParams } from './write.js';
-export { editTool, type EditParams } from './edit.js';
+export { readTool, createReadTool, type ReadParams, type ReadToolDeps } from './read.js';
+export { writeTool, createWriteTool, type WriteParams, type WriteToolDeps } from './write.js';
+export { editTool, createEditTool, type EditParams, type EditToolDeps } from './edit.js';
 export { globTool, type GlobParams } from './glob.js';
 export {
 	bashTool,
@@ -20,7 +20,7 @@ export { grepTool, type GrepParams } from './grep.js';
 export { ToolRegistry, createToolRegistry, createToolRegistryForRun, type ToolRegistryRunDeps } from './registry.ts';
 
 // New tools (Wave 1-4)
-export { applyPatchTool, type ApplyPatchParams } from './apply_patch/index.js';
+export { applyPatchTool, createApplyPatchTool, type ApplyPatchParams, type ApplyPatchToolDeps } from './apply_patch/index.js';
 export { webfetchTool, type WebfetchParams } from './webfetch.js';
 export { websearchTool, type WebsearchParams } from './websearch.js';
 export {
