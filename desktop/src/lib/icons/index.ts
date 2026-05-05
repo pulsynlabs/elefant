@@ -71,6 +71,24 @@ export { default as ExternalLinkIcon } from '@hugeicons/core-free-icons/ArrowUpR
 export { default as PanelRightIcon } from '@hugeicons/core-free-icons/PanelRightIcon';
 export { default as PanelRightCloseIcon } from '@hugeicons/core-free-icons/PanelRightCloseIcon';
 
+// Agent Profiles — per-kind avatar icons (DESIGN_SPEC §6).
+// Names map 1:1 to Hugeicons module names; some DESIGN_SPEC names
+// (BeakerIcon, ShieldCheckIcon, BugIcon, WrenchIcon, PaintBrushIcon,
+// CompassIcon) don't exist in core-free-icons, so the closest available
+// variant is exported. Comment marks the intended role next to each.
+export { default as UserGroupIcon } from '@hugeicons/core-free-icons/UserGroupIcon'; // orchestrator
+export { default as CheckListIcon } from '@hugeicons/core-free-icons/CheckListIcon'; // planner
+export { default as Search01Icon } from '@hugeicons/core-free-icons/Search01Icon'; // researcher
+export { default as Compass01Icon } from '@hugeicons/core-free-icons/Compass01Icon'; // explorer
+export { default as Book02Icon } from '@hugeicons/core-free-icons/Book02Icon'; // librarian
+export { default as ToolsIcon } from '@hugeicons/core-free-icons/ToolsIcon'; // executor-low
+export { default as Wrench01Icon } from '@hugeicons/core-free-icons/Wrench01Icon'; // executor-medium
+export { default as PaintBrush02Icon } from '@hugeicons/core-free-icons/PaintBrush02Icon'; // executor-frontend
+export { default as ValidationIcon } from '@hugeicons/core-free-icons/ValidationIcon'; // verifier (closest to ShieldCheck)
+export { default as TestTube01Icon } from '@hugeicons/core-free-icons/TestTube01Icon'; // tester (closest to Beaker)
+export { default as Bug01Icon } from '@hugeicons/core-free-icons/Bug01Icon'; // debugger
+export { default as Edit02Icon } from '@hugeicons/core-free-icons/Edit02Icon'; // writer (canonical name alongside the EditIcon alias)
+
 // MCP (Model Context Protocol)
 export { default as McpServerIcon } from '@hugeicons/core-free-icons/McpServerIcon';
 export { default as PlugIcon } from '@hugeicons/core-free-icons/Plug01Icon';
