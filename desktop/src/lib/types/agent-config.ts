@@ -2,13 +2,20 @@
 // `src/config/schema.ts`. Kept structural (not imported from the daemon)
 // because the desktop is a separately-built Tauri bundle.
 
+/** Canonical agent kind enum. Sync source: src/config/schema.ts → AGENT_KINDS. Kept in sync by src/config/agent-config-sync.test.ts. */
 export const AGENT_KINDS = [
-	'primary',
+	'orchestrator',
 	'planner',
 	'executor',
 	'researcher',
-	'reviewer',
-	'background',
+	'explorer',
+	'verifier',
+	'debugger',
+	'tester',
+	'writer',
+	'librarian',
+	'default',
+	'custom',
 ] as const;
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
@@ -32,21 +39,13 @@ export interface AgentBehavior {
 	model?: string;
 	temperature?: number;
 	topP?: number;
-	maxTokens?: number;
 	permissionMode?: PermissionMode;
 	workflowMode?: WorkflowMode;
 	workflowDepth?: WorkflowDepth;
 	autopilot?: boolean;
 }
 
-export interface AgentLimits {
-	maxIterations: number;
-	timeoutMs: number;
-	maxConcurrency: number;
-}
-
 export interface ToolPolicy {
-	mode: ToolMode;
 	allowedTools?: string[];
 	deniedTools?: string[];
 	perToolApproval?: Record<string, PerToolDecision>;
@@ -65,7 +64,6 @@ export interface AgentProfile {
 	description?: string;
 	enabled: boolean;
 	behavior: AgentBehavior;
-	limits: AgentLimits;
 	tools: ToolPolicy;
 }
 
@@ -80,7 +78,7 @@ export type ConfigLayer = 'global' | 'project' | 'override';
  * Flattened per-field layer attribution map.
  *
  * Keys are dotted field paths matching the nested structure of
- * `AgentProfile` (e.g. `"behavior.temperature"`, `"limits.maxIterations"`).
+ * `AgentProfile` (e.g. `"behavior.temperature"`, `"behavior.model"`).
  * Values indicate which layer won for that field.
  */
 export type AgentConfigSources = Record<string, ConfigLayer>;
@@ -107,9 +105,6 @@ export interface AgentRunOverride {
 	model?: string;
 	temperature?: number;
 	topP?: number;
-	maxTokens?: number;
-	maxIterations?: number;
-	timeoutMs?: number;
 }
 
 /** Default empty override (no fields set). */
