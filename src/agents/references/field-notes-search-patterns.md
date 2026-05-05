@@ -1,9 +1,9 @@
 ---
-id: research-search-patterns
-title: Research Search Patterns
-description: Effective query patterns for research_search and research_grep in the Elefant Research Base.
+id: field-notes-search-patterns
+title: Field Notes Search Patterns
+description: Effective query patterns for field_notes_search and field_notes_grep in the Elefant Field Notes.
 tags:
-  - research-base
+  - field-notes
   - researcher
   - workflow
 audience:
@@ -12,20 +12,20 @@ audience:
 version: 1.0.0
 ---
 
-# Research Search Patterns
+# Field Notes Search Patterns
 
-Efficient search is the difference between finding the right research in one call and burning context on irrelevant results. This reference covers query construction, mode selection, and tool choice for the Elefant Research Base.
+Efficient search is the difference between finding the right research in one call and burning context on irrelevant results. This reference covers query construction, mode selection, and tool choice for the Elefant Field Notes.
 
 ## Choosing the Right Tool
 
 | Scenario | Use |
 |----------|-----|
-| "I know what I'm looking for but not where" | `research_search` (hybrid) |
-| "Find every document that mentions `sqlite-vec`" | `research_grep` with pattern |
-| "Show me everything in the Decisions section" | `research_index` with `section: 03-decisions` |
-| "What was added this week?" | `research_index` with `recencyDays: 7` |
-| "I have the UUID from a prior search result" | `research_read` with `id` |
-| "I clicked a `research://` link" | `research_read` with `link` |
+| "I know what I'm looking for but not where" | `field_notes_search` (hybrid) |
+| "Find every document that mentions `sqlite-vec`" | `field_notes_grep` with pattern |
+| "Show me everything in the Decisions section" | `field_notes_index` with `section: 03-decisions` |
+| "What was added this week?" | `field_notes_index` with `recencyDays: 7` |
+| "I have the UUID from a prior search result" | `field_notes_read` with `id` |
+| "I clicked a `fieldnotes://` link" | `field_notes_read` with `link` |
 
 ## Search Modes
 
@@ -51,7 +51,7 @@ Best for exact term matching, identifiers, and code symbols.
 
 **When to use:**
 - Finding specific terms: "sqlite-vec", "RRF", "Reciprocal Rank Fusion"
-- Searching for code-level patterns: "assertInsideResearchBase", "serializeResearchLink"
+- Searching for code-level patterns: "assertInsideFieldNotes", "serializeFieldNotesLink"
 - When the embedding provider is `disabled`
 
 **When to avoid:**
@@ -80,13 +80,13 @@ Good: `how does Elefant handle conversation history across sessions`
 
 ### Use Domain Terms
 
-The Research Base is indexed by the same terminology used in the codebase. Queries using Elefant-specific terms match more precisely:
+The Field Notes is indexed by the same terminology used in the codebase. Queries using Elefant-specific terms match more precisely:
 
 Bad: `knowledge storage`  
-Good: `research_write frontmatter schema confidence levels`
+Good: `field_notes_write frontmatter schema confidence levels`
 
 Bad: `tool for searching files`  
-Good: `research_grep ripgrep pattern matching research base`
+Good: `field_notes_grep ripgrep pattern matching field notes`
 
 ### Add Context for Semantic Queries
 
@@ -103,62 +103,62 @@ Good: `document chunking strategy for embedding search results`
 Narrow results before the search runs by scoping to a section:
 
 ```
-research_search({ query: "authentication middleware pattern", section: "03-decisions" })
+field_notes_search({ query: "authentication middleware pattern", section: "03-decisions" })
 ```
 
 Post-filter with tags for documents you know are tagged:
 
 ```
-research_search({ query: "memory", tags: ["research-base", "architecture"] })
+field_notes_search({ query: "memory", tags: ["field-notes", "architecture"] })
 ```
 
-## `research_grep` Patterns
+## `field_notes_grep` Patterns
 
-Use `research_grep` when you need regex-level precision that semantic search cannot provide.
+Use `field_notes_grep` when you need regex-level precision that semantic search cannot provide.
 
 ### Finding Code References
 
 ```
-research_grep({ pattern: "ResearchStore\\.open" })
-→ Finds every document that references the ResearchStore.open() call
+field_notes_grep({ pattern: "FieldNotesStore\\.open" })
+→ Finds every document that references the FieldNotesStore.open() call
 ```
 
 ### Finding Configuration Values
 
 ```
-research_grep({ pattern: "maxFiles.*20" })
+field_notes_grep({ pattern: "maxFiles.*20" })
 → Finds documents mentioning the maxFiles default of 20
 ```
 
 ### Section-Scoped Grep
 
 ```
-research_grep({ pattern: "confidence.*high", section: "03-decisions" })
+field_notes_grep({ pattern: "confidence.*high", section: "03-decisions" })
 → Finds high-confidence claims only in the Decisions section
 ```
 
 ### File-Type Filtering
 
 ```
-research_grep({ pattern: "TODO|FIXME|HACK", include: "*.md" })
+field_notes_grep({ pattern: "TODO|FIXME|HACK", include: "*.md" })
 → Finds marked todos across all research documents
 ```
 
-### When to Use `research_index` Instead
+### When to Use `field_notes_index` Instead
 
-`research_index` is not a search tool — it's a browser. Use it when you want to see the structure, not find specific content:
+`field_notes_index` is not a search tool — it's a browser. Use it when you want to see the structure, not find specific content:
 
-- "Show me everything in `02-tech`" → `research_index({ section: "02-tech" })`
-- "What's new this month?" → `research_index({ recencyDays: 30, output: "flat" })`
-- "Find all documents tagged `vector-search`" → `research_index({ tag: "vector-search" })`
+- "Show me everything in `02-tech`" → `field_notes_index({ section: "02-tech" })`
+- "What's new this month?" → `field_notes_index({ recencyDays: 30, output: "flat" })`
+- "Find all documents tagged `vector-search`" → `field_notes_index({ tag: "vector-search" })`
 
 ## Example Queries with Expected Results
 
 | Query | Mode | Why |
 |-------|------|-----|
-| "Research Base frontmatter schema" | hybrid | Natural language, conceptual — semantic component helps |
+| "Field Notes frontmatter schema" | hybrid | Natural language, conceptual — semantic component helps |
 | "sqlite-vec benchmark" | keyword | Specific technology name — exact match preferred |
-| "research_write PERMISSION_DENIED" | keyword | Error code lookup — must match exactly |
+| "field_notes_write PERMISSION_DENIED" | keyword | Error code lookup — must match exactly |
 | "How do agents save findings?" | semantic | Conceptual query — terminology may vary across docs |
 | "Section 99-scratch validation rules" | hybrid | Mix of specific terms and conceptual intent |
 
@@ -167,4 +167,4 @@ research_grep({ pattern: "TODO|FIXME|HACK", include: "*.md" })
 - **Single-word queries without context**: `"database"` matches too broadly. Add qualifiers: `"vector database embedding sqlite-vec"`.
 - **Overly long queries**: Queries over ~100 words dilute relevance. Focus on 2–5 key terms.
 - **Ignoring `minScore`**: If you get too many low-quality results, add `minScore: 0.3` to filter noise.
-- **Using `research_grep` for conceptual searches**: "How does the resolver work?" is a `research_search` query, not a regex pattern.
+- **Using `field_notes_grep` for conceptual searches**: "How does the resolver work?" is a `field_notes_search` query, not a regex pattern.

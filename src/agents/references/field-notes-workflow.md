@@ -1,9 +1,9 @@
 ---
-id: research-base-workflow
-title: Research Base Workflow
-description: How to use research_search, research_read, research_write, research_index, and research_grep tools effectively.
+id: field-notes-workflow
+title: Field Notes Workflow
+description: How to use field_notes_search, field_notes_read, field_notes_write, field_notes_index, and field_notes_grep tools effectively.
 tags:
-  - research-base
+  - field-notes
   - researcher
   - writer
   - workflow
@@ -14,32 +14,32 @@ audience:
 version: 1.0.0
 ---
 
-# Research Base Workflow
+# Field Notes Workflow
 
-The Research Base is the project's knowledge repository. Five tools provide read, write, search, and browse access. This reference covers when and how to use each tool.
+The Field Notes is the project's knowledge repository. Five tools provide read, write, search, and browse access. This reference covers when and how to use each tool.
 
 ## Tool Summary
 
 | Tool | Purpose | Who Can Write |
 |------|---------|---------------|
-| `research_search` | Semantic/hybrid/keyword search | All agents (read-only) |
-| `research_grep` | Ripgrep pattern matching within documents | All agents (read-only) |
-| `research_read` | Read a file by ID, path, or `research://` link | All agents (read-only) |
-| `research_write` | Write or update a file; enforces frontmatter | `researcher`, `writer`, `librarian` |
-| `research_index` | List/browse by section, tag, or recency | All agents (read-only) |
+| `field_notes_search` | Semantic/hybrid/keyword search | All agents (read-only) |
+| `field_notes_grep` | Ripgrep pattern matching within documents | All agents (read-only) |
+| `field_notes_read` | Read a file by ID, path, or `fieldnotes://` link | All agents (read-only) |
+| `field_notes_write` | Write or update a file; enforces frontmatter | `researcher`, `writer`, `librarian` |
+| `field_notes_index` | List/browse by section, tag, or recency | All agents (read-only) |
 
-## When to Write to Research Base vs. Memory
+## When to Write to Field Notes vs. Memory
 
-| Write to Research Base | Write to Memory |
+| Write to Field Notes | Write to Memory |
 |------------------------|-----------------|
 | Primary-source finding | Ephemeral decision log |
 | Comparison or analysis | Quick observation |
 | Architecture decision record | Session state tracking |
 | Reference summary worth citing later | Temporary context |
 
-Rule of thumb: If another agent should cite your finding in a future session, it belongs in the Research Base. If it's relevant only to the current workflow, use memory.
+Rule of thumb: If another agent should cite your finding in a future session, it belongs in the Field Notes. If it's relevant only to the current workflow, use memory.
 
-## Writing: `research_write`
+## Writing: `field_notes_write`
 
 Only `researcher`, `writer`, and `librarian` agents can write. Other agents receive a `PERMISSION_DENIED` error.
 
@@ -47,7 +47,7 @@ Only `researcher`, `writer`, and `librarian` agents can write. Other agents rece
 
 | Parameter | Type | Notes |
 |-----------|------|-------|
-| `path` | `string` | Relative path from `.elefant/markdown-db/`, e.g. `02-tech/my-notes.md` |
+| `path` | `string` | Relative path from `.elefant/field-notes/`, e.g. `02-tech/my-notes.md` |
 | `title` | `string` | Document title (1–200 chars) |
 | `summary` | `string` | Concise summary for indexes and search results (1–500 chars) |
 | `body` | `string` | Full markdown body without frontmatter |
@@ -60,7 +60,7 @@ Only `researcher`, `writer`, and `librarian` agents can write. Other agents rece
 | `tags` | `string[]` | `[]` | String tags for filtering and browsing |
 | `sources` | `string[]` | `[]` | Source URLs or citations |
 | `confidence` | `'high' \| 'medium' \| 'low'` | `'medium'` | Confidence level |
-| `workflow` | `string` | — | Workflow slug for `research://` links |
+| `workflow` | `string` | — | Workflow slug for `fieldnotes://` links |
 | `id` | `string` | Auto-generated | Existing UUID to preserve on update |
 
 ### Update Behaviour
@@ -72,9 +72,9 @@ When `path` matches an existing file, frontmatter is merged: the existing `id` a
 - `section` must match the first path segment. Writing `02-tech/foo.md` with `section: 03-decisions` is rejected.
 - `99-scratch/` paths skip strict frontmatter validation — any section value is accepted.
 
-## Searching: `research_search`
+## Searching: `field_notes_search`
 
-Use `research_search` for finding documents by meaning or keyword.
+Use `field_notes_search` for finding documents by meaning or keyword.
 
 ### Parameters
 
@@ -99,18 +99,18 @@ Each result includes:
 
 | Field | Description |
 |-------|-------------|
-| `path` | Relative path from `.elefant/markdown-db/` |
+| `path` | Relative path from `.elefant/field-notes/` |
 | `section` | Section directory |
 | `title` | Document title from frontmatter |
 | `summary` | Summary from frontmatter |
 | `score` | Normalised relevance score (0–1) |
 | `snippet` | Context window around the matching sentence |
 | `frontmatter` | Full parsed frontmatter object |
-| `research_link` | Clickable `research://` URI |
+| `fieldnotes_link` | Clickable `fieldnotes://` URI |
 
-## Pattern Matching: `research_grep`
+## Pattern Matching: `field_notes_grep`
 
-Use `research_grep` for regex-based search within research documents. It delegates to the system's `ripgrep` binary with scope fixed to `.elefant/markdown-db/`.
+Use `field_notes_grep` for regex-based search within research documents. It delegates to the system's `ripgrep` binary with scope fixed to `.elefant/field-notes/`.
 
 ### Parameters
 
@@ -118,7 +118,7 @@ Use `research_grep` for regex-based search within research documents. It delegat
 |-----------|------|---------|-------------|
 | `pattern` | `string` (required) | — | Regex pattern to search for |
 | `section` | `string` | — | Limit to a specific section directory |
-| `include` | `string` | — | File glob pattern within the research base |
+| `include` | `string` | — | File glob pattern within the field notes |
 | `maxFiles` | `number` | 20 | Maximum unique files to return |
 
 ### Return Shape
@@ -130,7 +130,7 @@ Use `research_grep` for regex-based search within research documents. It delegat
       "path": "02-tech/vector-search.md",
       "section": "02-tech",
       "title": "Vector Search Comparison",
-      "research_link": "research://_/02-tech/vector-search.md",
+      "fieldnotes_link": "fieldnotes://_/02-tech/vector-search.md",
       "matches": [
         { "line": 42, "snippet": "sqlite-vec outperforms pgvector by 3x" }
       ],
@@ -141,17 +141,17 @@ Use `research_grep` for regex-based search within research documents. It delegat
 }
 ```
 
-## Reading: `research_read`
+## Reading: `field_notes_read`
 
-Use `research_read` to read a specific file. Provide exactly one of `id`, `path`, or `link`.
+Use `field_notes_read` to read a specific file. Provide exactly one of `id`, `path`, or `link`.
 
 ### Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `id` | `string` | Frontmatter UUID (requires store/DB lookup) |
-| `path` | `string` | Relative path from `.elefant/markdown-db/` |
-| `link` | `string` | `research://` URI |
+| `path` | `string` | Relative path from `.elefant/field-notes/` |
+| `link` | `string` | `fieldnotes://` URI |
 | `anchor` | `string` | Optional heading slug to extract a specific section |
 
 ### Return Shape
@@ -162,12 +162,12 @@ Use `research_read` to read a specific file. Provide exactly one of `id`, `path`
 | `frontmatter` | Parsed frontmatter, or `null` for scratch/lenient reads |
 | `body` | Full markdown body after frontmatter stripping |
 | `anchorBody` | Extracted section when matching heading found, or `undefined` |
-| `research_link` | `research://` URI for this file |
+| `fieldnotes_link` | `fieldnotes://` URI for this file |
 | `wordCount` | Whitespace-delimited word count of body text |
 
-## Browsing: `research_index`
+## Browsing: `field_notes_index`
 
-Use `research_index` to browse the Research Base structure without a search query.
+Use `field_notes_index` to browse the Field Notes structure without a search query.
 
 ### Parameters
 
@@ -181,33 +181,33 @@ Use `research_index` to browse the Research Base structure without a search quer
 
 ### Output Formats
 
-- **tree**: Grouped by section in canonical order (`00-index` through `99-scratch`), each with title, summary, tags, confidence, and a `research_link`.
+- **tree**: Grouped by section in canonical order (`00-index` through `99-scratch`), each with title, summary, tags, confidence, and a `fieldnotes_link`.
 - **flat**: Sorted by `updated` descending (most recent first).
 
 ## Citation Format
 
-When referencing a research finding in your response or handoff, emit a `research://` link:
+When referencing a research finding in your response or handoff, emit a `fieldnotes://` link:
 
 ```
-research://<workflow>/<section>/<filename>.md[#anchor]
+fieldnotes://<workflow>/<section>/<filename>.md[#anchor]
 ```
 
-- Use `_` as the workflow when the scope is project-wide: `research://_/02-tech/sqlite-vec.md`
-- These links are clickable in the Elefant client — they open the Research View at that file
-- Anchors are GitHub-style heading slugs (lowercase, kebab-case): `research://_/02-tech/foo.md#benchmark-results`
+- Use `_` as the workflow when the scope is project-wide: `fieldnotes://_/02-tech/sqlite-vec.md`
+- These links are clickable in the Elefant client — they open the Field Notes at that file
+- Anchors are GitHub-style heading slugs (lowercase, kebab-case): `fieldnotes://_/02-tech/foo.md#benchmark-results`
 
 ### Examples
 
 ```
-See research://_/03-decisions/vector-store-selection.md for the full decision record.
+See fieldnotes://_/03-decisions/vector-store-selection.md for the full decision record.
 
-Per the benchmarks in research://elefant-search/02-tech/embedding-providers.md#performance, bundled-cpu is sufficient for < 100K documents.
+Per the benchmarks in fieldnotes://elefant-search/02-tech/embedding-providers.md#performance, bundled-cpu is sufficient for < 100K documents.
 ```
 
 ## Writer Agent Index Maintenance
 
-The writer agent runs `research_index` after each wave and rewrites:
-- `.elefant/markdown-db/INDEX.md` — the top-level index
+The writer agent runs `field_notes_index` after each wave and rewrites:
+- `.elefant/field-notes/INDEX.md` — the top-level index
 - `00-index/README.md` — the section index
 
 Never manually edit these files if you are not the writer agent.

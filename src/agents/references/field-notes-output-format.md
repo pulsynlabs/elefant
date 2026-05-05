@@ -1,18 +1,18 @@
 ---
-id: research-output-format
-title: Research Output Format
-description: Conventions for writer agents outputting to the Elefant Research Base — structure, tone, citation format.
+id: field-notes-output-format
+title: Field Notes Output Format
+description: Conventions for writer agents outputting to the Elefant Field Notes — structure, tone, citation format.
 tags:
-  - research-base
+  - field-notes
   - writer
 audience:
   - writer
 version: 1.0.0
 ---
 
-# Research Output Format
+# Field Notes Output Format
 
-Writer agents are responsible for producing high-quality, citeable research documents in the Elefant Research Base. This reference defines the structural, tonal, and citation conventions that every writer agent must follow.
+Writer agents are responsible for producing high-quality, citeable field notes documents in the Elefant Field Notes. This reference defines the structural, tonal, and citation conventions that every writer agent must follow.
 
 ## Document Structure
 
@@ -105,7 +105,7 @@ For inline confidence markers, use parenthetical qualifiers:
 ```markdown
 sqlite-vec may support GPU-accelerated indexing in a future release (confidence: low).
 
-The RRF k=60 parameter appears optimal for research documents averaging
+The RRF k=60 parameter appears optimal for field notes documents averaging
 500–2000 words (confidence: speculative).
 ```
 
@@ -141,12 +141,12 @@ The `sources` array must contain only real, accessible resources you have review
 
 ### No GoopSpec Terminology
 
-The Research Base is an Elefant feature. Documents should reference Elefant's own tools, agent kinds, and concepts. Do not describe GoopSpec phases, waves, or spec-lock gates — those are foreign concepts in the Elefant system.
+The Field Notes is an Elefant feature. Documents should reference Elefant's own tools, agent kinds, and concepts. Do not describe GoopSpec phases, waves, or spec-lock gates — those are foreign concepts in the Elefant system.
 
 ## Formatting Rules
 
 - Use standard markdown links: `[text](path-or-url)`
-- Use `research://` URIs for cross-references to other research documents
+- Use `fieldnotes://` URIs for cross-references to other field notes documents
 - Use fenced code blocks with language tags for code snippets
 - Use tables for structured comparisons (but keep them narrow — max 4 columns)
 - Do not use `[[wikilinks]]` (Obsidian syntax)
