@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { researchBaseDir } from '../project/paths.ts';
-import { ResearchWatcher } from './watcher.ts';
+import { fieldNotesDir } from '../project/paths.ts';
+import { FieldNotesWatcher } from './watcher.ts';
 
 function tempProject(): string {
   return mkdtempSync(join(tmpdir(), 'elefant-indexer-'));
@@ -18,21 +18,21 @@ function wait(ms: number): Promise<void> {
 }
 
 function ensureBase(project: string): string {
-  const dir = join(researchBaseDir(project), '02-tech');
+  const dir = join(fieldNotesDir(project), '02-tech');
   mkdirSync(dir, { recursive: true });
   return dir;
 }
 
 const maybeTest = Bun.env.CI ? test.skip : test;
 
-describe('ResearchWatcher', () => {
+describe('FieldNotesWatcher', () => {
   maybeTest('debounces rapid writes into one change callback', async () => {
     const project = tempProject();
     try {
       const dir = ensureBase(project);
       const file = join(dir, 'debounce.md');
       const changed: string[] = [];
-      const watcher = new ResearchWatcher({
+      const watcher = new FieldNotesWatcher({
         projectPath: project,
         debounceMs: 40,
         onChanged: async (path) => { changed.push(path); },
@@ -58,7 +58,7 @@ describe('ResearchWatcher', () => {
       const dir = ensureBase(project);
       const file = join(dir, 'created.md');
       const changed: string[] = [];
-      const watcher = new ResearchWatcher({ projectPath: project, debounceMs: 30, onChanged: async (path) => { changed.push(path); }, onRemoved: async () => undefined });
+      const watcher = new FieldNotesWatcher({ projectPath: project, debounceMs: 30, onChanged: async (path) => { changed.push(path); }, onRemoved: async () => undefined });
       watcher.start();
       await wait(20);
       writeFileSync(file, 'created');
@@ -77,7 +77,7 @@ describe('ResearchWatcher', () => {
       const file = join(dir, 'removed.md');
       writeFileSync(file, 'remove me');
       const removed: string[] = [];
-      const watcher = new ResearchWatcher({ projectPath: project, debounceMs: 30, onChanged: async () => undefined, onRemoved: async (path) => { removed.push(path); } });
+      const watcher = new FieldNotesWatcher({ projectPath: project, debounceMs: 30, onChanged: async () => undefined, onRemoved: async (path) => { removed.push(path); } });
       watcher.start();
       await wait(20);
       unlinkSync(file);
@@ -95,7 +95,7 @@ describe('ResearchWatcher', () => {
       const dir = ensureBase(project);
       const file = join(dir, 'stopped.md');
       const changed: string[] = [];
-      const watcher = new ResearchWatcher({ projectPath: project, debounceMs: 30, onChanged: async (path) => { changed.push(path); }, onRemoved: async () => undefined });
+      const watcher = new FieldNotesWatcher({ projectPath: project, debounceMs: 30, onChanged: async (path) => { changed.push(path); }, onRemoved: async () => undefined });
       watcher.start();
       watcher.stop();
       writeFileSync(file, 'no callback');

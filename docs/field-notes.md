@@ -224,7 +224,7 @@ The `/v1/fieldnotes/status` endpoint reports:
 
 ## Agent Tools Reference
 
-All research tools are registered in `src/tools/registry.ts` and allow-listed per-agent in YAML configs.
+All Field Notes tools are registered in `src/tools/registry.ts` and allow-listed per-agent in YAML configs.
 
 ### `field_notes_search`
 
@@ -478,7 +478,7 @@ At ≤640 px (mobile breakpoint):
 | `/` | Focus search input |
 | `g r` | Focus reader pane |
 | `Escape` | Close mobile drawer (if open) |
-| `⌘K` (macOS) / `Ctrl+K` (Linux/Windows) | Open command palette → "Search Research" |
+| `⌘K` (macOS) / `Ctrl+K` (Linux/Windows) | Open command palette → "Search Field Notes" |
 
 ### Chat Integration
 
@@ -687,7 +687,7 @@ If you are working on a new Elefant project, use `.elefant/field-notes/` instead
 **Symptom:** Switching embedding providers in Settings causes an error.
 
 **Solution:**
-1. Check daemon logs for `research:` namespace errors
+1. Check daemon logs for `fieldnotes:` namespace errors
 2. Verify provider configuration (e.g., Ollama running at `http://localhost:11434`)
 3. Try switching to `disabled` mode (keyword-only) to isolate the issue
 4. If dimension mismatch, reindex is triggered automatically

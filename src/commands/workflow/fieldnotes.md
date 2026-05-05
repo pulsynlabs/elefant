@@ -1,4 +1,4 @@
-# /research
+# /fieldnotes
 
 **Description:** Dispatch the researcher agent on a specific topic. Saves findings to `.goopspec/<workflowId>/research/<topic-slug>.md` and logs the research decision to ADL.
 **Category:** Spec Mode
@@ -7,7 +7,7 @@
 When you need deep domain exploration before planning — technology tradeoffs, library comparisons, architectural patterns, or competitive analysis.
 
 ## Prerequisites
-- A topic must be provided as the command argument (e.g., `/research "WebSocket vs SSE for real-time events"`).
+- A topic must be provided as the command argument (e.g., `/fieldnotes "WebSocket vs SSE for real-time events"`).
 - A workflow should exist (or a new one is created for the research session).
 
 ## Process

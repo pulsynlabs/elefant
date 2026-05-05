@@ -100,7 +100,7 @@ describe('buildWorkflowSection', () => {
 
 		expect(result).toContain('Phase: research')
 		expect(result).toContain('Research unknowns')
-		expect(result).toContain('/research')
+		expect(result).toContain('/fieldnotes')
 		expect(result).toContain('skill')
 	})
 

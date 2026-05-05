@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Database } from 'bun:sqlite';
-import { researchIndexPath } from '../project/paths.js';
-import { ResearchStore, type UpsertDocumentInput } from './store.js';
+import { fieldNotesIndexPath } from '../project/paths.js';
+import { FieldNotesStore, type UpsertDocumentInput } from './store.js';
 
 function tempProject(): string {
   return mkdtempSync(join(tmpdir(), 'elefant-research-store-'));
@@ -34,28 +34,28 @@ function doc(overrides: Partial<UpsertDocumentInput> = {}): UpsertDocumentInput 
   };
 }
 
-function openStore(project: string): ResearchStore {
-  const result = ResearchStore.open(project);
+function openStore(project: string): FieldNotesStore {
+  const result = FieldNotesStore.open(project);
   expect(result.ok).toBe(true);
   if (result.ok === false) throw new Error(result.error.message);
   return result.data;
 }
 
-describe('ResearchStore', () => {
+describe('FieldNotesStore', () => {
   test('open creates the DB and initializes all schema objects', () => {
     const project = tempProject();
     const store = openStore(project);
     store.close();
 
-    const db = new Database(researchIndexPath(project));
+    const db = new Database(fieldNotesIndexPath(project));
     const tables = db
       .query("SELECT name FROM sqlite_master WHERE type IN ('table', 'trigger') ORDER BY name")
       .all()
       .map((row) => String((row as { name: string }).name));
-    expect(tables).toContain('research_documents');
-    expect(tables).toContain('research_chunks');
-    expect(tables).toContain('research_chunks_fts');
-    expect(tables).toContain('research_chunks_ai');
+    expect(tables).toContain('field_notes_documents');
+    expect(tables).toContain('field_notes_chunks');
+    expect(tables).toContain('field_notes_chunks_fts');
+    expect(tables).toContain('field_notes_chunks_ai');
     db.close();
     cleanup(project);
   });

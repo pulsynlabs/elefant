@@ -69,9 +69,9 @@ describe('fieldNotesHitsToCards', () => {
 
 	it('uses path when fieldnotes_link is absent', () => {
 		const cards = fieldNotesHitsToCards([
-			{ title: 'A', summary: 'B', path: '.elefant/markdown-db/foo.md' },
+			{ title: 'A', summary: 'B', path: '.elefant/field-notes/foo.md' },
 		]);
-		expect(cards[0]?.url).toBe('.elefant/markdown-db/foo.md');
+		expect(cards[0]?.url).toBe('.elefant/field-notes/foo.md');
 	});
 
 	it('truncates long summaries to 400 chars', () => {

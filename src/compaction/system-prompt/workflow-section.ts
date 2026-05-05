@@ -28,7 +28,7 @@ const PHASE_GUIDES: Record<string, PhaseGuide> = {
 	},
 	research: {
 		action: 'Research unknowns, compare alternatives, and document tradeoffs',
-		command: '/research',
+		command: '/fieldnotes',
 		tools: ['skill'],
 	},
 	specify: {

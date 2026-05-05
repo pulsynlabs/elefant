@@ -470,7 +470,7 @@ export function mountFieldNotesRoutes(app: Elysia, db: Database, deps: FieldNote
     const status = await getStatus(project.ctx);
     if (!status) {
       set.status = 500;
-      return errorBody('TOOL_EXECUTION_FAILED', 'Failed to get research status');
+      return errorBody('TOOL_EXECUTION_FAILED', 'Failed to get field notes status');
     }
     return status;
   });

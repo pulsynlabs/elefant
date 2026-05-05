@@ -28,7 +28,7 @@ const FALLBACK_COMMANDS: Command[] = [
 	{ trigger: '/pause', description: 'Save checkpoint and pause work' },
 	{ trigger: '/resume', description: 'Resume from a saved checkpoint' },
 	{ trigger: '/quick', description: 'Fast-track a small task without full workflow' },
-	{ trigger: '/research', description: 'Launch research for unknowns or risks' },
+	{ trigger: '/fieldnotes', description: 'Launch field notes research for unknowns or risks' },
 	{ trigger: '/debug', description: 'Debug with a systematic workflow' },
 	{ trigger: '/map-codebase', description: 'Map and understand an existing codebase' },
 	{ trigger: '/pr-review', description: 'Review a GitHub pull request end-to-end' },

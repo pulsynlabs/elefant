@@ -19,16 +19,17 @@ const EXPECTED_TRIGGERS = [
 	'/pause',
 	'/resume',
 	'/quick',
-	'/research',
+	'/fieldnotes',
 	'/debug',
 	'/map-codebase',
 	'/pr-review',
+	'/init',
 ] as const;
 
 describe('command-listing', () => {
 	describe('DEFAULT_COMMANDS', () => {
-		it('contains all 15 commands', () => {
-			expect(DEFAULT_COMMANDS).toHaveLength(15);
+		it('contains all 16 commands', () => {
+			expect(DEFAULT_COMMANDS).toHaveLength(16);
 		});
 
 		it('every entry has a trigger and description', () => {

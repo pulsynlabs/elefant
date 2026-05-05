@@ -2,10 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { researchBaseDir } from '../project/paths.ts';
+import { fieldNotesDir } from '../project/paths.ts';
 import { createEmbeddingProvider } from './embeddings/provider.ts';
 import { IndexerService } from './indexer.ts';
-import { ResearchStore } from './store.ts';
+import { FieldNotesStore } from './store.ts';
 import type { IndexProgressPhase } from './progress.ts';
 
 function tempProject(): string {
@@ -18,7 +18,7 @@ function cleanup(path: string): void {
 
 function ensureResearchDirs(project: string): void {
   for (const section of ['00-index', '01-domain', '02-tech', '03-decisions', '99-scratch']) {
-    mkdirSync(join(researchBaseDir(project), section), { recursive: true });
+    mkdirSync(join(fieldNotesDir(project), section), { recursive: true });
   }
 }
 
@@ -34,8 +34,8 @@ function disabledIndexer(project: string): IndexerService {
   return new IndexerService({ projectPath: project, projectId: 'project-1', provider: providerResult.data });
 }
 
-function openStore(project: string): ResearchStore {
-  const result = ResearchStore.open(project);
+function openStore(project: string): FieldNotesStore {
+  const result = FieldNotesStore.open(project);
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error(result.error.message);
   return result.data;
@@ -46,9 +46,9 @@ describe('IndexerService', () => {
     const project = tempProject();
     try {
       ensureResearchDirs(project);
-      writeFileSync(join(researchBaseDir(project), '01-domain', 'alpha.md'), markdown('11111111-1111-4111-8111-111111111111', '01-domain', 'Alpha', 'Alpha domain research.'));
-      writeFileSync(join(researchBaseDir(project), '02-tech', 'beta.md'), markdown('22222222-2222-4222-8222-222222222222', '02-tech', 'Beta', 'Beta technical research.'));
-      writeFileSync(join(researchBaseDir(project), '03-decisions', 'gamma.md'), markdown('33333333-3333-4333-8333-333333333333', '03-decisions', 'Gamma', 'Gamma decision research.'));
+      writeFileSync(join(fieldNotesDir(project), '01-domain', 'alpha.md'), markdown('11111111-1111-4111-8111-111111111111', '01-domain', 'Alpha', 'Alpha domain research.'));
+      writeFileSync(join(fieldNotesDir(project), '02-tech', 'beta.md'), markdown('22222222-2222-4222-8222-222222222222', '02-tech', 'Beta', 'Beta technical research.'));
+      writeFileSync(join(fieldNotesDir(project), '03-decisions', 'gamma.md'), markdown('33333333-3333-4333-8333-333333333333', '03-decisions', 'Gamma', 'Gamma decision research.'));
 
       const indexer = disabledIndexer(project);
       const phases: IndexProgressPhase[] = [];
@@ -86,9 +86,9 @@ describe('IndexerService', () => {
     const project = tempProject();
     try {
       ensureResearchDirs(project);
-      const alpha = join(researchBaseDir(project), '01-domain', 'alpha.md');
-      const beta = join(researchBaseDir(project), '02-tech', 'beta.md');
-      const gamma = join(researchBaseDir(project), '03-decisions', 'gamma.md');
+      const alpha = join(fieldNotesDir(project), '01-domain', 'alpha.md');
+      const beta = join(fieldNotesDir(project), '02-tech', 'beta.md');
+      const gamma = join(fieldNotesDir(project), '03-decisions', 'gamma.md');
       writeFileSync(alpha, markdown('11111111-1111-4111-8111-111111111111', '01-domain', 'Alpha', 'Alpha domain research.'));
       writeFileSync(beta, markdown('22222222-2222-4222-8222-222222222222', '02-tech', 'Beta', 'Beta technical research.'));
       writeFileSync(gamma, markdown('33333333-3333-4333-8333-333333333333', '03-decisions', 'Gamma', 'Gamma decision research.'));
@@ -121,7 +121,7 @@ describe('IndexerService', () => {
     try {
       ensureResearchDirs(project);
       const indexer = disabledIndexer(project);
-      const file = join(researchBaseDir(project), '02-tech', 'delta.md');
+      const file = join(fieldNotesDir(project), '02-tech', 'delta.md');
       writeFileSync(file, markdown('44444444-4444-4444-8444-444444444444', '02-tech', 'Delta', 'Delta notes.'));
 
       const indexed = await indexer.indexFile(file);
@@ -144,10 +144,10 @@ describe('IndexerService', () => {
     const project = tempProject();
     try {
       ensureResearchDirs(project);
-      writeFileSync(join(researchBaseDir(project), '01-domain', 'valid.md'), markdown('55555555-5555-4555-8555-555555555555', '01-domain', 'Valid', 'Valid notes.'));
-      writeFileSync(join(researchBaseDir(project), '01-domain', 'README.md'), markdown('66666666-6666-4666-8666-666666666666', '01-domain', 'Readme', 'Ignored.'));
-      writeFileSync(join(researchBaseDir(project), '99-scratch', 'scratch.md'), markdown('77777777-7777-4777-8777-777777777777', '99-scratch', 'Scratch', 'Ignored.'));
-      writeFileSync(join(researchBaseDir(project), '02-tech', 'huge.md'), markdown('88888888-8888-4888-8888-888888888888', '02-tech', 'Huge', 'x'.repeat(510 * 1024)));
+      writeFileSync(join(fieldNotesDir(project), '01-domain', 'valid.md'), markdown('55555555-5555-4555-8555-555555555555', '01-domain', 'Valid', 'Valid notes.'));
+      writeFileSync(join(fieldNotesDir(project), '01-domain', 'README.md'), markdown('66666666-6666-4666-8666-666666666666', '01-domain', 'Readme', 'Ignored.'));
+      writeFileSync(join(fieldNotesDir(project), '99-scratch', 'scratch.md'), markdown('77777777-7777-4777-8777-777777777777', '99-scratch', 'Scratch', 'Ignored.'));
+      writeFileSync(join(fieldNotesDir(project), '02-tech', 'huge.md'), markdown('88888888-8888-4888-8888-888888888888', '02-tech', 'Huge', 'x'.repeat(510 * 1024)));
 
       const result = await disabledIndexer(project).bulkIndex();
       expect(result.ok).toBe(true);
@@ -171,7 +171,7 @@ describe('IndexerService — uncovered lines', () => {
     const project = tempProject();
     try {
       ensureResearchDirs(project);
-      writeFileSync(join(researchBaseDir(project), '01-domain', 'alpha.md'), markdown('11111111-1111-4111-8111-111111111111', '01-domain', 'Alpha', 'Alpha content.'));
+      writeFileSync(join(fieldNotesDir(project), '01-domain', 'alpha.md'), markdown('11111111-1111-4111-8111-111111111111', '01-domain', 'Alpha', 'Alpha content.'));
 
       const indexer = disabledIndexer(project);
       const result = await indexer.bulkIndex();
@@ -188,8 +188,8 @@ describe('IndexerService — uncovered lines', () => {
     const project = tempProject();
     try {
       ensureResearchDirs(project);
-      writeFileSync(join(researchBaseDir(project), '01-domain', 'good.md'), markdown('11111111-1111-4111-8111-111111111111', '01-domain', 'Good', 'Good content.'));
-      writeFileSync(join(researchBaseDir(project), '02-tech', 'bad.md'), markdown('22222222-2222-4222-8222-222222222222', '02-tech', 'Bad', 'Bad content.'));
+      writeFileSync(join(fieldNotesDir(project), '01-domain', 'good.md'), markdown('11111111-1111-4111-8111-111111111111', '01-domain', 'Good', 'Good content.'));
+      writeFileSync(join(fieldNotesDir(project), '02-tech', 'bad.md'), markdown('22222222-2222-4222-8222-222222222222', '02-tech', 'Bad', 'Bad content.'));
 
       // Index first file successfully
       const indexer = disabledIndexer(project);
@@ -211,9 +211,9 @@ describe('IndexerService — uncovered lines', () => {
     try {
       ensureResearchDirs(project);
       // Create a scratch file that should be skipped
-      writeFileSync(join(researchBaseDir(project), '99-scratch', 'temp.md'), markdown('99999999-9999-4999-8999-999999999999', '99-scratch', 'Scratch', 'Skip me.'));
+      writeFileSync(join(fieldNotesDir(project), '99-scratch', 'temp.md'), markdown('99999999-9999-4999-8999-999999999999', '99-scratch', 'Scratch', 'Skip me.'));
       // Create a valid file that should be indexed
-      writeFileSync(join(researchBaseDir(project), '01-domain', 'valid.md'), markdown('cccccccc-cccc-4ccc-8ccc-cccccccccccc', '01-domain', 'Valid', 'Include me.'));
+      writeFileSync(join(fieldNotesDir(project), '01-domain', 'valid.md'), markdown('cccccccc-cccc-4ccc-8ccc-cccccccccccc', '01-domain', 'Valid', 'Include me.'));
 
       // Verify files are on disk before indexing
       const indexer = disabledIndexer(project);
@@ -231,7 +231,7 @@ describe('IndexerService — uncovered lines', () => {
     const project = tempProject();
     try {
       ensureResearchDirs(project);
-      const hugeFile = join(researchBaseDir(project), '02-tech', 'huge.md');
+      const hugeFile = join(fieldNotesDir(project), '02-tech', 'huge.md');
       writeFileSync(hugeFile, markdown('dddddddd-dddd-4ddd-8ddd-dddddddddddd', '02-tech', 'Huge', 'x'.repeat(510 * 1024)));
 
       const result = await disabledIndexer(project).bulkIndex();
@@ -262,7 +262,7 @@ describe('IndexerService — uncovered lines', () => {
     const project = tempProject();
     try {
       ensureResearchDirs(project);
-      const file = join(researchBaseDir(project), '02-tech', 'delta.md');
+      const file = join(fieldNotesDir(project), '02-tech', 'delta.md');
       writeFileSync(file, markdown('44444444-4444-4444-8444-444444444444', '02-tech', 'Delta', 'Delta notes.'));
 
       const indexer = disabledIndexer(project);

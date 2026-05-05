@@ -1,17 +1,17 @@
 import type { Elysia } from 'elysia';
 import type { ElefantWsServer } from '../transport/ws-server.ts';
 
-export const RESEARCH_WS_EVENT_TYPES = [
-  'research:indexed',
-  'research:provider-changed',
-  'research:reindex-progress',
+export const FIELD_NOTES_WS_EVENT_TYPES = [
+  'fieldnotes:indexed',
+  'fieldnotes:provider-changed',
+  'fieldnotes:reindex-progress',
 ] as const;
 
-export type ResearchWsEventType = (typeof RESEARCH_WS_EVENT_TYPES)[number];
+export type FieldNotesWsEventType = (typeof FIELD_NOTES_WS_EVENT_TYPES)[number];
 
-export const REGISTERED_WS_EVENT_TYPES = [...RESEARCH_WS_EVENT_TYPES] as const;
+export const REGISTERED_WS_EVENT_TYPES = [...FIELD_NOTES_WS_EVENT_TYPES] as const;
 
-export function isRegisteredWsEventType(event: string): event is ResearchWsEventType {
+export function isRegisteredWsEventType(event: string): event is FieldNotesWsEventType {
   return (REGISTERED_WS_EVENT_TYPES as readonly string[]).includes(event);
 }
 

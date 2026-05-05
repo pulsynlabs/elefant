@@ -10,7 +10,7 @@ import { fieldNotesDir } from '../project/paths.ts';
 import { ProgressEmitter } from '../fieldnotes/progress.ts';
 import type { SearchResult } from '../tools/field_notes_search/index.ts';
 import { mountFieldNotesRoutes } from './routes-fieldnotes.ts';
-import { RESEARCH_WS_EVENT_TYPES, isRegisteredWsEventType } from './routes-ws.ts';
+import { FIELD_NOTES_WS_EVENT_TYPES, isRegisteredWsEventType } from './routes-ws.ts';
 
 const frontmatter = `---
 id: 11111111-1111-4111-8111-111111111111
@@ -267,12 +267,12 @@ describe('mountFieldNotesRoutes', () => {
   });
 
   it('registers research event types for the WebSocket event channel', () => {
-    expect(RESEARCH_WS_EVENT_TYPES).toEqual([
-      'research:indexed',
-      'research:provider-changed',
-      'research:reindex-progress',
+    expect(FIELD_NOTES_WS_EVENT_TYPES).toEqual([
+      'fieldnotes:indexed',
+      'fieldnotes:provider-changed',
+      'fieldnotes:reindex-progress',
     ]);
-    expect(isRegisteredWsEventType('research:indexed')).toBe(true);
+    expect(isRegisteredWsEventType('fieldnotes:indexed')).toBe(true);
     expect(isRegisteredWsEventType('chat:message')).toBe(false);
   });
 });

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdirSync, writeFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getResearchStatus, type ResearchStatus } from './status.js';
-import { ResearchStore } from './store.js';
+import { getFieldNotesStatus, type ResearchStatus } from './status.js';
+import { FieldNotesStore } from './store.js';
 import type { EmbeddingProvider, EmbeddingProviderName } from './embeddings/provider.js';
 import type { HardwareProfile, RecommendedTier } from './hardware.js';
 
@@ -36,7 +36,7 @@ function createMockHardware(overrides?: Partial<HardwareProfile>): HardwareProfi
   };
 }
 
-describe('getResearchStatus', () => {
+describe('getFieldNotesStatus', () => {
   let tmpDir: string;
   let projectPath: string;
   let markdownDbDir: string;
@@ -44,7 +44,7 @@ describe('getResearchStatus', () => {
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'elefant-test-'));
     projectPath = tmpDir;
-    markdownDbDir = join(projectPath, '.elefant', 'markdown-db');
+    markdownDbDir = join(projectPath, '.elefant', 'field-notes');
     mkdirSync(markdownDbDir, { recursive: true });
   });
 
@@ -56,7 +56,7 @@ describe('getResearchStatus', () => {
     it('returns indexExists=false when no DB file exists', async () => {
       const provider = createMockProvider({ name: 'ollama', isLocal: true, dim: 384 });
       
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store: null,
@@ -77,7 +77,7 @@ describe('getResearchStatus', () => {
     it('returns correct provider info', async () => {
       const provider = createMockProvider({ name: 'ollama', isLocal: true, dim: 384 });
       
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store: null,
@@ -96,7 +96,7 @@ describe('getResearchStatus', () => {
     it('returns null hardware when not provided', async () => {
       const provider = createMockProvider({ name: 'ollama', isLocal: true, dim: 384 });
       
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store: null,
@@ -113,7 +113,7 @@ describe('getResearchStatus', () => {
 
   describe('populated store', () => {
     it('returns correct metrics from store', async () => {
-      const storeResult = ResearchStore.open(projectPath);
+      const storeResult = FieldNotesStore.open(projectPath);
       expect(storeResult.ok).toBe(true);
       if (!storeResult.ok) return;
       
@@ -148,7 +148,7 @@ describe('getResearchStatus', () => {
       ]);
       expect(chunksResult.ok).toBe(true);
 
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store,
@@ -172,7 +172,7 @@ describe('getResearchStatus', () => {
     it('returns vectorEnabled=false and embeddingDim=0', async () => {
       const provider = createMockProvider({ name: 'disabled', isLocal: true, dim: 0 });
       
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store: null,
@@ -190,7 +190,7 @@ describe('getResearchStatus', () => {
 
   describe('drift detection', () => {
     it('returns driftCount > 0 when files have mtime > lastIndexedAt', async () => {
-      const storeResult = ResearchStore.open(projectPath);
+      const storeResult = FieldNotesStore.open(projectPath);
       expect(storeResult.ok).toBe(true);
       if (!storeResult.ok) return;
       
@@ -237,7 +237,7 @@ describe('getResearchStatus', () => {
       // Modify the file after indexing
       writeFileSync(testFile, '# Modified Content');
 
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store,
@@ -253,7 +253,7 @@ describe('getResearchStatus', () => {
     });
 
     it('returns driftCount = 0 when all files are older than lastIndexedAt', async () => {
-      const storeResult = ResearchStore.open(projectPath);
+      const storeResult = FieldNotesStore.open(projectPath);
       expect(storeResult.ok).toBe(true);
       if (!storeResult.ok) return;
       
@@ -294,7 +294,7 @@ describe('getResearchStatus', () => {
         },
       ]);
 
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store,
@@ -316,7 +316,7 @@ describe('getResearchStatus', () => {
       const testFile = join(markdownDbDir, 'test.md');
       writeFileSync(testFile, '# Test Content');
 
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store: null,
@@ -341,7 +341,7 @@ describe('getResearchStatus', () => {
 
       const provider = createMockProvider({ name: 'ollama', isLocal: true, dim: 384 });
       
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store: null,
@@ -365,7 +365,7 @@ describe('getResearchStatus', () => {
 
       const provider = createMockProvider({ name: 'ollama', isLocal: true, dim: 384 });
       
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store: null,
@@ -388,7 +388,7 @@ describe('getResearchStatus', () => {
 
       const provider = createMockProvider({ name: 'ollama', isLocal: true, dim: 384 });
       
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store: null,
@@ -407,7 +407,7 @@ describe('getResearchStatus', () => {
     it('does not throw on invalid paths', async () => {
       const provider = createMockProvider({ name: 'ollama', isLocal: true, dim: 384 });
       
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath: '/nonexistent/path/that/does/not/exist',
         projectId: 'test-project',
         store: null,
@@ -429,7 +429,7 @@ describe('getResearchStatus', () => {
       const hardware = createMockHardware();
       const provider = createMockProvider({ name: 'openai', isLocal: false, dim: 1536 });
       
-      const result = await getResearchStatus({
+      const result = await getFieldNotesStatus({
         projectPath,
         projectId: 'test-project',
         store: null,

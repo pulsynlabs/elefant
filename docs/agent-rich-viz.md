@@ -1,7 +1,7 @@
 # Agent Rich Visualization
 
 The `visualize` tool lets the orchestrator agent inline-render premium
-visualization components (mermaid, tables, stat grids, research cards,
+visualization components (mermaid, tables, stat grids, field-notes cards,
 etc.) directly in the chat transcript. The full design lives under
 `.goopspec/feat-rich-viz/`; this document is the agent-facing guide.
 
@@ -58,7 +58,7 @@ const cards = fieldNotesHitsToCards(hits.results);
 await visualize({
   type: 'field-notes-card',
   title: 'Mermaid theming notes',
-  intent: 'Surface relevant prior research before answering',
+  intent: 'Surface relevant field notes before answering',
   data: { cards },
 });
 ```

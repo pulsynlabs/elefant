@@ -2,15 +2,15 @@ import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { researchBaseDir } from '../project/paths.ts';
+import { fieldNotesDir } from '../project/paths.ts';
 import { createEmbeddingProvider, type EmbeddingProvider } from './embeddings/provider.ts';
-import { ResearchStore } from './store.ts';
+import { FieldNotesStore } from './store.ts';
 import { IndexerService } from './indexer.ts';
 import { switchProvider } from './provider-switch.ts';
-import { getResearchStatus } from './status.ts';
-import { createResearchWriteTool } from '../tools/research_write/index.ts';
-import { createResearchSearchTool } from '../tools/research_search/index.ts';
-import { RESEARCH_SECTIONS } from '../project/paths.ts';
+import { getFieldNotesStatus } from './status.ts';
+import { createFieldNotesWriteTool } from '../tools/field_notes_write/index.ts';
+import { createFieldNotesSearchTool } from '../tools/field_notes_search/index.ts';
+import { FIELD_NOTES_SECTIONS } from '../project/paths.ts';
 
 /** Minimal context object used throughout the test. */
 const mockCtx = { agentName: 'researcher', projectPath: '', projectId: 'test-project' };
@@ -23,9 +23,9 @@ function cleanup(path: string): void {
   rmSync(path, { recursive: true, force: true });
 }
 
-function ensureResearchDirs(projectPath: string): void {
-  for (const section of RESEARCH_SECTIONS) {
-    const dir = join(researchBaseDir(projectPath), section);
+function ensureFieldNotesDirs(projectPath: string): void {
+  for (const section of FIELD_NOTES_SECTIONS) {
+    const dir = join(fieldNotesDir(projectPath), section);
     const { mkdirSync } = require('node:fs') as typeof import('node:fs');
     mkdirSync(dir, { recursive: true });
   }
@@ -61,16 +61,16 @@ function resolveSecondaryProvider(): EmbeddingProvider {
 
 describe('Research Base integration', () => {
   let projectPath: string;
-  let store: ResearchStore;
+  let store: FieldNotesStore;
   let provider: EmbeddingProvider;
   let providerMode: 'bundled-cpu' | 'disabled';
   let indexer: IndexerService;
 
   beforeAll(async () => {
     projectPath = tempProject();
-    ensureResearchDirs(projectPath);
+    ensureFieldNotesDirs(projectPath);
 
-    const storeResult = ResearchStore.open(projectPath);
+    const storeResult = FieldNotesStore.open(projectPath);
     if (!storeResult.ok) throw new Error('Failed to open store: ' + storeResult.error.message);
     store = storeResult.data;
 
@@ -90,7 +90,7 @@ describe('Research Base integration', () => {
   // ── Test 1: write files ─────────────────────────────────────────────────────
 
   test('writes 3 research files with distinct topics', async () => {
-    const writeTool = createResearchWriteTool({ projectPath, indexerService: indexer });
+    const writeTool = createFieldNotesWriteTool({ projectPath, indexerService: indexer });
 
     const results = await Promise.all([
       writeTool.execute({
@@ -101,7 +101,7 @@ describe('Research Base integration', () => {
         body: 'sqlite-vec is a vector search extension for SQLite that stores embeddings in a page-encoded format. It supports HNSW indexing for approximate nearest neighbour search. The extension loads as a SQLite run-time extension and exposes a SQL API for inserting, querying, and managing vector data. Chunked vectors are stored in virtual tables backed by in-memory or memory-mapped pages. The index supports filtering by metadata columns and can be combined with FTS5 for full-text search.',
         tags: ['sqlite', 'vector-db', 'embeddings'],
         confidence: 'high',
-        workflow: 'research-base-system',
+        workflow: 'field-notes-system',
       }, mockCtx),
 
       writeTool.execute({
@@ -112,7 +112,7 @@ describe('Research Base integration', () => {
         body: 'Transformers.js is an open-source library that brings transformer models to the browser and Node.js using ONNX Runtime. It achieves near-native performance by running inference in Web Workers and leveraging WebAssembly. The library ships with quantized models that work without a GPU. Supported tasks include text classification, named entity recognition, question answering, text generation, and embedding creation. Embedding outputs are returned as dense Float32 arrays suitable for vector store ingestion.',
         tags: ['embeddings', 'onnx', 'browser'],
         confidence: 'high',
-        workflow: 'research-base-system',
+        workflow: 'field-notes-system',
       }, mockCtx),
 
       writeTool.execute({
@@ -123,7 +123,7 @@ describe('Research Base integration', () => {
         body: 'We selected a provider abstraction that supports openai, ollama, lm-studio, vllm, google, and bundled ONNX models. The primary constraint is zero-config defaults: users should get working embeddings without an API key or external server. The bundled-cpu provider uses Transformers.js with quantized models stored in the agent binary. The bundled-gpu and bundled-large variants target machines with GPU memory headroom. The disabled provider stores no vectors and degrades search to keyword-only FTS5 matching.',
         tags: ['embeddings', 'architecture'],
         confidence: 'medium',
-        workflow: 'research-base-system',
+        workflow: 'field-notes-system',
       }, mockCtx),
     ]);
 
@@ -140,7 +140,7 @@ describe('Research Base integration', () => {
   // ── Test 2: hybrid search returns the most relevant hit ────────────────────
 
   test('hybrid search returns the most relevant hit', async () => {
-    const searchTool = createResearchSearchTool({ projectPath, store, embeddingProvider: provider });
+    const searchTool = createFieldNotesSearchTool({ projectPath, store, embeddingProvider: provider });
 
     // "sqlite" and "vector" are explicitly in the sqlite-vec document
     const result = await searchTool.execute({ query: 'sqlite vector', k: 3, mode: 'hybrid' }, mockCtx);
@@ -178,7 +178,7 @@ describe('Research Base integration', () => {
     // switchProvider deleted all chunks (dim 384 → 0 triggers requiresReindex=true).
     // Re-write the files so the store is populated for the keyword search.
     // Each write triggers an async reindex via the old indexer (bundled-cpu).
-    const writeTool = createResearchWriteTool({ projectPath, indexerService: indexer });
+    const writeTool = createFieldNotesWriteTool({ projectPath, indexerService: indexer });
     for (const [path, title, summary, body, tags] of [
       ['02-tech/sqlite-vec.md', 'sqlite-vec', 'sqlite vector db', 'sqlite-vec stores vector embeddings in SQLite using a page-encoded format.', ['sqlite', 'vector-db']],
       ['02-tech/transformers-js.md', 'Transformers.js', 'ONNX in browser', 'Transformers.js runs ONNX models in the browser via WebAssembly.', ['embeddings', 'onnx']],
@@ -194,7 +194,7 @@ describe('Research Base integration', () => {
     const initResult = await disabledProvider.init();
     expect(initResult.ok).toBe(true);
 
-    const searchTool = createResearchSearchTool({ projectPath, store, embeddingProvider: disabledProvider });
+    const searchTool = createFieldNotesSearchTool({ projectPath, store, embeddingProvider: disabledProvider });
 
     // Request semantic mode explicitly — should degrade to keyword
     const result = await searchTool.execute({ query: 'sqlite vector', k: 3, mode: 'semantic' }, mockCtx);
@@ -214,7 +214,7 @@ describe('Research Base integration', () => {
     expect(disabledProviderResult.ok).toBe(true);
     if (!disabledProviderResult.ok) return;
 
-    const statusResult = await getResearchStatus({
+    const statusResult = await getFieldNotesStatus({
       projectPath,
       projectId: 'test-project',
       store,

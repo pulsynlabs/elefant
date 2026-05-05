@@ -2,11 +2,11 @@ import { describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { assertInsideResearchBase } from './membership.js';
+import { assertInsideFieldNotes } from './membership.js';
 
 function setupProject(extraDirs?: string[]): string {
   const root = mkdtempSync(join(tmpdir(), 'elefant-membership-'));
-  const db = join(root, '.elefant', 'markdown-db');
+  const db = join(root, '.elefant', 'field-notes');
   mkdirSync(db, { recursive: true });
   if (extraDirs) {
     for (const d of extraDirs) {
@@ -20,15 +20,15 @@ function teardownProject(root: string): void {
   rmSync(root, { recursive: true, force: true });
 }
 
-describe('assertInsideResearchBase', () => {
+describe('assertInsideFieldNotes', () => {
   let projectRoot: string;
 
   test('accepts a valid .md file inside a section', () => {
     projectRoot = setupProject(['02-tech']);
-    const file = join(projectRoot, '.elefant', 'markdown-db', '02-tech', 'foo.md');
+    const file = join(projectRoot, '.elefant', 'field-notes', '02-tech', 'foo.md');
     writeFileSync(file, '# Test');
 
-    const result = assertInsideResearchBase(projectRoot, file);
+    const result = assertInsideFieldNotes(projectRoot, file);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data).toBe(realpathSync(file));
@@ -39,11 +39,11 @@ describe('assertInsideResearchBase', () => {
 
   test('accepts a path relative to project root', () => {
     projectRoot = setupProject(['02-tech']);
-    const relativeToProject = '.elefant/markdown-db/02-tech/foo.md';
-    const file = join(projectRoot, '.elefant', 'markdown-db', '02-tech', 'foo.md');
+    const relativeToProject = '.elefant/field-notes/02-tech/foo.md';
+    const file = join(projectRoot, '.elefant', 'field-notes', '02-tech', 'foo.md');
     writeFileSync(file, '# Test');
 
-    const result = assertInsideResearchBase(projectRoot, relativeToProject);
+    const result = assertInsideFieldNotes(projectRoot, relativeToProject);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data).toBe(realpathSync(file));
@@ -54,9 +54,9 @@ describe('assertInsideResearchBase', () => {
 
   test('rejects .. traversal escape', () => {
     projectRoot = setupProject();
-    const escapePath = join(projectRoot, '.elefant', 'markdown-db', '..', 'escape.md');
+    const escapePath = join(projectRoot, '.elefant', 'field-notes', '..', 'escape.md');
 
-    const result = assertInsideResearchBase(projectRoot, escapePath);
+    const result = assertInsideFieldNotes(projectRoot, escapePath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('PERMISSION_DENIED');
@@ -71,14 +71,14 @@ describe('assertInsideResearchBase', () => {
     const escapePath = join(
       projectRoot,
       '.elefant',
-      'markdown-db',
+      'field-notes',
       '02-tech',
       '..',
       '..',
       'escape.md',
     );
 
-    const result = assertInsideResearchBase(projectRoot, escapePath);
+    const result = assertInsideFieldNotes(projectRoot, escapePath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('PERMISSION_DENIED');
@@ -92,7 +92,7 @@ describe('assertInsideResearchBase', () => {
     const outside = join(tmpdir(), 'totally-outside.md');
     writeFileSync(outside, '# Nope');
 
-    const result = assertInsideResearchBase(projectRoot, outside);
+    const result = assertInsideFieldNotes(projectRoot, outside);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('PERMISSION_DENIED');
@@ -111,7 +111,7 @@ describe('assertInsideResearchBase', () => {
     const symlinkPath = join(
       projectRoot,
       '.elefant',
-      'markdown-db',
+      'field-notes',
       '02-tech',
       'evil-symlink.md',
     );
@@ -125,7 +125,7 @@ describe('assertInsideResearchBase', () => {
       return; // skip — test.environment doesn't support symlinks
     }
 
-    const result = assertInsideResearchBase(projectRoot, symlinkPath);
+    const result = assertInsideFieldNotes(projectRoot, symlinkPath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('PERMISSION_DENIED');
@@ -138,14 +138,14 @@ describe('assertInsideResearchBase', () => {
   test('rejects symlink inside base that escapes via .. relative symlink', () => {
     projectRoot = setupProject(['02-tech']);
 
-    // Create a symlink: .elefant/markdown-db/02-tech/esc -> ../../outside.md
+    // Create a symlink: .elefant/field-notes/02-tech/esc -> ../../outside.md
     const outsideTarget = join(projectRoot, 'outside.md');
     writeFileSync(outsideTarget, '# Outside');
 
     const symlinkPath = join(
       projectRoot,
       '.elefant',
-      'markdown-db',
+      'field-notes',
       '02-tech',
       'escape-link.md',
     );
@@ -159,7 +159,7 @@ describe('assertInsideResearchBase', () => {
       return;
     }
 
-    const result = assertInsideResearchBase(projectRoot, symlinkPath);
+    const result = assertInsideFieldNotes(projectRoot, symlinkPath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('PERMISSION_DENIED');
@@ -171,10 +171,10 @@ describe('assertInsideResearchBase', () => {
 
   test('rejects non-.md file outside 99-scratch/ when requireMarkdown=true', () => {
     projectRoot = setupProject(['02-tech']);
-    const file = join(projectRoot, '.elefant', 'markdown-db', '02-tech', 'data.json');
+    const file = join(projectRoot, '.elefant', 'field-notes', '02-tech', 'data.json');
     writeFileSync(file, '{"key": 1}');
 
-    const result = assertInsideResearchBase(projectRoot, file, {
+    const result = assertInsideFieldNotes(projectRoot, file, {
       requireMarkdown: true,
     });
     expect(result.ok).toBe(false);
@@ -188,12 +188,12 @@ describe('assertInsideResearchBase', () => {
 
   test('rejects non-.md file outside 99-scratch/ but relative path', () => {
     projectRoot = setupProject(['02-tech']);
-    const file = join(projectRoot, '.elefant', 'markdown-db', '02-tech', 'data.txt');
+    const file = join(projectRoot, '.elefant', 'field-notes', '02-tech', 'data.txt');
     writeFileSync(file, 'hello');
 
-    const result = assertInsideResearchBase(
+    const result = assertInsideFieldNotes(
       projectRoot,
-      '.elefant/markdown-db/02-tech/data.txt',
+      '.elefant/field-notes/02-tech/data.txt',
       { requireMarkdown: true },
     );
     expect(result.ok).toBe(false);
@@ -206,10 +206,10 @@ describe('assertInsideResearchBase', () => {
 
   test('accepts non-.md file inside 99-scratch/ when requireMarkdown=true', () => {
     projectRoot = setupProject(['99-scratch']);
-    const file = join(projectRoot, '.elefant', 'markdown-db', '99-scratch', 'notes.txt');
+    const file = join(projectRoot, '.elefant', 'field-notes', '99-scratch', 'notes.txt');
     writeFileSync(file, 'scratch notes');
 
-    const result = assertInsideResearchBase(projectRoot, file, {
+    const result = assertInsideFieldNotes(projectRoot, file, {
       requireMarkdown: true,
     });
     expect(result.ok).toBe(true);
@@ -219,10 +219,10 @@ describe('assertInsideResearchBase', () => {
 
   test('accepts .py file inside 99-scratch/ when requireMarkdown=true', () => {
     projectRoot = setupProject(['99-scratch']);
-    const file = join(projectRoot, '.elefant', 'markdown-db', '99-scratch', 'script.py');
+    const file = join(projectRoot, '.elefant', 'field-notes', '99-scratch', 'script.py');
     writeFileSync(file, 'print("ok")');
 
-    const result = assertInsideResearchBase(projectRoot, file, {
+    const result = assertInsideFieldNotes(projectRoot, file, {
       requireMarkdown: true,
     });
     expect(result.ok).toBe(true);
@@ -232,10 +232,10 @@ describe('assertInsideResearchBase', () => {
 
   test('accepts .md file inside 99-scratch/ when requireMarkdown=true', () => {
     projectRoot = setupProject(['99-scratch']);
-    const file = join(projectRoot, '.elefant', 'markdown-db', '99-scratch', 'draft.md');
+    const file = join(projectRoot, '.elefant', 'field-notes', '99-scratch', 'draft.md');
     writeFileSync(file, '# Draft');
 
-    const result = assertInsideResearchBase(projectRoot, file, {
+    const result = assertInsideFieldNotes(projectRoot, file, {
       requireMarkdown: true,
     });
     expect(result.ok).toBe(true);
@@ -248,13 +248,13 @@ describe('assertInsideResearchBase', () => {
     const file = join(
       projectRoot,
       '.elefant',
-      'markdown-db',
+      'field-notes',
       '05-references',
       'ref.md',
     );
     writeFileSync(file, '# Ref');
 
-    const result = assertInsideResearchBase(projectRoot, file, {
+    const result = assertInsideFieldNotes(projectRoot, file, {
       requireMarkdown: true,
     });
     expect(result.ok).toBe(true);
@@ -264,10 +264,10 @@ describe('assertInsideResearchBase', () => {
 
   test('accepts non-.md file when requireMarkdown is not set', () => {
     projectRoot = setupProject(['02-tech']);
-    const file = join(projectRoot, '.elefant', 'markdown-db', '02-tech', 'data.json');
+    const file = join(projectRoot, '.elefant', 'field-notes', '02-tech', 'data.json');
     writeFileSync(file, '{}');
 
-    const result = assertInsideResearchBase(projectRoot, file);
+    const result = assertInsideFieldNotes(projectRoot, file);
     expect(result.ok).toBe(true);
 
     teardownProject(projectRoot);
@@ -275,9 +275,9 @@ describe('assertInsideResearchBase', () => {
 
   test('rejects candidate that is exactly the research base directory', () => {
     projectRoot = setupProject();
-    const basePath = join(projectRoot, '.elefant', 'markdown-db');
+    const basePath = join(projectRoot, '.elefant', 'field-notes');
 
-    const result = assertInsideResearchBase(projectRoot, basePath);
+    const result = assertInsideFieldNotes(projectRoot, basePath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('VALIDATION_ERROR');
@@ -290,7 +290,7 @@ describe('assertInsideResearchBase', () => {
   test('rejects empty string candidate', () => {
     projectRoot = setupProject();
 
-    const result = assertInsideResearchBase(projectRoot, '');
+    const result = assertInsideFieldNotes(projectRoot, '');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('VALIDATION_ERROR');
@@ -303,7 +303,7 @@ describe('assertInsideResearchBase', () => {
   test('rejects whitespace-only candidate', () => {
     projectRoot = setupProject();
 
-    const result = assertInsideResearchBase(projectRoot, '   ');
+    const result = assertInsideFieldNotes(projectRoot, '   ');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('VALIDATION_ERROR');
@@ -321,7 +321,7 @@ describe('assertInsideResearchBase', () => {
     writeFileSync(outsideTarget, '# Outside');
 
     // Create a real dir inside base, then symlink it outside
-    const dirInside = join(projectRoot, '.elefant', 'markdown-db', '02-tech');
+    const dirInside = join(projectRoot, '.elefant', 'field-notes', '02-tech');
     mkdirSync(dirInside, { recursive: true });
 
     const symlinkPath = join(dirInside, 'escape.md');
@@ -334,7 +334,7 @@ describe('assertInsideResearchBase', () => {
       return;
     }
 
-    const result = assertInsideResearchBase(projectRoot, symlinkPath);
+    const result = assertInsideFieldNotes(projectRoot, symlinkPath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('PERMISSION_DENIED');
@@ -347,9 +347,9 @@ describe('assertInsideResearchBase', () => {
   test('accepts a not-yet-existing file path inside the base', () => {
     projectRoot = setupProject(['02-tech']);
     // File doesn't exist yet but the parent directory does
-    const candidate = join(projectRoot, '.elefant', 'markdown-db', '02-tech', 'future.md');
+    const candidate = join(projectRoot, '.elefant', 'field-notes', '02-tech', 'future.md');
 
-    const result = assertInsideResearchBase(projectRoot, candidate);
+    const result = assertInsideFieldNotes(projectRoot, candidate);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data).toBe(resolve(candidate));
@@ -364,14 +364,14 @@ describe('assertInsideResearchBase', () => {
     const candidate = join(
       projectRoot,
       '.elefant',
-      'markdown-db',
+      'field-notes',
       '02-tech',
       '..',
       '..',
       'new-escape.md',
     );
 
-    const result = assertInsideResearchBase(projectRoot, candidate);
+    const result = assertInsideFieldNotes(projectRoot, candidate);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('PERMISSION_DENIED');
@@ -380,15 +380,15 @@ describe('assertInsideResearchBase', () => {
     teardownProject(projectRoot);
   });
 
-  test('rejects path with .elefant/markdown-db-evil prefix attack', () => {
+  test('rejects path with .elefant/field-notes-evil prefix attack', () => {
     projectRoot = setupProject(['02-tech']);
     // Create an evil-suffixed directory to verify prefix+sep check
-    const evilDir = join(projectRoot, '.elefant', 'markdown-db-evil');
+    const evilDir = join(projectRoot, '.elefant', 'field-notes-evil');
     mkdirSync(evilDir, { recursive: true });
     const evilFile = join(evilDir, 'payload.md');
     writeFileSync(evilFile, '# Attack');
 
-    const result = assertInsideResearchBase(projectRoot, evilFile);
+    const result = assertInsideFieldNotes(projectRoot, evilFile);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('PERMISSION_DENIED');

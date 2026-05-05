@@ -3,7 +3,7 @@ import { ok, err } from '../types/result.ts';
 import type { Result } from '../types/result.ts';
 import type { ElefantError } from '../types/errors.ts';
 import type { EmbeddingProvider, EmbeddingProviderConfig, EmbedResult } from './embeddings/provider.ts';
-import type { ResearchStore } from './store.ts';
+import type { FieldNotesStore } from './store.ts';
 import type { IndexerService, IndexerOptions, BulkIndexSummary } from './indexer.ts';
 import { switchProvider, type ProviderSwitchedEvent } from './provider-switch.ts';
 
@@ -18,7 +18,7 @@ interface MockStoreState {
   clearAllEmbeddingsCalled: boolean;
 }
 
-function createMockStore(state: MockStoreState): ResearchStore {
+function createMockStore(state: MockStoreState): FieldNotesStore {
   return {
     getMaxEmbeddingDim: () => state.maxDim,
     totalChunks: () => state.chunkCount,
@@ -30,7 +30,7 @@ function createMockStore(state: MockStoreState): ResearchStore {
       state.clearAllEmbeddingsCalled = true;
       return ok<undefined>(undefined);
     },
-  } as unknown as ResearchStore;
+  } as unknown as FieldNotesStore;
 }
 
 function createMockProvider(name: string, dim: number): EmbeddingProvider {
@@ -119,7 +119,7 @@ describe('switchProvider', () => {
 
     // Event
     expect(emitted).not.toBeNull();
-    expect(emitted!.type).toBe('research:provider-changed');
+    expect(emitted!.type).toBe('fieldnotes:provider-changed');
     expect(emitted!.previousDim).toBe(0);
     expect(emitted!.newDim).toBe(0);
     expect(emitted!.requiresReindex).toBe(false);

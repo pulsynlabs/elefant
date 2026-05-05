@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { createLogger, researchLog, indexerLog, watcherLog, embeddingsLog, providerSwitchLog, routesLog } from './log.ts';
+import { createLogger, fieldNotesLog, indexerLog, watcherLog, embeddingsLog, providerSwitchLog, fieldNotesRoutesLog } from './log.ts';
 
 describe('log', () => {
   let infoSpy: string[] = [];
@@ -80,16 +80,42 @@ describe('log', () => {
       expect(errorSpy[0]).toMatch(/\[test:ns:error\] error message/);
     });
 
-    test('debug logs only when DEBUG includes research', () => {
+    test('debug logs only when DEBUG includes fieldnotes', () => {
       Bun.env.DEBUG = 'other';
       const log = createLogger('test:ns');
       log.debug('debug message');
       expect(debugSpy).toHaveLength(0);
 
-      Bun.env.DEBUG = 'research';
+      Bun.env.DEBUG = 'fieldnotes';
       log.debug('debug message 2');
       expect(debugSpy).toHaveLength(1);
       expect(debugSpy[0]).toMatch(/\[test:ns:debug\] debug message 2/);
+    });
+
+  describe('predefined loggers', () => {
+    test('fieldNotesLog uses fieldnotes namespace', () => {
+      fieldNotesLog.info('test');
+      expect(infoSpy[0]).toMatch(/\[fieldnotes:info\]/);
+    });
+
+    test('indexerLog uses fieldnotes:indexer namespace', () => {
+      indexerLog.info('test');
+      expect(infoSpy[0]).toMatch(/\[fieldnotes:indexer:info\]/);
+    });
+
+    test('watcherLog uses fieldnotes:watcher namespace', () => {
+      watcherLog.info('test');
+      expect(infoSpy[0]).toMatch(/\[fieldnotes:watcher:info\]/);
+    });
+
+    test('embeddingsLog uses fieldnotes:embeddings namespace', () => {
+      embeddingsLog.info('test');
+      expect(infoSpy[0]).toMatch(/\[fieldnotes:embeddings:info\]/);
+    });
+
+    test('providerSwitchLog uses fieldnotes:provider-switch namespace', () => {
+      providerSwitchLog.info('test');
+      expect(infoSpy[0]).toMatch(/\[fieldnotes:provider-switch:info\]/);
     });
 
     test('handles undefined data gracefully', () => {
@@ -101,8 +127,8 @@ describe('log', () => {
   });
 
   describe('predefined loggers', () => {
-    test('researchLog uses research namespace', () => {
-      researchLog.info('test');
+    test('fieldNotesLog uses research namespace', () => {
+      fieldNotesLog.info('test');
       expect(infoSpy[0]).toMatch(/\[research:info\]/);
     });
 
@@ -126,9 +152,9 @@ describe('log', () => {
       expect(infoSpy[0]).toMatch(/\[research:provider-switch:info\]/);
     });
 
-    test('routesLog uses research:routes namespace', () => {
-      routesLog.info('test');
-      expect(infoSpy[0]).toMatch(/\[research:routes:info\]/);
+    test('fieldNotesRoutesLog uses fieldnotes:routes namespace', () => {
+      fieldNotesRoutesLog.info('test');
+      expect(infoSpy[0]).toMatch(/\[fieldnotes:routes:info\]/);
     });
   });
 });
