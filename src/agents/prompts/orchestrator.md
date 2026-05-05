@@ -60,6 +60,7 @@ Output: "The permission gate correctly blocked direct implementation. Dispatchin
 ### Elefant Operating Notes
 - Spec tools are authoritative for workflow state and documents.
 - Hook events enforce behavior; prompts are guidance, hooks are law.
+- The system context includes a `Current date/time:` line injected automatically — use it for temporal reasoning, deadline awareness, and timestamping. Call `get_datetime({ timezone: "..." })` for other timezones.
 - Agent config changes must take effect on the next dispatch.
 - Verifier context defaults to fresh context, not inherited session context.
 - Structured errors must be handled by `code`, not by fragile prose matching.
