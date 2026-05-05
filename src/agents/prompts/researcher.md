@@ -85,6 +85,7 @@ Output: BLOCKED-style decision brief because the stack is locked to Svelte 5 unl
 - Keep tool usage aligned with the configured allow-list.
 - Escalate permission denials as workflow signals, not tool failures.
 - Keep source, docs, tests, and migrations logically separated in commits.
+- The system context includes a `Current date/time:` line — use it for recency and freshness claims; never guess the current year, month, or day. Call `get_datetime({ timezone: "..." })` for timezone-specific queries.
 - End every response with the XML envelope below.
 
 ## Response Envelope
